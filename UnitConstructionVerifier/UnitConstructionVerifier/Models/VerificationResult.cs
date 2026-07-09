@@ -23,9 +23,13 @@ namespace UnitConstructionVerifier.Models
         // Design Tracking Properties
         public string Description       { get; set; } = string.Empty;  // part description / title
 
-        /// <summary>True when MODEL_NUMBER == "091-30117-080" or Description contains "SUBFLOOR".</summary>
-        public bool IsSubFloor => ModelNumber.Trim() == "091-30117-080" || 
-                                  (!string.IsNullOrEmpty(Description) && Description.IndexOf("SUBFLOOR", System.StringComparison.OrdinalIgnoreCase) >= 0);
+        public string GetClassification()
+        {
+            return MaterialsConfig.GetPartClassification(ModelNumber, Description);
+        }
+
+        /// <summary>True when the part classification is "Sub-Floor".</summary>
+        public bool IsSubFloor => GetClassification() == "Sub-Floor";
     }
 
     /// <summary>All IPT parts found under an assembly, keyed by part number.</summary>

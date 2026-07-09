@@ -10,6 +10,7 @@ Guidelines for parsing, sorting, and validating Air Handling Unit (AHU) segment 
 - **Wall Thickness Dependency**: Casing specifications (skin material/gauge, liner material/gauge, insulation, paint) are side-specific (Top, Bottom, Left, Right, Front, Rear).
 - **Existence Check**: A side's configuration properties are only active if that side has a defined wall thickness (`WallThickness_* > 0` or similar). Ignore materials or gauges on sides with null or zero thickness, as they represent open/internal boundaries.
 - **Thickness Fallbacks**: If a segment does not specify local wall thicknesses, fall back to the skid's `nominalSurfaceThickness` casing thickness.
+- **Wall Channel Suffix Resolution (Non-Automating Parts)**: Specific wall channel parts and brackets (`091-30117-078`, `091-30117-048`, `091-30117-046`, and `091-30117-077`) do not scale or automate their thickness suffixes. When verifying these parts, strip any trailing thickness suffix (`2`, `3`, or `4`) from the expected channel material spec (e.g. comparing against `STL GALV` instead of `STL GALV3`) to prevent false mismatches.
 
 ## 3. Base Frame & Sub-Floor Part Classification & Verification
 - **Sub-Floor Classification**: Identify sub-floor sheets if the part's description contains `"SUBFLOOR"` (case-insensitive) or its model number is `"091-30117-080"`. Route them exclusively to the Sub-Floor Gauge/Material verification check.

@@ -12,6 +12,8 @@ namespace UnitConstructionVerifier.Models
         public static Dictionary<string, string> MaterialMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public static Dictionary<string, string> GaugeMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public static Dictionary<string, string> ThicknessMap { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static Dictionary<string, string> PartClassifications { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static List<PartRule> PartRules { get; } = new List<PartRule>();
 
         private static readonly List<string> DefaultGauges = new List<string>
         {
@@ -60,6 +62,60 @@ namespace UnitConstructionVerifier.Models
             GaugeMappings["0.1345"] = "10";
 
             ThicknessMap.Clear();
+
+            PartClassifications.Clear();
+            PartClassifications["091-30117-082"] = "Liner";
+            PartClassifications["091-30117-084"] = "Liner";
+            PartClassifications["091-30117-073"] = "Liner";
+            PartClassifications["091-30119-006"] = "Liner";
+            PartClassifications["091-30119-007"] = "Misc Trim";
+            PartClassifications["091-30117-083"] = "Skin";
+            PartClassifications["091-30117-081"] = "Skin";
+            PartClassifications["091-30117-177"] = "Skin";
+            PartClassifications["091-30117-186"] = "Structural Channel";
+            PartClassifications["091-30117-187"] = "Structural Channel";
+            PartClassifications["091-30117-188"] = "Structural Channel";
+            PartClassifications["091-30117-189"] = "Structural Channel";
+            PartClassifications["091-30117-066"] = "Base Accessory";
+            PartClassifications["091-30117-067"] = "Base Accessory";
+            PartClassifications["091-30117-190"] = "Base Accessory";
+            PartClassifications["091-30117-001"] = "Trim";
+            PartClassifications["091-30117-058"] = "Trim";
+            PartClassifications["091-30117-072"] = "Trim";
+            PartClassifications["091-30117-074"] = "Trim";
+            PartClassifications["091-30117-076"] = "Misc Trim";
+            PartClassifications["091-30117-011"] = "Misc Trim";
+            PartClassifications["091-30117-057"] = "Misc Trim";
+            PartClassifications["091-30117-049"] = "Misc Trim";
+            PartClassifications["091-30117-053"] = "Misc Trim";
+            PartClassifications["091-30117-022"] = "Misc Trim";
+            PartClassifications["091-30117-195"] = "Misc Trim";
+            PartClassifications["091-30117-196"] = "Misc Trim";
+            PartClassifications["091-30117-064"] = "Channel";
+            PartClassifications["091-30117-065"] = "Channel";
+            PartClassifications["091-30117-085"] = "Channel";
+            PartClassifications["091-30117-086"] = "Channel";
+            PartClassifications["091-30117-078"] = "Channel";
+            PartClassifications["091-30117-048"] = "Channel";
+            PartClassifications["091-30117-046"] = "Channel";
+            PartClassifications["091-30117-077"] = "Channel";
+            PartClassifications["091-30117-068"] = "Channel";
+            PartClassifications["091-30117-069"] = "Channel";
+            PartClassifications["091-30117-070"] = "Channel";
+            PartClassifications["091-30117-056"] = "Floor Sheet";
+            PartClassifications["091-30117-124"] = "Floor Sheet";
+            PartClassifications["091-30117-080"] = "Sub-Floor";
+            PartClassifications["091-30117-061"] = "Sub-Floor";
+            PartClassifications["091-30117-062"] = "Sub-Floor";
+            PartClassifications["091-30117-075"] = "Split Cover";
+            PartClassifications["091-30117-087"] = "Split Cover";
+            PartClassifications["091-30117-089"] = "Split Cover";
+            PartClassifications["091-30117-051"] = "Formed Channel";
+            PartClassifications["091-30117-054"] = "Perimeter Angle";
+            PartClassifications["091-30117-055"] = "Perimeter Angle";
+            PartClassifications["091-30117-079"] = "Perimeter Angle";
+
+            PartRules.Clear();
         }
 
         public static void Initialize()
@@ -105,6 +161,32 @@ namespace UnitConstructionVerifier.Models
                             foreach (var kvp in data.GaugeMappings)
                             {
                                 GaugeMappings[kvp.Key] = kvp.Value;
+                            }
+                        }
+                        if (data.PartClassifications != null)
+                        {
+                            PartClassifications.Clear();
+                            foreach (var kvp in data.PartClassifications)
+                            {
+                                PartClassifications[kvp.Key] = kvp.Value;
+                            }
+                        }
+                        if (data.PartRules != null)
+                        {
+                            PartRules.Clear();
+                            PartRules.AddRange(data.PartRules);
+
+                            // Auto-register any stock numbers declared in rules into the
+                            // PartClassifications table so stock-number lookup resolves them
+                            // before the description-keyword fallback is reached.
+                            foreach (var rule in PartRules)
+                            {
+                                if (rule.StockNumbers == null) continue;
+                                foreach (var sn in rule.StockNumbers)
+                                {
+                                    if (!string.IsNullOrWhiteSpace(sn))
+                                        PartClassifications[sn.Trim()] = rule.Classification;
+                                }
                             }
                         }
                     }
@@ -237,12 +319,158 @@ namespace UnitConstructionVerifier.Models
             return false;
         }
 
+        public static string GetPartClassification(string modelOrStockNumber, string description)
+        {
+            if (!string.IsNullOrWhiteSpace(modelOrStockNumber))
+            {
+                string key = modelOrStockNumber.Trim();
+                if (PartClassifications.TryGetValue(key, out string cls))
+                {
+                    return cls;
+                }
+            }
+
+            if (description == null) return string.Empty;
+
+            // Rule-based description-keyword classification.
+            // Runs after stock-number lookup but before the legacy hardcoded fallbacks,
+            // so config-defined rules take precedence over generic keyword matching.
+            foreach (var rule in PartRules)
+            {
+                if (rule.DescriptionKeywords == null) continue;
+                foreach (var keyword in rule.DescriptionKeywords)
+                {
+                    if (!string.IsNullOrWhiteSpace(keyword) &&
+                        description.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return rule.Classification;
+                    }
+                }
+            }
+
+            // Legacy Casing & Wall/Roof classification fallbacks
+            if (description.IndexOf("liner", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Liner";
+
+            if (description.IndexOf("peaked roof split cover", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("roof seal-off angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                string.Equals(modelOrStockNumber, "091-30119-007", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(modelOrStockNumber, "091-30117-076", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Misc Trim";
+            }
+
+            if (description.IndexOf("roof corner cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("roof cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("sq part - trim", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Trim";
+            }
+
+            if (description.StartsWith("C:SC", StringComparison.OrdinalIgnoreCase))
+                return "Channel";
+
+            if (description.IndexOf("skin", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("panel", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("post", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Skin";
+            }
+
+            // Legacy Base & Floor classification fallbacks
+            if (modelOrStockNumber?.Trim() == "091-30117-080" || 
+                description.IndexOf("SUBFLOOR", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Sub-Floor";
+            }
+
+            if (description.IndexOf("floor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("deck", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Floor Sheet";
+            }
+
+            if (description.StartsWith("CHN:STRUCT", StringComparison.OrdinalIgnoreCase))
+                return "Structural Channel";
+
+            if (description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Formed Channel";
+
+            if (description.IndexOf("perimeter angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                description.IndexOf("angle, perimeter", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (description.IndexOf("perimeter", StringComparison.OrdinalIgnoreCase) >= 0 && description.IndexOf("angle", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return "Perimeter Angle";
+            }
+
+            return "Unknown";
+        }
+
+        public static string AdjustExpectedChannel(string expectedChannel, string modelNumber)
+        {
+            if (string.IsNullOrWhiteSpace(expectedChannel)) return expectedChannel;
+
+            // Check if the part is one of the non-automating wall channel parts/brackets
+            if (modelNumber == "091-30117-078" || 
+                modelNumber == "091-30117-048" || 
+                modelNumber == "091-30117-046" || 
+                modelNumber == "091-30117-077")
+            {
+                // Strip trailing '2', '3', or '4' suffix if present (e.g., "STL GALV3" -> "STL GALV")
+                if (expectedChannel.EndsWith("2")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
+                if (expectedChannel.EndsWith("3")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
+                if (expectedChannel.EndsWith("4")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
+            }
+            return expectedChannel;
+        }
+
         private class ConfigDataSchema
         {
             public List<string>? Gauges { get; set; }
             public List<string>? Materials { get; set; }
             public Dictionary<string, string>? MaterialMappings { get; set; }
             public Dictionary<string, string>? GaugeMappings { get; set; }
+            public Dictionary<string, string>? PartClassifications { get; set; }
+            public List<PartRule>? PartRules { get; set; }
         }
+    }
+
+    /// <summary>
+    /// A config-driven classification and verification rule for a part type.
+    /// Defined in the <c>PartRules</c> array of <c>materials_config.json</c>.
+    /// </summary>
+    public sealed class PartRule
+    {
+        /// <summary>The classification string returned by <see cref="MaterialsConfig.GetPartClassification"/>.</summary>
+        public string Classification { get; set; } = string.Empty;
+
+        /// <summary>Exact model/stock numbers that map to this rule (highest priority).</summary>
+        public List<string> StockNumbers { get; set; } = new List<string>();
+
+        /// <summary>Description substrings (case-insensitive) that trigger this rule when no stock number matches.</summary>
+        public List<string> DescriptionKeywords { get; set; } = new List<string>();
+
+        /// <summary>
+        /// How to resolve the expected gauge. Supported formats:
+        /// <list type="bullet">
+        ///   <item><c>fixed:&lt;value&gt;</c> — always use the literal gauge, e.g. <c>fixed:16</c></item>
+        ///   <item><c>borrow:&lt;FieldName&gt;</c> — copy from a named field on the surface row, e.g. <c>borrow:InteriorLinerGauge</c></item>
+        /// </list>
+        /// </summary>
+        public string GaugeSource { get; set; } = string.Empty;
+
+        /// <summary>
+        /// How to resolve the expected material. Supported formats: <c>fixed:&lt;value&gt;</c> or <c>borrow:&lt;FieldName&gt;</c>.
+        /// </summary>
+        public string MaterialSource { get; set; } = string.Empty;
+
+        /// <summary><c>mismatch</c> — generate a mismatch on failure; <c>display</c> — show in grid only, never flag.</summary>
+        public string VerificationMode { get; set; } = "mismatch";
+
+        /// <summary>Grid section label shown in the verification window (e.g. <c>Casing</c>, <c>Base</c>).</summary>
+        public string Section { get; set; } = "Casing";
+
+        /// <summary>Column header / field name shown in the mismatch grid.</summary>
+        public string FieldName { get; set; } = string.Empty;
     }
 }

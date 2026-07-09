@@ -292,5 +292,139 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual(1, result.Mismatches.Count);
             Assert.AreEqual("Angle-Part-2", result.Mismatches[0].IptPartNumber);
         }
+
+        [Test]
+        public void TestWallChannelVerification_NonAutomatingParts()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam = "Wall.iam",
+                        ChannelSkinGauge = "16",
+                        ChannelSkinMaterial = "STL GALV3"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    // Non-automating channel: expects STL GALV (STL GALV3 stripped of '3')
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber = "NonAuto-Channel-1",
+                        ModelNumber = "091-30117-078",
+                        Description = "Coil Panel Nesting Channel",
+                        MtlGauge = "16",
+                        YCMATL = "STL GALV"
+                    },
+                    // Automating channel: expects STL GALV3 (no stripping). This should trigger a mismatch if it is only STL GALV.
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber = "Auto-Channel-2",
+                        ModelNumber = "091-30117-064",
+                        Description = "Horizontal Channel",
+                        MtlGauge = "16",
+                        YCMATL = "STL GALV"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            // Should have exactly 1 mismatch for the automating channel (expected: "16 GA STL GALV3", actual: "16 GA STL GALV")
+            Assert.IsFalse(result.IsPass);
+            Assert.AreEqual(1, result.Mismatches.Count);
+            Assert.AreEqual("Auto-Channel-2", result.Mismatches[0].IptPartNumber);
+            Assert.AreEqual("16 GA STL GALV3", result.Mismatches[0].ExpectedValue);
+            Assert.AreEqual("16 GA STL GALV", result.Mismatches[0].ActualValue);
+        }
+        [Test]
+        public void TestWallVerification_SealOffAngle_MatchesLinerMaterial()
+        {
+            // Seal-Off Angle with correct gauge (16 GA) and material matching the liner → no mismatch.
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam  = "Wall.iam",
+                        InteriorLinerGauge    = "22",
+                        InteriorLinerMaterial = "STL GALV"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "SealOff-Pass",
+                        Description  = "Wall Seal-Off Angle",
+                        MtlGauge     = "16",
+                        YCMATL       = "STL GALV"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestWallVerification_SealOffAngle_WrongGaugeMismatch()
+        {
+            // Seal-Off Angle with wrong gauge (18 instead of fixed 16) → one mismatch.
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        InteriorLinerGauge    = "22",
+                        InteriorLinerMaterial = "STL GALV"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "SealOff-Fail",
+                        Description  = "Wall Seal-Off Angle",
+                        MtlGauge     = "18",          // Wrong — rule expects fixed:16
+                        YCMATL       = "STL GALV"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsFalse(result.IsPass);
+            Assert.AreEqual(1, result.Mismatches.Count);
+            Assert.AreEqual("Seal-Off Angle Gauge & Material", result.Mismatches[0].FieldName);
+            Assert.AreEqual("16 GA STL GALV", result.Mismatches[0].ExpectedValue);
+            Assert.AreEqual("18 GA STL GALV", result.Mismatches[0].ActualValue);
+        }
     }
 }

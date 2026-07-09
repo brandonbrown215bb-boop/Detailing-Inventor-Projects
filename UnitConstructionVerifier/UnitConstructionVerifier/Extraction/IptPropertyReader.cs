@@ -133,12 +133,6 @@ namespace UnitConstructionVerifier.Extraction
                     {
                         props.YCMATL    = ExtractMaterialFromIdentifier(materialIdentifier);
                     }
-                    if (props.Description != null && 
-                        props.Description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                        props.YCMATL == "STL GALV")
-                    {
-                        props.YCMATL = "STL HOT ROLL";
-                    }
                     props.ModelNumber   = ReadProp(userDefined, PropModelNumber);
                     if (string.IsNullOrWhiteSpace(props.ModelNumber))
                     {
@@ -146,6 +140,11 @@ namespace UnitConstructionVerifier.Extraction
                     }
                     props.MtlGauge      = ReadProp(userDefined, PropMtlGauge);
                     props.MaterialStyle = ReadProp(userDefined, PropMaterialStyle);
+
+                    if (props.GetClassification() == "Formed Channel" && props.YCMATL == "STL GALV")
+                    {
+                        props.YCMATL = "STL HOT ROLL";
+                    }
                 }
 
 

@@ -6,20 +6,24 @@ This document defines how the JCI Construction Verifier classifies Autodesk Inve
 
 ## 1. Summary of Part Classifications & expected Specs
 
-The tool divides parts into two main verification areas: **Roof/Wall Casing** (Casing details) and **Base/Floor Frame** (Base details). The classification rules, expectation sources, and parameters checked are summarized below:
+The tool divides parts into two main verification areas: **Roof/Wall Casing** (Casing details) and **Base/Floor Frame** (Base details). Parts are classified primarily by looking up their **Stock Number** (from `Stock Number` or `MODEL_NUMBER` properties) in the `PartClassifications` config database inside `materials_config.json`. If a part's stock number is not in the configuration database, it falls back to description-based legacy keyword rules.
 
-| Part Type | Category | Classification Logic (Description or Model Number) | Checked Parameter | Expected Spec Source |
+The classification categories, expectation sources, and checked parameters are summarized below:
+
+| Part Type | Category | Stock Number Mapping / Legacy Description Fallback | Checked Parameter | Expected Spec Source |
 | :--- | :--- | :--- | :--- | :--- |
-| **Liner** | Casing | Description contains `"liner"` | Gauge & Material | Selected row's `InteriorGaugeAndMaterial` |
-| **Trim** | Casing | Description contains `"roof corner cap"`, `"roof cap"`, or `"sq part - trim"` | Gauge & Material | Selected row's `TrimGaugeAndMaterial` (Roofs) or `ExteriorGaugeAndMaterial` (Walls) |
-| **Misc Trim** | Casing | Description contains `"peaked roof split cover"` or `"roof seal-off angle"`; OR Model Number is `"091-30119-007"` or `"091-30117-076"` | Display only (no mismatch verification) | None |
-| **Channel (Casing)** | Casing | Description starts with `"C:SC"` | Gauge & Material | Selected row's `ChannelGaugeAndMaterial` |
-| **Skin** | Casing | Not classified as Liner, Trim, Misc Trim, or Channel; AND Description contains `"skin"`, `"panel"`, or `"post"` | Gauge & Material | Selected row's `ExteriorGaugeAndMaterial` |
-| **Sub-Floor Sheet** | Base | Model Number is `"091-30117-080"`; OR Description contains `"SUBFLOOR"` | Gauge & Material | Selected row's `SubFloorGaugeAndMaterial` |
-| **Floor Sheet** | Base | Description contains `"floor"` or `"deck"` | Gauge & Material | Selected row's `FloorGaugeAndMaterial` |
-| **Structural Channel** | Base | Description starts with `"CHN:STRUCT"` | Material | Mapped from selected row's `BaseMaterial` (`STL C CHNL` if steel base, `ALM C CHNL` if aluminum base) |
-| **Formed Channel** | Base | Description contains `"Channel, Formed"` | Gauge & Material | Selected row's `FormedChannelMaterial` |
-| **Perimeter Angle** | Base | Description contains `"perimeter angle"` or `"angle, perimeter"`; OR contains both `"perimeter"` and `"angle"` | Gauge & Material | Selected row's `PerimeterAngleGaugeAndMaterial` |
+| **Liner** | Casing | Maps to `Liner`; OR description contains `"liner"` | Gauge & Material | Selected row's `InteriorGaugeAndMaterial` |
+| **Trim** | Casing | Maps to `Trim`; OR description contains `"roof corner cap"`, `"roof cap"`, or `"sq part - trim"` | Gauge & Material | Selected row's `TrimGaugeAndMaterial` (Roofs) or `ExteriorGaugeAndMaterial` (Walls) |
+| **Misc Trim** | Casing | Maps to `Misc Trim`; OR description contains `"peaked roof split cover"` / `"roof seal-off angle"`; OR Model is `"091-30119-007"` / `"091-30117-076"` | Display only (no mismatch verification) | None |
+| **Split Cover** | Casing | Maps to `Split Cover` | Display only (no mismatch verification) | None |
+| **Channel (Casing)** | Casing | Maps to `Channel`; OR description starts with `"C:SC"` | Gauge & Material | Selected row's `ChannelGaugeAndMaterial` |
+| **Skin** | Casing | Maps to `Skin`; OR description contains `"skin"`, `"panel"`, or `"post"` | Gauge & Material | Selected row's `ExteriorGaugeAndMaterial` |
+| **Sub-Floor Sheet** | Base | Maps to `Sub-Floor`; OR Model is `"091-30117-080"`; OR description contains `"SUBFLOOR"` | Gauge & Material | Selected row's `SubFloorGaugeAndMaterial` |
+| **Floor Sheet** | Base | Maps to `Floor Sheet`; OR description contains `"floor"` or `"deck"` | Gauge & Material | Selected row's `FloorGaugeAndMaterial` |
+| **Structural Channel** | Base | Maps to `Structural Channel` (includes structural channels & structural angles); OR description starts with `"CHN:STRUCT"` | Material | Mapped from selected row's `BaseMaterial` (`STL C CHNL` if steel base, `ALM C CHNL` if aluminum base) |
+| **Formed Channel** | Base | Maps to `Formed Channel`; OR description contains `"Channel, Formed"` | Gauge & Material | Selected row's `FormedChannelMaterial` |
+| **Perimeter Angle** | Base | Maps to `Perimeter Angle`; OR description contains `"perimeter angle"`, `"angle, perimeter"`, or both `"perimeter"` and `"angle"` | Gauge & Material | Selected row's `PerimeterAngleGaugeAndMaterial` |
+| **Base Accessory** | Base | Maps to `Base Accessory` | Ignored | Ignored during main structural/formed channel verification |
 
 ---
 
@@ -44,7 +48,7 @@ The tool divides parts into two main verification areas: **Roof/Wall Casing** (C
 ## 3. Special Logic, Overrides & Mappings
 
 ### A. Template Material Overrides
-- When a part is classified as a **Formed Channel** and its raw database material (`YCMATL`) is `"STL GALV"`, the tool overrides it to `"STL HOT ROLL"` during property reading. This prevents standard galvanized steel templates from flagging false errors since base formed channels are always Hot Rolled steel when the base is steel.
+- When a part is classified as a **Formed Channel** (either via Stock Number mapping or description fallback) and its raw database material (`YCMATL`) is `"STL GALV"`, the tool overrides it to `"STL HOT ROLL"` during property reading. This prevents standard galvanized steel templates from flagging false errors since base formed channels are always Hot Rolled steel when the base is steel.
 
 ### B. Precise Thickness Resolution (YCMATL Fallback)
 - If custom properties or `YCMATL` are blank, JCI assigns unique, highly precise decimal thicknesses to resolve the exact material/paint code:
@@ -56,5 +60,5 @@ The tool divides parts into two main verification areas: **Roof/Wall Casing** (C
 ### C. Normalization & Gauge Mapping
 - **Normalization**: User input and model values are trimmed, converted to uppercase, and stripped of quotes (`"` or `'`) before comparisons to prevent syntax mismatches.
 - **Gauge Mappings**: Resolves decimal thicknesses to gauges (e.g. `0.056` ➔ `16`, `0.028` ➔ `22`) via mappings loaded from `materials_config.json` and `materials_thickness_map.json`.
-- **Precedence**: `Misc Trim` stock number match takes precedence over generic descriptions so custom-engineered parts do not trigger standard trim mismatches.
+- **Precedence**: Stock Number mapping takes precedence over legacy keyword matches. For fallbacks, `Misc Trim` stock number match takes precedence over generic descriptions so custom-engineered parts do not trigger standard trim mismatches.
 - **No Override for Trim**: Trim materials are NOT auto-overridden from galvanized (`STL GALV`) to painted (`STL GALV PPC`), as some trim remains unpainted.

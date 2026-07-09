@@ -36,8 +36,14 @@ namespace UnitConstructionVerifier.Engine
                         .ToList();
 
                     foreach (var ipt in candidates)
-                        VerifyRoofWallIpt(row.Thickness, row.ExteriorGaugeAndMaterial, row.InteriorGaugeAndMaterial,
-                                          row.ChannelGaugeAndMaterial, row.TrimGaugeAndMaterial, row.ThermalBreak, ipt, result);
+                    {
+                        var rule = FindRule(ipt);
+                        if (rule != null)
+                            VerifyWithRule(rule, ipt, BuildRowFields(row), result);
+                        else
+                            VerifyRoofWallIpt(row.Thickness, row.ExteriorGaugeAndMaterial, row.InteriorGaugeAndMaterial,
+                                              row.ChannelGaugeAndMaterial, row.TrimGaugeAndMaterial, row.ThermalBreak, ipt, result);
+                    }
                 }
             }
 
@@ -51,8 +57,14 @@ namespace UnitConstructionVerifier.Engine
                         .ToList();
 
                     foreach (var ipt in candidates)
-                        VerifyRoofWallIpt(row.Thickness, row.ExteriorGaugeAndMaterial, row.InteriorGaugeAndMaterial,
-                                          row.ExteriorGaugeAndMaterial, row.ExteriorGaugeAndMaterial, row.ThermalBreak, ipt, result);
+                    {
+                        var rule = FindRule(ipt);
+                        if (rule != null)
+                            VerifyWithRule(rule, ipt, BuildRowFields(row), result);
+                        else
+                            VerifyRoofWallIpt(row.Thickness, row.ExteriorGaugeAndMaterial, row.InteriorGaugeAndMaterial,
+                                              row.ChannelGaugeAndMaterial, row.ExteriorGaugeAndMaterial, row.ThermalBreak, ipt, result);
+                    }
                 }
             }
 
@@ -87,17 +99,12 @@ namespace UnitConstructionVerifier.Engine
             IptProperties ipt,
             VerificationResult result)
         {
-            // Classify the part
-            bool isLiner = ipt.Description.IndexOf("liner", StringComparison.OrdinalIgnoreCase) >= 0;
-            bool isMiscTrim = ipt.Description.IndexOf("peaked roof split cover", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                              ipt.Description.IndexOf("roof seal-off angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                              string.Equals(ipt.ModelNumber, "091-30119-007", StringComparison.OrdinalIgnoreCase) ||
-                              string.Equals(ipt.ModelNumber, "091-30117-076", StringComparison.OrdinalIgnoreCase);
-            bool isTrim  = !isMiscTrim &&
-                           (ipt.Description.IndexOf("roof corner cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            ipt.Description.IndexOf("roof cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            ipt.Description.IndexOf("sq part - trim", StringComparison.OrdinalIgnoreCase) >= 0);
-            bool isChannel = ipt.Description.StartsWith("C:SC", StringComparison.OrdinalIgnoreCase);
+            // Classify the part using unified classification helper
+            string classification = ipt.GetClassification();
+            bool isLiner    = classification == "Liner";
+            bool isMiscTrim = classification == "Misc Trim" || classification == "Split Cover";
+            bool isTrim     = classification == "Trim";
+            bool isChannel  = classification == "Channel";
 
             // 1. Liners: Gauge & Material only (no thickness)
             if (isLiner)
@@ -130,15 +137,14 @@ namespace UnitConstructionVerifier.Engine
                 if (!string.IsNullOrWhiteSpace(expectedChannel))
                 {
                     string actual = FormatGaugeAndMaterial(ipt.MtlGauge, ipt.YCMATL);
-                    Compare(result, ipt, "Casing", "Channel Gauge & Material", expectedChannel, actual);
+                    string finalExpected = MaterialsConfig.AdjustExpectedChannel(expectedChannel, ipt.ModelNumber);
+                    Compare(result, ipt, "Casing", "Channel Gauge & Material", finalExpected, actual);
                 }
                 return;
             }
 
             // 5. Skins: Gauge & Material only (no thickness)
-            bool isSkin = ipt.Description.IndexOf("skin", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         ipt.Description.IndexOf("panel", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         ipt.Description.IndexOf("post", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isSkin = classification == "Skin";
 
             if (isSkin && !string.IsNullOrWhiteSpace(expectedExterior))
             {
@@ -270,6 +276,112 @@ namespace UnitConstructionVerifier.Engine
             if (string.IsNullOrEmpty(mappedGauge))    return mappedMaterial;
             if (string.IsNullOrEmpty(mappedMaterial)) return mappedGauge;
             return $"{mappedGauge} GA {mappedMaterial}";
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Config-driven rule dispatch helpers
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the first <see cref="PartRule"/> whose classification matches the part,
+        /// or <c>null</c> if the part should be handled by the fixed dispatch chain.
+        /// </summary>
+        public static PartRule? FindRule(IptProperties ipt)
+        {
+            string cls = ipt.GetClassification();
+            foreach (var rule in MaterialsConfig.PartRules)
+            {
+                if (string.Equals(rule.Classification, cls, StringComparison.OrdinalIgnoreCase))
+                    return rule;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Builds a field-name → value map from a <see cref="RoofSurfaceRow"/>,
+        /// used to resolve <c>borrow:FieldName</c> sources in <see cref="PartRule"/>.
+        /// </summary>
+        public static Dictionary<string, string> BuildRowFields(RoofSurfaceRow row)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ExteriorSkinGauge"]     = row.ExteriorSkinGauge,
+                ["ExteriorSkinMaterial"]  = row.ExteriorSkinMaterial,
+                ["InteriorLinerGauge"]    = row.InteriorLinerGauge,
+                ["InteriorLinerMaterial"] = row.InteriorLinerMaterial,
+                ["ChannelSkinGauge"]      = row.ChannelSkinGauge,
+                ["ChannelSkinMaterial"]   = row.ChannelSkinMaterial,
+                ["TrimSkinGauge"]         = row.TrimSkinGauge,
+                ["TrimSkinMaterial"]      = row.TrimSkinMaterial,
+            };
+        }
+
+        /// <summary>
+        /// Builds a field-name → value map from a <see cref="WallSurfaceRow"/>.
+        /// </summary>
+        public static Dictionary<string, string> BuildRowFields(WallSurfaceRow row)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ExteriorSkinGauge"]     = row.ExteriorSkinGauge,
+                ["ExteriorSkinMaterial"]  = row.ExteriorSkinMaterial,
+                ["InteriorLinerGauge"]    = row.InteriorLinerGauge,
+                ["InteriorLinerMaterial"] = row.InteriorLinerMaterial,
+                ["ChannelSkinGauge"]      = row.ChannelSkinGauge,
+                ["ChannelSkinMaterial"]   = row.ChannelSkinMaterial,
+            };
+        }
+
+        /// <summary>
+        /// Resolves a <c>fixed:value</c> or <c>borrow:FieldName</c> spec against the row's field map.
+        /// Returns an empty string if the spec is unrecognised or the borrowed field is empty.
+        /// </summary>
+        public static string ResolveRuleField(string spec, Dictionary<string, string> rowFields)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return string.Empty;
+
+            const string fixedPrefix  = "fixed:";
+            const string borrowPrefix = "borrow:";
+
+            if (spec.StartsWith(fixedPrefix, StringComparison.OrdinalIgnoreCase))
+                return spec.Substring(fixedPrefix.Length).Trim();
+
+            if (spec.StartsWith(borrowPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                string fieldName = spec.Substring(borrowPrefix.Length).Trim();
+                return rowFields.TryGetValue(fieldName, out string val) ? (val ?? string.Empty) : string.Empty;
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Verifies an IPT part according to a config-driven <see cref="PartRule"/>.
+        /// Resolves expected gauge and material from the rule's source specs,
+        /// then compares against the part's actual properties.
+        /// </summary>
+        private void VerifyWithRule(
+            PartRule rule,
+            IptProperties ipt,
+            Dictionary<string, string> rowFields,
+            VerificationResult result)
+        {
+            // Display-only rules are never flagged as mismatches.
+            if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string expectedGauge    = ResolveRuleField(rule.GaugeSource,    rowFields);
+            string expectedMaterial = ResolveRuleField(rule.MaterialSource,  rowFields);
+
+            // Build the expected string the same way the UI does: "N GA MATERIAL"
+            string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
+            if (string.IsNullOrWhiteSpace(expected)) return;
+
+            string actual  = FormatGaugeAndMaterial(ipt.MtlGauge, ipt.YCMATL);
+            string section = string.IsNullOrWhiteSpace(rule.Section)    ? "Casing"           : rule.Section;
+            string field   = string.IsNullOrWhiteSpace(rule.FieldName)  ? rule.Classification : rule.FieldName;
+
+            Compare(result, ipt, section, field, expected, actual);
         }
     }
 }

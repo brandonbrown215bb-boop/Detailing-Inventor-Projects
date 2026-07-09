@@ -376,21 +376,13 @@ namespace UnitConstructionVerifier.UI
 
                 foreach (var p in parts)
                 {
-                    // Classify the part
-                    bool isLiner    = p.Description.IndexOf("liner", StringComparison.OrdinalIgnoreCase) >= 0;
-                    bool isMiscTrim = p.Description.IndexOf("peaked roof split cover", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       p.Description.IndexOf("roof seal-off angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       string.Equals(p.ModelNumber, "091-30119-007", StringComparison.OrdinalIgnoreCase) ||
-                                       string.Equals(p.ModelNumber, "091-30117-076", StringComparison.OrdinalIgnoreCase);
-                    bool isTrim     = !isMiscTrim &&
-                                      (p.Description.IndexOf("roof corner cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       p.Description.IndexOf("roof cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       p.Description.IndexOf("sq part - trim", StringComparison.OrdinalIgnoreCase) >= 0);
-                    bool isChannel  = p.Description.StartsWith("C:SC", StringComparison.OrdinalIgnoreCase);
-                    bool isSkin     = !isLiner && !isTrim && !isMiscTrim && !isChannel &&
-                                      (p.Description.IndexOf("skin", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       p.Description.IndexOf("panel", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                       p.Description.IndexOf("post", StringComparison.OrdinalIgnoreCase) >= 0);
+                    // Classify the part using unified classification
+                    string classification = p.GetClassification();
+                    bool isLiner    = classification == "Liner";
+                    bool isMiscTrim = classification == "Misc Trim" || classification == "Split Cover";
+                    bool isTrim     = classification == "Trim";
+                    bool isChannel  = classification == "Channel";
+                    bool isSkin     = classification == "Skin";
 
                     // Liners: Gauge & Material only
                     if (isLiner)
@@ -417,7 +409,7 @@ namespace UnitConstructionVerifier.UI
                     // C:SC Channels: uses dedicated Channel gauge & material
                     else if (isChannel)
                     {
-                        string expected = roof.ChannelGaugeAndMaterial ?? string.Empty;
+                        string expected = MaterialsConfig.AdjustExpectedChannel(roof.ChannelGaugeAndMaterial, p.ModelNumber) ?? string.Empty;
                         string actual   = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
                         AddGridRow(gridRows, p.PartNumber, p.Description, "Channel", "Gauge & Material", expected, actual, isMismatch, p.FilePath);
@@ -429,6 +421,28 @@ namespace UnitConstructionVerifier.UI
                         string actual   = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
                         AddGridRow(gridRows, p.PartNumber, p.Description, "Skin", "Gauge & Material", expected, actual, isMismatch, p.FilePath);
+                    }
+                    else
+                    {
+                        var rule = VerificationEngine.FindRule(p);
+                        if (rule != null)
+                        {
+                            var rowFields = VerificationEngine.BuildRowFields(roof);
+                            string expectedGauge = VerificationEngine.ResolveRuleField(rule.GaugeSource, rowFields);
+                            string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
+                            string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
+                            string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                            bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
+                            
+                            string section = string.IsNullOrWhiteSpace(rule.Section) ? "Casing" : rule.Section;
+                            string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
+
+                            // Custom rules with display verification mode never show as mismatch in grid
+                            if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
+                                isMismatch = false;
+
+                            AddGridRow(gridRows, p.PartNumber, p.Description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
+                        }
                     }
 
                 }
@@ -443,16 +457,13 @@ namespace UnitConstructionVerifier.UI
 
                 foreach (var p in parts)
                 {
-                    // Classify the part
-                    bool isLiner   = p.Description.IndexOf("liner", StringComparison.OrdinalIgnoreCase) >= 0;
-                    bool isTrim    = p.Description.IndexOf("roof corner cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                     p.Description.IndexOf("roof cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                     p.Description.IndexOf("sq part - trim", StringComparison.OrdinalIgnoreCase) >= 0;
-                    bool isChannel = p.Description.StartsWith("C:SC", StringComparison.OrdinalIgnoreCase);
-                    bool isSkin    = !isLiner && !isTrim && !isChannel &&
-                                     (p.Description.IndexOf("skin", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                      p.Description.IndexOf("panel", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                      p.Description.IndexOf("post", StringComparison.OrdinalIgnoreCase) >= 0);
+                    // Classify the part using unified classification
+                    string classification = p.GetClassification();
+                    bool isLiner    = classification == "Liner";
+                    bool isMiscTrim = classification == "Misc Trim" || classification == "Split Cover";
+                    bool isTrim     = classification == "Trim";
+                    bool isChannel  = classification == "Channel";
+                    bool isSkin     = classification == "Skin";
 
                     // Liners: Gauge & Material only
                     if (isLiner)
@@ -470,10 +481,16 @@ namespace UnitConstructionVerifier.UI
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
                         AddGridRow(gridRows, p.PartNumber, p.Description, "Trim", "Gauge & Material", expected, actual, isMismatch, p.FilePath);
                     }
+                    // Misc Trim / Split Cover: shown, no expected spec
+                    else if (isMiscTrim)
+                    {
+                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                        AddGridRow(gridRows, p.PartNumber, p.Description, classification, "Gauge & Material", string.Empty, actual, false, p.FilePath);
+                    }
                     // C:SC Channels: Gauge & Material only
                     else if (isChannel)
                     {
-                        string expected = wall.ChannelGaugeAndMaterial ?? string.Empty;
+                        string expected = MaterialsConfig.AdjustExpectedChannel(wall.ChannelGaugeAndMaterial, p.ModelNumber) ?? string.Empty;
                         string actual   = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
                         AddGridRow(gridRows, p.PartNumber, p.Description, "Channel", "Gauge & Material", expected, actual, isMismatch, p.FilePath);
@@ -485,6 +502,28 @@ namespace UnitConstructionVerifier.UI
                         string actual   = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
                         AddGridRow(gridRows, p.PartNumber, p.Description, "Skin", "Gauge & Material", expected, actual, isMismatch, p.FilePath);
+                    }
+                    else
+                    {
+                        var rule = VerificationEngine.FindRule(p);
+                        if (rule != null)
+                        {
+                            var rowFields = VerificationEngine.BuildRowFields(wall);
+                            string expectedGauge = VerificationEngine.ResolveRuleField(rule.GaugeSource, rowFields);
+                            string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
+                            string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
+                            string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                            bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
+                            
+                            string section = string.IsNullOrWhiteSpace(rule.Section) ? "Casing" : rule.Section;
+                            string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
+
+                            // Custom rules with display verification mode never show as mismatch in grid
+                            if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
+                                isMismatch = false;
+
+                            AddGridRow(gridRows, p.PartNumber, p.Description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
+                        }
                     }
 
                 }
@@ -499,7 +538,9 @@ namespace UnitConstructionVerifier.UI
 
                 foreach (var p in parts)
                 {
-                    if (p.IsSubFloor)
+                    string classification = p.GetClassification();
+
+                    if (classification == "Sub-Floor")
                     {
                         if (!string.IsNullOrWhiteSpace(bs.SubFloorGaugeAndMaterial))
                         {
@@ -508,8 +549,7 @@ namespace UnitConstructionVerifier.UI
                             AddGridRow(gridRows, p.PartNumber, p.Description, "Sub-Floor", "Gauge & Material", bs.SubFloorGaugeAndMaterial, actual, isMismatch, p.FilePath);
                         }
                     }
-                    else if (p.Description.IndexOf("floor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                             p.Description.IndexOf("deck", StringComparison.OrdinalIgnoreCase) >= 0)
+                    else if (classification == "Floor Sheet")
                     {
                         if (!string.IsNullOrWhiteSpace(bs.FloorGaugeAndMaterial))
                         {
@@ -520,11 +560,9 @@ namespace UnitConstructionVerifier.UI
                     }
                     else
                     {
-                        bool isStructuralChannel = p.Description.StartsWith("CHN:STRUCT", StringComparison.OrdinalIgnoreCase);
-                        bool isFormedChannel = p.Description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0;
-                        bool isPerimeterAngle = p.Description.IndexOf("perimeter angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                p.Description.IndexOf("angle, perimeter", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                (p.Description.IndexOf("perimeter", StringComparison.OrdinalIgnoreCase) >= 0 && p.Description.IndexOf("angle", StringComparison.OrdinalIgnoreCase) >= 0);
+                        bool isStructuralChannel = classification == "Structural Channel";
+                        bool isFormedChannel = classification == "Formed Channel";
+                        bool isPerimeterAngle = classification == "Perimeter Angle";
 
                         if (isStructuralChannel || isFormedChannel || isPerimeterAngle)
                         {

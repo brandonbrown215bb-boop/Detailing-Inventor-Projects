@@ -212,7 +212,7 @@ namespace UnitConstructionVerifier.Extraction
                 if (baseIpts.Count > 0)
                 {
                     var structuralParts = baseIpts
-                        .Where(p => p.Description.StartsWith("CHN:STRUCT", StringComparison.OrdinalIgnoreCase))
+                        .Where(p => p.GetClassification() == "Structural Channel")
                         .ToList();
 
                     if (structuralParts.Count > 0)
@@ -228,7 +228,7 @@ namespace UnitConstructionVerifier.Extraction
                     }
 
                     var formedParts = baseIpts
-                        .Where(p => p.Description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0)
+                        .Where(p => p.GetClassification() == "Formed Channel")
                         .ToList();
 
                     if (formedParts.Count > 0)
@@ -242,8 +242,8 @@ namespace UnitConstructionVerifier.Extraction
                     }
 
                     var nonFloorParts = baseIpts
-                        .Where(p => p.Description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                    p.Description.StartsWith("CHN:STRUCT", StringComparison.OrdinalIgnoreCase))
+                        .Where(p => p.GetClassification() == "Formed Channel" ||
+                                    p.GetClassification() == "Structural Channel")
                         .ToList();
 
                     if (nonFloorParts.Count > 0)
@@ -310,9 +310,7 @@ namespace UnitConstructionVerifier.Extraction
                 string perimeterGauge = string.Empty;
                 string perimeterMat = string.Empty;
                 var perimeterParts = baseIpts
-                    .Where(p => p.Description.IndexOf("perimeter angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                p.Description.IndexOf("angle, perimeter", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                (p.Description.IndexOf("perimeter", StringComparison.OrdinalIgnoreCase) >= 0 && p.Description.IndexOf("angle", StringComparison.OrdinalIgnoreCase) >= 0))
+                    .Where(p => p.GetClassification() == "Perimeter Angle")
                     .ToList();
                 if (perimeterParts.Count > 0)
                 {
