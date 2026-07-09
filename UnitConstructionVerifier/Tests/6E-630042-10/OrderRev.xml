@@ -1,0 +1,38 @@
+<root:OrderRevision xmlns:root="http://schemas.airside.be.jci.com/AHU/OrderRevision">
+  <productType>SolutionYC</productType>
+  <jobName>44398 MSOE EIC Campus MLK Engineering Ph 2 BP2</jobName>
+  <orderNumber>6E-630042-10</orderNumber>
+  <lineNumber>1</lineNumber>
+  <projectName />
+  <projectID>{00000000-0000-0000-0000-000000000000}</projectID>
+  <baseSQOrderNumber />
+  <revisionDate>
+    <year>2026</year>
+    <month>5</month>
+    <day>19</day>
+    <hour>21</hour>
+    <minute>8</minute>
+    <second>7</second>
+  </revisionDate>
+  <quantity>1</quantity>
+  <tagList>
+    <tag>AHU-2</tag>
+  </tagList>
+  <documentVersion>
+    <schemaVersion>
+      <major>2018</major>
+      <minor>9</minor>
+      <build>14</build>
+      <revision>1003</revision>
+    </schemaVersion>
+    <generatingSoftwareInfo>
+      <generatingSoftwareName>M.O.M. AHU Revision Serializer</generatingSoftwareName>
+      <generatingSoftwareVersion>
+        <major>2026</major>
+        <minor>6</minor>
+        <build>12</build>
+        <revision>1</revision>
+      </generatingSoftwareVersion>
+    </generatingSoftwareInfo>
+  </documentVersion>
+</root:OrderRevision>
