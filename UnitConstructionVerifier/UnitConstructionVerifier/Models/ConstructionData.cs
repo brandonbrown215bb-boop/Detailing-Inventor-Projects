@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json;
 
 namespace UnitConstructionVerifier.Models
 {
@@ -95,7 +97,9 @@ namespace UnitConstructionVerifier.Models
         // Base structural frame details
         public string BaseMaterial              { get; set; } = string.Empty;
         public string FormedChannelGauge        { get; set; } = string.Empty;
-        public string FormedChannelMaterialOnly { get; set; } = string.Empty;
+
+        [JsonProperty("FormedChannelMaterialOnly")]
+        public string FormedChannelMaterial     { get; set; } = string.Empty;
         public string BasePaint                 { get; set; } = string.Empty;
 
         // Floor casing details
@@ -116,10 +120,38 @@ namespace UnitConstructionVerifier.Models
         public string SourceSurfaceIam          { get; set; } = string.Empty;
 
         // Computed properties for compatibility and verification
-        public string FormedChannelMaterial => ConstructionDataHelper.FormatGaugeAndMaterial(FormedChannelGauge, FormedChannelMaterialOnly);
+        public string FormedChannelGaugeAndMaterial => ConstructionDataHelper.FormatGaugeAndMaterial(FormedChannelGauge, FormedChannelMaterial);
         public string FloorGaugeAndMaterial => ConstructionDataHelper.FormatGaugeAndMaterial(FloorGauge, FloorMaterial);
         public string SubFloorGaugeAndMaterial => ConstructionDataHelper.FormatGaugeAndMaterial(SubFloorGauge, SubFloorMaterial);
         public string PerimeterAngleGaugeAndMaterial => ConstructionDataHelper.FormatGaugeAndMaterial(PerimeterAngleGauge, PerimeterAngleMaterial);
+
+        // Backward compatibility support for old saves that wrote "FormedChannelMaterial" as the combined string
+        [JsonProperty("FormedChannelMaterial")]
+        private string LegacyFormedChannelMaterialSetter
+        {
+            set
+            {
+                if (string.IsNullOrEmpty(value)) return;
+                // If it is a combined gauge & material string (contains "GA"), parse it
+                if (value.Contains("GA") || value.Contains(" "))
+                {
+                    var parts = value.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3 && parts[1].Equals("GA", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        FormedChannelGauge = parts[0];
+                        FormedChannelMaterial = string.Join(" ", parts.Skip(2));
+                    }
+                    else
+                    {
+                        FormedChannelMaterial = value;
+                    }
+                }
+                else
+                {
+                    FormedChannelMaterial = value;
+                }
+            }
+        }
     }
 
     // ── Other Construction ────────────────────────────────────────────────────

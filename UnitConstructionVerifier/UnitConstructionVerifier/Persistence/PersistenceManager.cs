@@ -250,16 +250,8 @@ namespace UnitConstructionVerifier.Persistence
                     // Formed Channel split merge
                     if (!string.IsNullOrWhiteSpace(savedRow.FormedChannelGauge))
                         liveRow.FormedChannelGauge = savedRow.FormedChannelGauge;
-                    if (!string.IsNullOrWhiteSpace(savedRow.FormedChannelMaterialOnly))
-                        liveRow.FormedChannelMaterialOnly = savedRow.FormedChannelMaterialOnly;
-
-                    // Backward compatibility for Formed Channel
-                    if (string.IsNullOrEmpty(savedRow.FormedChannelGauge) && string.IsNullOrEmpty(savedRow.FormedChannelMaterialOnly) && !string.IsNullOrWhiteSpace(savedRow.FormedChannelMaterial))
-                    {
-                        ParseGaugeAndMaterial(savedRow.FormedChannelMaterial, out string g, out string m);
-                        if (!string.IsNullOrEmpty(g)) liveRow.FormedChannelGauge = g;
-                        if (!string.IsNullOrEmpty(m)) liveRow.FormedChannelMaterialOnly = m;
-                    }
+                    if (!string.IsNullOrWhiteSpace(savedRow.FormedChannelMaterial))
+                        liveRow.FormedChannelMaterial = savedRow.FormedChannelMaterial;
 
                     // Floor split merge
                     if (!string.IsNullOrWhiteSpace(savedRow.FloorGauge))

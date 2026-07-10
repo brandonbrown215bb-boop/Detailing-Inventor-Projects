@@ -212,7 +212,8 @@ namespace UnitConstructionVerifier.Extraction
                 if (baseIpts.Count > 0)
                 {
                     var structuralParts = baseIpts
-                        .Where(p => p.GetClassification() == "Structural Channel")
+                        .Where(p => p.GetClassification() == "Structural Channel" ||
+                                    p.GetClassification() == "Structural Angle")
                         .ToList();
 
                     if (structuralParts.Count > 0)
@@ -243,7 +244,8 @@ namespace UnitConstructionVerifier.Extraction
 
                     var nonFloorParts = baseIpts
                         .Where(p => p.GetClassification() == "Formed Channel" ||
-                                    p.GetClassification() == "Structural Channel")
+                                    p.GetClassification() == "Structural Channel" ||
+                                    p.GetClassification() == "Structural Angle")
                         .ToList();
 
                     if (nonFloorParts.Count > 0)
@@ -343,7 +345,7 @@ namespace UnitConstructionVerifier.Extraction
                     BaseHeight = baseHeightStr,
                     BaseMaterial = baseMat,
                     FormedChannelGauge = formedGauge,
-                    FormedChannelMaterialOnly = formedMatOnly,
+                    FormedChannelMaterial = formedMatOnly,
                     BasePaint = basePaint,
                     FloorGauge = floorGauge,
                     FloorMaterial = floorMat,

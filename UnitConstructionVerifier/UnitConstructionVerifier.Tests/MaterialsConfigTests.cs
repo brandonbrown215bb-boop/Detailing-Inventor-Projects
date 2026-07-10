@@ -54,6 +54,12 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("16", MaterialsConfig.MapGauge("0.05604"));
             Assert.AreEqual("16", MaterialsConfig.MapGauge("0.05601"));
             Assert.AreEqual("18", MaterialsConfig.MapGauge("0.04803"));
+
+            // Nominal decimal thicknesses should fallback to closest default JCI thickness
+            Assert.AreEqual("18", MaterialsConfig.MapGauge("0.045"));
+            Assert.AreEqual("20", MaterialsConfig.MapGauge("0.034"));
+            Assert.AreEqual("24", MaterialsConfig.MapGauge("0.022"));
+            Assert.AreEqual("22", MaterialsConfig.MapGauge("0.028"));
         }
 
         [Test]
@@ -77,6 +83,17 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("10", gauge3);
             Assert.AreEqual("STL HOT ROLL", material3);
 
+            // Nominal decimal thicknesses fallback matching
+            resolved = MaterialsConfig.ResolveFromThickness("0.045", out string gaugeNom, out string materialNom);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("18", gaugeNom);
+            Assert.AreEqual("STL GALV", materialNom);
+
+            resolved = MaterialsConfig.ResolveFromThickness("0.034", out string gaugeNom2, out string materialNom2);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("20", gaugeNom2);
+            Assert.AreEqual("STL GALV", materialNom2);
+
             // Invalid thickness
             resolved = MaterialsConfig.ResolveFromThickness("invalid", out _, out _);
             Assert.IsFalse(resolved);
@@ -89,7 +106,7 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("Liner", MaterialsConfig.GetPartClassification("091-30117-082", "random desc"));
             Assert.AreEqual("Skin", MaterialsConfig.GetPartClassification("091-30117-083", ""));
             Assert.AreEqual("Trim", MaterialsConfig.GetPartClassification("091-30117-074", "other desc"));
-            Assert.AreEqual("Structural Channel", MaterialsConfig.GetPartClassification("091-30117-187", "Structural steel angle"));
+            Assert.AreEqual("Structural Angle", MaterialsConfig.GetPartClassification("091-30117-187", "Structural steel angle"));
             Assert.AreEqual("Misc Trim", MaterialsConfig.GetPartClassification("091-30117-076", "Split Cover"));
             Assert.AreEqual("Sub-Floor", MaterialsConfig.GetPartClassification("091-30117-080", "Attachment Angle"));
             Assert.AreEqual("Split Cover", MaterialsConfig.GetPartClassification("091-30117-075", ""));

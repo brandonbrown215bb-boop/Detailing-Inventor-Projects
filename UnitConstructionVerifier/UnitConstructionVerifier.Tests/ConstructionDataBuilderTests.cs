@@ -9,6 +9,12 @@ namespace UnitConstructionVerifier.Tests
     [TestFixture]
     public class ConstructionDataBuilderTests
     {
+        [OneTimeSetUp]
+        public void Setup()
+        {
+            MaterialsConfig.Initialize();
+        }
+
         [Test]
         public void TestSegmentSorting_AirflowDirectionDescendingX()
         {
@@ -216,7 +222,7 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("20", row.SubFloorGauge);
             Assert.AreEqual("STL GALV", row.SubFloorMaterial);
             Assert.AreEqual("10", row.FormedChannelGauge);
-            Assert.AreEqual("STL HOT ROLL", row.FormedChannelMaterialOnly);
+            Assert.AreEqual("STL HOT ROLL", row.FormedChannelMaterial);
             Assert.AreEqual("12", row.PerimeterAngleGauge);
             Assert.AreEqual("STL GALV", row.PerimeterAngleMaterial);
         }

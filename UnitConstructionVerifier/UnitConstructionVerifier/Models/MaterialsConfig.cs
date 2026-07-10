@@ -252,26 +252,15 @@ namespace UnitConstructionVerifier.Models
                     return mappedVal;
                 }
 
-                // Reverse lookup in JCI ThicknessMap database (handles 5-digit precision formats e.g. 0.05604 -> "16")
+                // Reverse lookup in JCI ThicknessMap database
+                // 1. Precise match (tolerance 0.000009)
                 foreach (var kvp in ThicknessMap)
                 {
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         if (Math.Abs(val - mapVal) < 0.000009)
                         {
-                            string matchedKey = kvp.Key;
-                            string gaugePart = string.Empty;
-                            foreach (char c in matchedKey)
-                            {
-                                if (char.IsDigit(c) || c == '.')
-                                {
-                                    gaugePart += c;
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
+                            string gaugePart = ExtractGaugePart(kvp.Key);
                             if (!string.IsNullOrEmpty(gaugePart))
                             {
                                 return gaugePart;
@@ -279,9 +268,51 @@ namespace UnitConstructionVerifier.Models
                         }
                     }
                 }
+
+                // 2. Closest match fallback (tolerance 0.00015)
+                string bestKey = null;
+                double minDiff = double.MaxValue;
+                foreach (var kvp in ThicknessMap)
+                {
+                    if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
+                    {
+                        double diff = Math.Abs(val - mapVal);
+                        if (diff < 0.00015 && diff < minDiff)
+                        {
+                            minDiff = diff;
+                            bestKey = kvp.Key;
+                        }
+                    }
+                }
+
+                if (bestKey != null)
+                {
+                    string gaugePart = ExtractGaugePart(bestKey);
+                    if (!string.IsNullOrEmpty(gaugePart))
+                    {
+                        return gaugePart;
+                    }
+                }
             }
 
             return key;
+        }
+
+        private static string ExtractGaugePart(string matchedKey)
+        {
+            string gaugePart = string.Empty;
+            foreach (char c in matchedKey)
+            {
+                if (char.IsDigit(c) || c == '.')
+                {
+                    gaugePart += c;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return gaugePart;
         }
 
         public static bool ResolveFromThickness(string thicknessStr, out string gauge, out string material)
@@ -292,29 +323,57 @@ namespace UnitConstructionVerifier.Models
 
             if (double.TryParse(thicknessStr.Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
             {
+                // 1. Precise match (tolerance 0.000009)
                 foreach (var kvp in ThicknessMap)
                 {
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         if (Math.Abs(val - mapVal) < 0.000009)
                         {
-                            string key = kvp.Key; // e.g. "16STL GALV PPC" or "10STL HOT ROLL"
-                            
-                            // Find where the gauge number ends and material code starts
-                            int i = 0;
-                            while (i < key.Length && (char.IsDigit(key[i]) || key[i] == '.'))
-                            {
-                                i++;
-                            }
-                            if (i > 0 && i < key.Length)
-                            {
-                                gauge = key.Substring(0, i);
-                                material = key.Substring(i).Trim();
-                                return true;
-                            }
+                            return ParseKey(kvp.Key, out gauge, out material);
                         }
                     }
                 }
+
+                // 2. Closest match fallback (tolerance 0.00015)
+                string bestKey = null;
+                double minDiff = double.MaxValue;
+                foreach (var kvp in ThicknessMap)
+                {
+                    if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
+                    {
+                        double diff = Math.Abs(val - mapVal);
+                        if (diff < 0.00015 && diff < minDiff)
+                        {
+                            minDiff = diff;
+                            bestKey = kvp.Key;
+                        }
+                    }
+                }
+
+                if (bestKey != null)
+                {
+                    return ParseKey(bestKey, out gauge, out material);
+                }
+            }
+            return false;
+        }
+
+        private static bool ParseKey(string key, out string gauge, out string material)
+        {
+            gauge = string.Empty;
+            material = string.Empty;
+            // Find where the gauge number ends and material code starts
+            int i = 0;
+            while (i < key.Length && (char.IsDigit(key[i]) || key[i] == '.'))
+            {
+                i++;
+            }
+            if (i > 0 && i < key.Length)
+            {
+                gauge = key.Substring(0, i);
+                material = key.Substring(i).Trim();
+                return true;
             }
             return false;
         }
@@ -346,61 +405,6 @@ namespace UnitConstructionVerifier.Models
                         return rule.Classification;
                     }
                 }
-            }
-
-            // Legacy Casing & Wall/Roof classification fallbacks
-            if (description.IndexOf("liner", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "Liner";
-
-            if (description.IndexOf("peaked roof split cover", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("roof seal-off angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                string.Equals(modelOrStockNumber, "091-30119-007", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(modelOrStockNumber, "091-30117-076", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Misc Trim";
-            }
-
-            if (description.IndexOf("roof corner cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("roof cap", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("sq part - trim", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return "Trim";
-            }
-
-            if (description.StartsWith("C:SC", StringComparison.OrdinalIgnoreCase))
-                return "Channel";
-
-            if (description.IndexOf("skin", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("panel", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("post", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return "Skin";
-            }
-
-            // Legacy Base & Floor classification fallbacks
-            if (modelOrStockNumber?.Trim() == "091-30117-080" || 
-                description.IndexOf("SUBFLOOR", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return "Sub-Floor";
-            }
-
-            if (description.IndexOf("floor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("deck", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return "Floor Sheet";
-            }
-
-            if (description.StartsWith("CHN:STRUCT", StringComparison.OrdinalIgnoreCase))
-                return "Structural Channel";
-
-            if (description.IndexOf("Channel, Formed", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "Formed Channel";
-
-            if (description.IndexOf("perimeter angle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                description.IndexOf("angle, perimeter", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                (description.IndexOf("perimeter", StringComparison.OrdinalIgnoreCase) >= 0 && description.IndexOf("angle", StringComparison.OrdinalIgnoreCase) >= 0))
-            {
-                return "Perimeter Angle";
             }
 
             return "Unknown";

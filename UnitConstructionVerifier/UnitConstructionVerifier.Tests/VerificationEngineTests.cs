@@ -111,7 +111,7 @@ namespace UnitConstructionVerifier.Tests
                         SourceSurfaceIam = "Base.iam",
                         BaseMaterial = "STL C CHNL",
                         FormedChannelGauge = "10",
-                        FormedChannelMaterialOnly = "STL HOT ROLL"
+                        FormedChannelMaterial = "STL HOT ROLL"
                     }
                 }
             };
@@ -144,6 +144,80 @@ namespace UnitConstructionVerifier.Tests
                         PartNumber = "Accessory-Lug",
                         Description = "LIFTING LUG A36",
                         YCMATL = "A36" // Not verified as main channel -> ignored
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestBaseVerification_StructuralAngle()
+        {
+            var userData = new UnitConstructionData
+            {
+                BaseRows = new List<BaseSurfaceRow>
+                {
+                    new BaseSurfaceRow
+                    {
+                        SourceSurfaceIam = "Base.iam",
+                        BaseMaterial = "STL C CHNL"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Base.iam",
+                        PartNumber = "Struct-Angle-1",
+                        Description = "ANG:STRUCT 3x3",
+                        ModelNumber = "091-30117-187",
+                        YCMATL = "STL ANGLE"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestBaseVerification_StructuralAngle_Aluminum()
+        {
+            var userData = new UnitConstructionData
+            {
+                BaseRows = new List<BaseSurfaceRow>
+                {
+                    new BaseSurfaceRow
+                    {
+                        SourceSurfaceIam = "Base.iam",
+                        BaseMaterial = "ALM C CHNL"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Base.iam",
+                        PartNumber = "Struct-Angle-Alum",
+                        Description = "ANG:STRUCT 3x3 AL",
+                        ModelNumber = "091-30117-189",
+                        YCMATL = "ALM ANGLE"
                     }
                 }
             };
@@ -425,6 +499,82 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("Seal-Off Angle Gauge & Material", result.Mismatches[0].FieldName);
             Assert.AreEqual("16 GA STL GALV", result.Mismatches[0].ExpectedValue);
             Assert.AreEqual("18 GA STL GALV", result.Mismatches[0].ActualValue);
+        }
+
+        [Test]
+        public void TestConditionalResolve_WallCornerCap_Steel()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        ExteriorSkinMaterial  = "STL GALV PPC"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "CornerCap-Steel",
+                        Description  = "Wall Corner Cap",
+                        ModelNumber  = "091-30117-072",
+                        MtlGauge     = "16",
+                        YCMATL       = "STL GALV PPC"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestConditionalResolve_WallCornerCap_Aluminum()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        ExteriorSkinMaterial  = "ALM SHT"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "CornerCap-Alum",
+                        Description  = "Wall Corner Cap",
+                        ModelNumber  = "091-30117-072",
+                        MtlGauge     = "14",
+                        YCMATL       = "ALM SHT"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
         }
     }
 }
