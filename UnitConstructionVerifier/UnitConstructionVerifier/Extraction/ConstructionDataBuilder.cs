@@ -160,10 +160,18 @@ namespace UnitConstructionVerifier.Extraction
                         }
                     }
 
+                    bool isShared = config.IsSharedWall();
+                    if (isShared)
+                    {
+                        skinGauge = linerGauge;
+                        skinMat = linerMat;
+                    }
+
                     var row = new WallSurfaceRow
                     {
                         PartNumber = partNum,
                         Segments = segsStr,
+                        IsSharedWall = isShared,
                         Thickness = thickness,
                         ExteriorPaint = paint,
                         ExteriorSkinGauge = skinGauge,
@@ -238,7 +246,7 @@ namespace UnitConstructionVerifier.Extraction
                             .GroupBy(p => new { p.MtlGauge, p.YCMATL })
                             .OrderByDescending(g => g.Count())
                             .First().Key;
-                        formedGauge = MaterialsConfig.MapGauge(dominantFormed.MtlGauge);
+                        formedGauge = MaterialsConfig.MapGauge(dominantFormed.MtlGauge, dominantFormed.YCMATL);
                         formedMatOnly = MaterialsConfig.MapMaterial(dominantFormed.YCMATL);
                     }
 
@@ -279,7 +287,7 @@ namespace UnitConstructionVerifier.Extraction
                         StringComparison.OrdinalIgnoreCase);
                 }
 
-                floorGauge = MaterialsConfig.MapGauge(floorGauge);
+                floorGauge = MaterialsConfig.MapGauge(floorGauge, floorMat);
                 floorMat = MaterialsConfig.MapMaterial(floorMat);
 
                 var insul = config.InsulationList
@@ -304,7 +312,7 @@ namespace UnitConstructionVerifier.Extraction
                 if (subFloorParts.Count > 0)
                 {
                     var first = subFloorParts[0];
-                    subFloorGauge = MaterialsConfig.MapGauge(first.MtlGauge);
+                    subFloorGauge = MaterialsConfig.MapGauge(first.MtlGauge, first.YCMATL);
                     subFloorMat = MaterialsConfig.MapMaterial(first.YCMATL);
                 }
 
@@ -320,7 +328,7 @@ namespace UnitConstructionVerifier.Extraction
                         .GroupBy(p => new { p.MtlGauge, p.YCMATL })
                         .OrderByDescending(g => g.Count())
                         .First().Key;
-                    perimeterGauge = MaterialsConfig.MapGauge(dominantPerimeter.MtlGauge);
+                    perimeterGauge = MaterialsConfig.MapGauge(dominantPerimeter.MtlGauge, dominantPerimeter.YCMATL);
                     perimeterMat = MaterialsConfig.MapMaterial(dominantPerimeter.YCMATL);
                 }
 

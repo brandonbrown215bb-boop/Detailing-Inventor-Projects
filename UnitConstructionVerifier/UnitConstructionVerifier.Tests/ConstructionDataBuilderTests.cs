@@ -226,5 +226,52 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("12", row.PerimeterAngleGauge);
             Assert.AreEqual("STL GALV", row.PerimeterAngleMaterial);
         }
+
+        [Test]
+        public void TestSharedWall_SkinInheritsLinerProperties()
+        {
+            var config = new ConfigData
+            {
+                SurfaceType = "WALL",
+                SourceIamPath = "SharedWall.iam",
+                SurfaceId = "shared-wall-id",
+                UnitSurfaceList = new List<UnitSurface>
+                {
+                    new UnitSurface
+                    {
+                        Id = "shared-wall-id",
+                        IsInteriorWall = true
+                    }
+                },
+                SurfaceSegmentList = new List<SurfaceSegment>
+                {
+                    new SurfaceSegment
+                    {
+                        SegmentType = "MB",
+                        SegmentTypeSuffix = "1",
+                        WallThickness_Left = 3.0,
+                        SkinMaterialGauge_Left = 20.0,
+                        SkinMaterialType_Left = "Steel, Galvanized",
+                        LinerMaterialGauge_Left = 18.0,
+                        LinerMaterialType_Left = "Aluminum 6061"
+                    }
+                },
+                Wall = new SurfaceGeometryContainer
+                {
+                    GeometryList = new List<GeometryItem> { new GeometryItem { X = 100.0 } }
+                }
+            };
+
+            var builder = new ConstructionDataBuilder(new List<ConfigData> { config }, null, new IptScanResult());
+            var result = builder.Build();
+
+            Assert.AreEqual(1, result.WallRows.Count);
+            var row = result.WallRows[0];
+            Assert.IsTrue(row.IsSharedWall);
+            Assert.AreEqual("18", row.ExteriorSkinGauge);
+            Assert.AreEqual("Aluminum 6061", row.ExteriorSkinMaterial);
+            Assert.AreEqual("18", row.InteriorLinerGauge);
+            Assert.AreEqual("Aluminum 6061", row.InteriorLinerMaterial);
+        }
     }
 }

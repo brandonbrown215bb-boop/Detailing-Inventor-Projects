@@ -127,7 +127,7 @@ namespace UnitConstructionVerifier.Engine
             return s.Trim().Replace("\"", "").Replace("'", "").ToUpperInvariant();
         }
 
-        private static string FormatGaugeAndMaterial(string gauge, string material)
+        private static string FormatGaugeAndMaterial(string gauge, string material, string expectedMaterialHint = null)
         {
             gauge    = (gauge    ?? string.Empty).Trim();
             material = (material ?? string.Empty).Trim();
@@ -135,7 +135,8 @@ namespace UnitConstructionVerifier.Engine
             // If the gauge is a decimal thickness, try to resolve both gauge and material from the database mapping first
             if (double.TryParse(gauge, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
             {
-                if (MaterialsConfig.ResolveFromThickness(gauge, out string resolvedGauge, out string resolvedMaterial))
+                string hint = !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material;
+                if (MaterialsConfig.ResolveFromThickness(gauge, hint, out string resolvedGauge, out string resolvedMaterial))
                 {
                     gauge = resolvedGauge;
                     // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
@@ -146,7 +147,7 @@ namespace UnitConstructionVerifier.Engine
                 }
             }
 
-            string mappedGauge = MaterialsConfig.MapGauge(gauge);
+            string mappedGauge = MaterialsConfig.MapGauge(gauge, !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material);
             string mappedMaterial = MaterialsConfig.MapMaterial(material);
 
             if (string.IsNullOrEmpty(mappedGauge) && string.IsNullOrEmpty(mappedMaterial)) return string.Empty;
@@ -195,10 +196,13 @@ namespace UnitConstructionVerifier.Engine
 
         public static Dictionary<string, string> BuildRowFields(WallSurfaceRow row)
         {
+            string skinGauge = row.IsSharedWall ? row.InteriorLinerGauge : row.ExteriorSkinGauge;
+            string skinMat = row.IsSharedWall ? row.InteriorLinerMaterial : row.ExteriorSkinMaterial;
+
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["ExteriorSkinGauge"]     = row.ExteriorSkinGauge,
-                ["ExteriorSkinMaterial"]  = row.ExteriorSkinMaterial,
+                ["ExteriorSkinGauge"]     = skinGauge,
+                ["ExteriorSkinMaterial"]  = skinMat,
                 ["InteriorLinerGauge"]    = row.InteriorLinerGauge,
                 ["InteriorLinerMaterial"] = row.InteriorLinerMaterial,
                 ["ChannelSkinGauge"]      = row.ChannelSkinGauge,
@@ -353,7 +357,7 @@ namespace UnitConstructionVerifier.Engine
             if (string.IsNullOrWhiteSpace(expected)) return;
 
             // Special case: Structural Channel/Angle compares YCMATL directly (no gauge format)
-            string actual = FormatGaugeAndMaterial(ipt.MtlGauge, ipt.YCMATL);
+            string actual = FormatGaugeAndMaterial(ipt.MtlGauge, ipt.YCMATL, expectedMaterial);
             if (string.Equals(rule.Classification, "Structural Channel", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(rule.Classification, "Structural Angle", StringComparison.OrdinalIgnoreCase))
             {

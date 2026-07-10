@@ -60,6 +60,12 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("20", MaterialsConfig.MapGauge("0.034"));
             Assert.AreEqual("24", MaterialsConfig.MapGauge("0.022"));
             Assert.AreEqual("22", MaterialsConfig.MapGauge("0.028"));
+
+            // 0.188 with ALM DIA hint should map to 0.188 (aluminum) instead of 7 (steel)
+            Assert.AreEqual("0.188", MaterialsConfig.MapGauge("0.188", "ALM DIA"));
+            // 0.188 with STL DIA HR hint (or no hint) should map to 7 (steel)
+            Assert.AreEqual("7", MaterialsConfig.MapGauge("0.188", "STL DIA HR"));
+            Assert.AreEqual("7", MaterialsConfig.MapGauge("0.188"));
         }
 
         [Test]
@@ -97,6 +103,24 @@ namespace UnitConstructionVerifier.Tests
             // Invalid thickness
             resolved = MaterialsConfig.ResolveFromThickness("invalid", out _, out _);
             Assert.IsFalse(resolved);
+
+            // Resolve 0.188 with ALM DIA hint
+            resolved = MaterialsConfig.ResolveFromThickness("0.188", "ALM DIA", out string gaugeAlm, out string materialAlm);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("0.188", gaugeAlm);
+            Assert.AreEqual("ALM DIA", materialAlm);
+
+            // Resolve 0.188 with STL DIA HR hint
+            resolved = MaterialsConfig.ResolveFromThickness("0.188", "STL DIA HR", out string gaugeStl, out string materialStl);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("7", gaugeStl);
+            Assert.AreEqual("STL DIA HR", materialStl);
+
+            // Resolve 0.188 without hint (should default to closest: 7 GA STL DIA HR)
+            resolved = MaterialsConfig.ResolveFromThickness("0.188", null, out string gaugeNone, out string materialNone);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("7", gaugeNone);
+            Assert.AreEqual("STL DIA HR", materialNone);
         }
 
         [Test]

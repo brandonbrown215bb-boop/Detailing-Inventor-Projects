@@ -229,6 +229,11 @@ namespace UnitConstructionVerifier.Models
 
         public static string MapGauge(string raw)
         {
+            return MapGauge(raw, null);
+        }
+
+        public static string MapGauge(string raw, string materialHint)
+        {
             if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
             string key = raw.Trim();
 
@@ -256,6 +261,8 @@ namespace UnitConstructionVerifier.Models
                 // 1. Precise match (tolerance 0.000009)
                 foreach (var kvp in ThicknessMap)
                 {
+                    if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
+
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         if (Math.Abs(val - mapVal) < 0.000009)
@@ -274,6 +281,8 @@ namespace UnitConstructionVerifier.Models
                 double minDiff = double.MaxValue;
                 foreach (var kvp in ThicknessMap)
                 {
+                    if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
+
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         double diff = Math.Abs(val - mapVal);
@@ -298,6 +307,36 @@ namespace UnitConstructionVerifier.Models
             return key;
         }
 
+        private static bool IsMatchingMaterialGroup(string thicknessMapKey, string materialHint)
+        {
+            if (string.IsNullOrWhiteSpace(materialHint)) return true;
+
+            string mappedHint = MapMaterial(materialHint).ToUpperInvariant();
+            
+            bool hintIsAlm = mappedHint.Contains("ALM") || mappedHint.Contains("ALUMINUM");
+            bool hintIsSteelOrSstOrGalv = mappedHint.Contains("STL") || mappedHint.Contains("SST") || 
+                                         mappedHint.Contains("GALV") || mappedHint.Contains("STEEL") || 
+                                         mappedHint.Contains("GALVANIZED") || mappedHint.Contains("STAINLESS");
+
+            // If the hint is not clearly one or the other, don't filter
+            if (!hintIsAlm && !hintIsSteelOrSstOrGalv) return true;
+
+            string keyUpper = thicknessMapKey.ToUpperInvariant();
+            bool keyIsAlm = keyUpper.Contains("ALM") || keyUpper.Contains("ALMB");
+            bool keyIsSteelOrSstOrGalv = keyUpper.Contains("STL") || keyUpper.Contains("SST") || keyUpper.Contains("GALV");
+
+            if (hintIsAlm)
+            {
+                return keyIsAlm;
+            }
+            if (hintIsSteelOrSstOrGalv)
+            {
+                return keyIsSteelOrSstOrGalv;
+            }
+
+            return true;
+        }
+
         private static string ExtractGaugePart(string matchedKey)
         {
             string gaugePart = string.Empty;
@@ -317,6 +356,11 @@ namespace UnitConstructionVerifier.Models
 
         public static bool ResolveFromThickness(string thicknessStr, out string gauge, out string material)
         {
+            return ResolveFromThickness(thicknessStr, null, out gauge, out material);
+        }
+
+        public static bool ResolveFromThickness(string thicknessStr, string materialHint, out string gauge, out string material)
+        {
             gauge = string.Empty;
             material = string.Empty;
             if (string.IsNullOrWhiteSpace(thicknessStr)) return false;
@@ -326,6 +370,8 @@ namespace UnitConstructionVerifier.Models
                 // 1. Precise match (tolerance 0.000009)
                 foreach (var kvp in ThicknessMap)
                 {
+                    if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
+
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         if (Math.Abs(val - mapVal) < 0.000009)
@@ -340,6 +386,8 @@ namespace UnitConstructionVerifier.Models
                 double minDiff = double.MaxValue;
                 foreach (var kvp in ThicknessMap)
                 {
+                    if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
+
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         double diff = Math.Abs(val - mapVal);

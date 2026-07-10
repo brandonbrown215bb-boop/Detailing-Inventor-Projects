@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
@@ -28,6 +29,22 @@ namespace UnitConstructionVerifier.Models
 
         [JsonProperty("surfaceType")]
         public string SurfaceType { get; set; } = string.Empty;          // YC SURF WALL / BASE / ROOF
+
+        [JsonProperty("surfaceID")]
+        public string? SurfaceId { get; set; }
+
+        public bool IsSharedWall()
+        {
+            if (string.IsNullOrEmpty(SurfaceId)) return false;
+            foreach (var surface in UnitSurfaceList)
+            {
+                if (string.Equals(surface.Id, SurfaceId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return surface.IsInteriorWall;
+                }
+            }
+            return false;
+        }
 
         [JsonProperty("skidID")]
         public string? SkidId { get; set; }

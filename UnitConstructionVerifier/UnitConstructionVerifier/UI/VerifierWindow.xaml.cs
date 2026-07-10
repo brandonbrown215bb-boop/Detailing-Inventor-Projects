@@ -389,7 +389,7 @@ namespace UnitConstructionVerifier.UI
                         }
 
                         string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
 
                         string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
@@ -426,7 +426,7 @@ namespace UnitConstructionVerifier.UI
                         }
 
                         string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
                         bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
 
                         string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
@@ -458,7 +458,7 @@ namespace UnitConstructionVerifier.UI
                         string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
 
                         string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL);
+                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
 
                         if (string.Equals(rule.Classification, "Structural Channel", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(rule.Classification, "Structural Angle", StringComparison.OrdinalIgnoreCase))
@@ -845,7 +845,7 @@ namespace UnitConstructionVerifier.UI
             return s.Trim().Replace("\"", "").Replace("'", "").ToUpperInvariant();
         }
 
-        private static string FormatGaugeAndMaterial(string gauge, string material)
+        private static string FormatGaugeAndMaterial(string gauge, string material, string expectedMaterialHint = null)
         {
             gauge    = (gauge    ?? string.Empty).Trim();
             material = (material ?? string.Empty).Trim();
@@ -853,7 +853,8 @@ namespace UnitConstructionVerifier.UI
             // If the gauge is a decimal thickness, try to resolve both gauge and material from the database mapping first
             if (double.TryParse(gauge, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
             {
-                if (MaterialsConfig.ResolveFromThickness(gauge, out string resolvedGauge, out string resolvedMaterial))
+                string hint = !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material;
+                if (MaterialsConfig.ResolveFromThickness(gauge, hint, out string resolvedGauge, out string resolvedMaterial))
                 {
                     gauge = resolvedGauge;
                     // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
@@ -864,7 +865,7 @@ namespace UnitConstructionVerifier.UI
                 }
             }
 
-            string mappedGauge = MaterialsConfig.MapGauge(gauge);
+            string mappedGauge = MaterialsConfig.MapGauge(gauge, !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material);
             string mappedMaterial = MaterialsConfig.MapMaterial(material);
 
             if (string.IsNullOrEmpty(mappedGauge) && string.IsNullOrEmpty(mappedMaterial)) return string.Empty;

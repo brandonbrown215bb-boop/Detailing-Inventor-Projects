@@ -68,7 +68,16 @@ namespace UnitConstructionVerifier.Operations
                 // Symmetrical Sync: Keep Gauge and Thickness in sync if only one is updated
                 if (edits.Thickness != null && edits.MtlGauge == null)
                 {
-                    string mappedGauge = MaterialsConfig.MapGauge(edits.Thickness);
+                    string material = edits.YCMATL;
+                    if (string.IsNullOrEmpty(material))
+                    {
+                        material = ReadUserProperty(userDefined, "YCMATL");
+                        if (string.IsNullOrEmpty(material))
+                        {
+                            material = ReadUserProperty(userDefined, "INPUT_PARAMETER_MaterialType");
+                        }
+                    }
+                    string mappedGauge = MaterialsConfig.MapGauge(edits.Thickness, material);
                     if (!string.IsNullOrEmpty(mappedGauge) && mappedGauge != edits.Thickness)
                     {
                         edits.MtlGauge = mappedGauge;

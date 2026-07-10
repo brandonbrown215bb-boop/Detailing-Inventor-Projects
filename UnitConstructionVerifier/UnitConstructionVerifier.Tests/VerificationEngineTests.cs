@@ -540,6 +540,44 @@ namespace UnitConstructionVerifier.Tests
         }
 
         [Test]
+        public void TestConditionalResolve_WallCornerLiner_Aluminum()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        InteriorLinerMaterial = "ALM SHT"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "CornerLiner-Alum",
+                        Description  = "Wall Corner Liner",
+                        ModelNumber  = "091-30117-073",
+                        MtlGauge     = "14",
+                        YCMATL       = "ALM SHT"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
         public void TestConditionalResolve_WallCornerCap_Aluminum()
         {
             var userData = new UnitConstructionData
@@ -566,6 +604,86 @@ namespace UnitConstructionVerifier.Tests
                         ModelNumber  = "091-30117-072",
                         MtlGauge     = "14",
                         YCMATL       = "ALM SHT"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestConditionalResolve_WallCornerCap_AluminumEmbossed()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        ExteriorSkinMaterial  = "ALM EMB"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "CornerCap-AlumEmb",
+                        Description  = "Wall Corner Cap",
+                        ModelNumber  = "091-30117-072",
+                        MtlGauge     = "20",
+                        YCMATL       = "ALM EMB"
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void TestSharedWall_SkinPartVerifiesAgainstLinerProperties()
+        {
+            var userData = new UnitConstructionData
+            {
+                WallRows = new List<WallSurfaceRow>
+                {
+                    new WallSurfaceRow
+                    {
+                        SourceSurfaceIam      = "Wall.iam",
+                        IsSharedWall          = true,
+                        ExteriorSkinGauge     = "20",
+                        ExteriorSkinMaterial  = "STL GALV",
+                        InteriorLinerGauge    = "18",
+                        InteriorLinerMaterial = "ALM SHT"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Wall.iam",
+                        PartNumber   = "Skin-Part-As-Liner",
+                        Description  = "casing skin panel",
+                        ModelNumber  = "091-30117-083", // classified as Skin
+                        MtlGauge     = "18", // should verify against liner gauge
+                        YCMATL       = "ALM SHT" // should verify against liner material
                     }
                 }
             };

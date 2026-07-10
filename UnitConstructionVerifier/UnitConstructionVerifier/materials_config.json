@@ -221,7 +221,7 @@
       "Classification": "Wall Corner Cap",
       "DescriptionKeywords": [ "wall corner cap" ],
       "StockNumbers": [ "091-30117-072" ],
-      "GaugeSource": "fixed:16",
+      "GaugeSource": "if:ExteriorSkinMaterial=ALM EMB?fixed:20:if:ExteriorSkinMaterial=ALM SHT?fixed:14:fixed:16",
       "MaterialSource": "borrow:ExteriorSkinMaterial",
       "VerificationMode": "mismatch",
       "Section": "Casing",

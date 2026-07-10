@@ -66,6 +66,7 @@ namespace UnitConstructionVerifier.Models
     {
         public string PartNumber                { get; set; } = string.Empty; // e.g. 391Z010111-0151
         public string Segments                  { get; set; } = string.Empty; // e.g. "CC, XA-1"
+        public bool IsSharedWall                { get; set; }
         public string Thickness                 { get; set; } = string.Empty;
         public string ExteriorPaint             { get; set; } = string.Empty;
         public string ExteriorSkinGauge         { get; set; } = string.Empty;
