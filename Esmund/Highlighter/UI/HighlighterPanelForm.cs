@@ -11,8 +11,10 @@ namespace Highlighter.UI
         private readonly HighlightController _controller;
         private readonly Button[] _typeButtons;
         private readonly Button[] _colorButtons;
+        private readonly Button _allModeBtn;
+        private readonly Button _selectiveModeBtn;
+        private readonly Button _normalBtn;
         private readonly ToolTip _tips = new ToolTip();
-        private readonly Label _status;
         private readonly HighlightPartType[] _types =
         {
             HighlightPartType.WallSkin,
@@ -36,7 +38,7 @@ namespace Highlighter.UI
             MinimizeBox = false;
             ShowInTaskbar = false;
             TopMost = true;
-            ClientSize = new Size(260, 286);
+            ClientSize = new Size(260, 348);
             BackColor = Color.FromArgb(245, 245, 247);
             Font = new Font("Segoe UI", 9f);
 
@@ -44,17 +46,48 @@ namespace Highlighter.UI
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 7,
+                RowCount = 9,
                 Padding = new Padding(10),
             };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); // mode
             for (int i = 0; i < 6; i++)
             {
                 layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
             }
 
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); // normal
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            var modeRow = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0, 0, 0, 6),
+            };
+            modeRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            modeRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+
+            _allModeBtn = MakeModeButton("All");
+            _allModeBtn.Click += (_, __) =>
+            {
+                _controller.SetScopeMode(HighlightScopeMode.All);
+                SyncModeButtons();
+                SyncTypeButtonLooks();
+            };
+            _selectiveModeBtn = MakeModeButton("Selective");
+            _selectiveModeBtn.Click += (_, __) =>
+            {
+                _controller.SetScopeMode(HighlightScopeMode.Selective);
+                SyncModeButtons();
+                SyncTypeButtonLooks();
+            };
+            modeRow.Controls.Add(_allModeBtn, 0, 0);
+            modeRow.Controls.Add(_selectiveModeBtn, 1, 0);
+            layout.SetColumnSpan(modeRow, 2);
+            layout.Controls.Add(modeRow, 0, 0);
 
             _typeButtons = new Button[_types.Length];
             _colorButtons = new Button[_types.Length];
@@ -75,7 +108,7 @@ namespace Highlighter.UI
                 typeBtn.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 186);
                 typeBtn.Click += TypeButton_Click;
                 _typeButtons[i] = typeBtn;
-                layout.Controls.Add(typeBtn, 0, i);
+                layout.Controls.Add(typeBtn, 0, i + 1);
 
                 Button colorBtn = new Button
                 {
@@ -88,31 +121,41 @@ namespace Highlighter.UI
                 };
                 colorBtn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 85);
                 colorBtn.FlatAppearance.BorderSize = 2;
-                // Cycle is reliable; TopMost + ContextMenuStrip often fails in Inventor.
                 colorBtn.Click += ColorButton_Click;
                 colorBtn.MouseUp += ColorButton_MouseUp;
                 _colorButtons[i] = colorBtn;
-                layout.Controls.Add(colorBtn, 1, i);
+                layout.Controls.Add(colorBtn, 1, i + 1);
             }
 
-            _status = new Label
+            _normalBtn = new Button
             {
-                Text = "Type on/off · color square cycles (right-click picks).",
+                Text = "Normal",
                 Dock = DockStyle.Fill,
-                ForeColor = Color.FromArgb(90, 90, 95),
-                Margin = new Padding(0, 6, 0, 0)
+                Margin = new Padding(0, 4, 0, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
             };
-            layout.SetColumnSpan(_status, 2);
-            layout.Controls.Add(_status, 0, 6);
+            _normalBtn.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 186);
+            _normalBtn.Click += (_, __) =>
+            {
+                _controller.RestoreNormal();
+                SyncModeButtons();
+                SyncTypeButtonLooks();
+                SyncColorButtons();
+            };
+            layout.SetColumnSpan(_normalBtn, 2);
+            layout.Controls.Add(_normalBtn, 0, 7);
 
             Controls.Add(layout);
             FormClosing += HighlighterPanelForm_FormClosing;
+            SyncModeButtons();
             SyncTypeButtonLooks();
             SyncColorButtons();
         }
 
         public void RefreshButtonStates()
         {
+            SyncModeButtons();
             SyncTypeButtonLooks();
             SyncColorButtons();
         }
@@ -131,6 +174,20 @@ namespace Highlighter.UI
             }
         }
 
+        private static Button MakeModeButton(string text)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 4, 0),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+            };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 186);
+            return btn;
+        }
+
         private void TypeButton_Click(object sender, EventArgs e)
         {
             if (!(sender is Button btn) || !(btn.Tag is HighlightPartType type))
@@ -139,9 +196,8 @@ namespace Highlighter.UI
             }
 
             bool next = !_controller.IsTypeOn(type);
-            string msg = _controller.SetType(type, next);
+            _controller.SetType(type, next);
             SyncTypeButtonLooks();
-            _status.Text = msg;
         }
 
         private void ColorButton_Click(object sender, EventArgs e)
@@ -151,11 +207,9 @@ namespace Highlighter.UI
                 return;
             }
 
-            // Left-click cycles — works even when menus are blocked by TopMost / Inventor focus.
-            string name = _controller.CycleTypeColor(type);
+            _controller.CycleTypeColor(type);
             SyncColorButtons();
             SyncTypeButtonLooks();
-            _status.Text = HighlightTypeCatalog.DisplayName(type) + " → " + name + " (saved)";
         }
 
         private void ColorButton_MouseUp(object sender, MouseEventArgs e)
@@ -170,7 +224,6 @@ namespace Highlighter.UI
                 return;
             }
 
-            // Right-click: pick from list (temporarily drop TopMost so menu isn't buried).
             bool wasTop = TopMost;
             try
             {
@@ -190,7 +243,6 @@ namespace Highlighter.UI
                             _controller.SetTypeColor(type, captured.R, captured.G, captured.B);
                             SyncColorButtons();
                             SyncTypeButtonLooks();
-                            _status.Text = HighlightTypeCatalog.DisplayName(type) + " → " + captured.Name + " (saved)";
                         };
                         menu.Items.Add(item);
                     }
@@ -201,6 +253,31 @@ namespace Highlighter.UI
             finally
             {
                 TopMost = wasTop;
+            }
+        }
+
+        private void SyncModeButtons()
+        {
+            bool selective = _controller.ScopeMode == HighlightScopeMode.Selective
+                || _controller.IsPicking
+                || _controller.SelectiveApplied;
+            StyleToggle(_allModeBtn, !selective);
+            StyleToggle(_selectiveModeBtn, selective);
+        }
+
+        private static void StyleToggle(Button btn, bool on)
+        {
+            if (on)
+            {
+                btn.BackColor = Color.FromArgb(210, 228, 245);
+                btn.FlatAppearance.BorderColor = Color.FromArgb(70, 120, 170);
+                btn.Font = new Font(btn.Font, FontStyle.Bold);
+            }
+            else
+            {
+                btn.BackColor = Color.White;
+                btn.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 186);
+                btn.Font = new Font(btn.Font, FontStyle.Regular);
             }
         }
 
@@ -266,7 +343,6 @@ namespace Highlighter.UI
             {
                 e.Cancel = true;
                 Hide();
-                _status.Text = "Hidden — colors saved; highlights stay until toggled off.";
             }
         }
     }

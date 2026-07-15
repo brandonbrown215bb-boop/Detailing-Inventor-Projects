@@ -8,6 +8,7 @@ namespace Highlighter.Core
     {
         public ComponentOccurrence Occurrence { get; set; }
         public bool WasTransparent { get; set; }
+        public double WasOverrideOpacity { get; set; }
     }
 
     /// <summary>
