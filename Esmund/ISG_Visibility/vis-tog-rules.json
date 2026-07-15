@@ -1,0 +1,928 @@
+{
+    "presets":  {
+                    "OVTP_Roof_Off":  {
+                                          "stocks":  [
+                                                         "091-30119-007",
+                                                         "091-30117-022",
+                                                         "091-30117-057",
+                                                         "091-30117-177",
+                                                         "091-30117-058",
+                                                         "091-30117-074",
+                                                         "091-30117-195",
+                                                         "091-30117-001",
+                                                         "091-30117-076",
+                                                         "091-30117-011",
+                                                         "091-30117-089",
+                                                         "091-30117-075",
+                                                         "091-30117-077",
+                                                         "091-30119-008"
+                                                     ],
+                                          "visible":  false
+                                      },
+                    "OVTP_Base_Off":  {
+                                          "stocks":  [
+                                                         "091-30117-067",
+                                                         "091-30117-190",
+                                                         "091-30117-066",
+                                                         "091-30117-061",
+                                                         "091-30117-062",
+                                                         "091-30117-078",
+                                                         "091-30117-124"
+                                                     ],
+                                          "visible":  false
+                                      },
+                    "OVTP_Wall_Off":  {
+                                          "stocks":  [
+                                                         "091-30117-053",
+                                                         "091-30117-049",
+                                                         "091-30119-006",
+                                                         "091-30117-072",
+                                                         "091-30117-073",
+                                                         "091-30117-046",
+                                                         "091-30117-048",
+                                                         "091-30117-196",
+                                                         "091-30117-087"
+                                                     ],
+                                          "visible":  false
+                                      },
+                    "M_VTP_Base_On":  {
+                                          "stocks":  [
+                                                         "091-30117-078",
+                                                         "091-30117-055",
+                                                         "091-30117-124",
+                                                         "091-30117-067",
+                                                         "091-30117-190",
+                                                         "091-30117-056",
+                                                         "091-30117-079",
+                                                         "091-30117-051",
+                                                         "091-30117-066",
+                                                         "091-30117-054",
+                                                         "091-30117-189",
+                                                         "091-30117-188",
+                                                         "091-30117-187",
+                                                         "091-30117-186",
+                                                         "091-30117-080",
+                                                         "091-30117-061",
+                                                         "091-30117-062"
+                                                     ],
+                                          "visible":  true
+                                      },
+                    "M_VTP_Wall_Off":  {
+                                           "stocks":  [
+                                                          "091-30117-046",
+                                                          "091-30117-048",
+                                                          "091-30117-053",
+                                                          "091-30117-064",
+                                                          "091-30117-082",
+                                                          "091-30117-081",
+                                                          "091-30117-196",
+                                                          "091-30117-065",
+                                                          "091-30117-072",
+                                                          "091-30117-073",
+                                                          "091-30117-049",
+                                                          "091-30119-006",
+                                                          "091-30117-087"
+                                                      ],
+                                           "visible":  false
+                                       },
+                    "M_VTP_Base_Off":  {
+                                           "stocks":  [
+                                                          "091-30117-078",
+                                                          "091-30117-055",
+                                                          "091-30117-124",
+                                                          "091-30117-067",
+                                                          "091-30117-190",
+                                                          "091-30117-056",
+                                                          "091-30117-079",
+                                                          "091-30117-051",
+                                                          "091-30117-066",
+                                                          "091-30117-054",
+                                                          "091-30117-189",
+                                                          "091-30117-188",
+                                                          "091-30117-187",
+                                                          "091-30117-186",
+                                                          "091-30117-080",
+                                                          "091-30117-061",
+                                                          "091-30117-062"
+                                                      ],
+                                           "visible":  false
+                                       },
+                    "M_VTP_Roof_Off":  {
+                                           "stocks":  [
+                                                          "091-30117-001",
+                                                          "091-30117-076",
+                                                          "091-30117-058",
+                                                          "091-30117-011",
+                                                          "091-30119-007",
+                                                          "091-30117-089",
+                                                          "091-30117-075",
+                                                          "091-30117-074",
+                                                          "091-30117-195",
+                                                          "091-30117-022",
+                                                          "091-30117-057",
+                                                          "091-30117-177",
+                                                          "091-30117-083",
+                                                          "091-30117-077",
+                                                          "091-30117-085",
+                                                          "091-30117-086",
+                                                          "091-30117-084",
+                                                          "091-30117-069",
+                                                          "091-30117-068",
+                                                          "091-30117-070",
+                                                          "091-30117-083",
+                                                          "091-30119-008"
+                                                      ],
+                                           "visible":  false
+                                       },
+                    "OVTP_Roof_On":  {
+                                         "stocks":  [
+                                                        "091-30119-007",
+                                                        "091-30117-022",
+                                                        "091-30117-057",
+                                                        "091-30117-177",
+                                                        "091-30117-058",
+                                                        "091-30117-074",
+                                                        "091-30117-195",
+                                                        "091-30117-001",
+                                                        "091-30117-076",
+                                                        "091-30117-011",
+                                                        "091-30117-089",
+                                                        "091-30117-075",
+                                                        "091-30117-077",
+                                                        "091-30119-008"
+                                                    ],
+                                         "visible":  true
+                                     },
+                    "OVTP_Wall_On":  {
+                                         "stocks":  [
+                                                        "091-30117-053",
+                                                        "091-30117-049",
+                                                        "091-30119-006",
+                                                        "091-30117-072",
+                                                        "091-30117-073",
+                                                        "091-30117-046",
+                                                        "091-30117-048",
+                                                        "091-30117-196",
+                                                        "091-30117-087"
+                                                    ],
+                                         "visible":  true
+                                     },
+                    "M_VTP_Wall_On":  {
+                                          "stocks":  [
+                                                         "091-30117-046",
+                                                         "091-30117-048",
+                                                         "091-30117-053",
+                                                         "091-30117-064",
+                                                         "091-30117-082",
+                                                         "091-30117-081",
+                                                         "091-30117-196",
+                                                         "091-30117-065",
+                                                         "091-30117-072",
+                                                         "091-30117-073",
+                                                         "091-30117-049",
+                                                         "091-30119-006",
+                                                         "091-30117-087"
+                                                     ],
+                                          "visible":  true
+                                      },
+                    "OVTP_Base_On":  {
+                                         "stocks":  [
+                                                        "091-30117-067",
+                                                        "091-30117-190",
+                                                        "091-30117-066",
+                                                        "091-30117-061",
+                                                        "091-30117-062",
+                                                        "091-30117-078",
+                                                        "091-30117-124"
+                                                    ],
+                                         "visible":  true
+                                     },
+                    "M_VTP_Roof_On":  {
+                                          "stocks":  [
+                                                         "091-30117-001",
+                                                         "091-30117-076",
+                                                         "091-30117-058",
+                                                         "091-30117-011",
+                                                         "091-30119-007",
+                                                         "091-30117-089",
+                                                         "091-30117-075",
+                                                         "091-30117-074",
+                                                         "091-30117-195",
+                                                         "091-30117-022",
+                                                         "091-30117-057",
+                                                         "091-30117-177",
+                                                         "091-30117-083",
+                                                         "091-30117-077",
+                                                         "091-30117-085",
+                                                         "091-30117-086",
+                                                         "091-30117-084",
+                                                         "091-30117-069",
+                                                         "091-30117-068",
+                                                         "091-30117-070",
+                                                         "091-30117-083",
+                                                         "091-30119-008"
+                                                     ],
+                                          "visible":  true
+                                      }
+                },
+    "toggles":  [
+                    {
+                        "id":  "VTP_Base_Coil Panel Nesting Channel",
+                        "zone":  "Base",
+                        "label":  "Coil Panel Nesting Channel",
+                        "stock":  "091-30117-078"
+                    },
+                    {
+                        "id":  "VTP_Base_Corridor Perimeter Angle",
+                        "zone":  "Base",
+                        "label":  "Corridor Perimeter Angle",
+                        "stock":  "091-30117-055"
+                    },
+                    {
+                        "id":  "VTP_Base_Electrical, Pipe Chase Cover",
+                        "zone":  "Base",
+                        "label":  "Electrical, Pipe Chase Cover",
+                        "stock":  "091-30117-124"
+                    },
+                    {
+                        "id":  "VTP_Base_Filler Plate Aluminum",
+                        "zone":  "Base",
+                        "label":  "Filler Plate Aluminum",
+                        "stock":  "091-30117-190"
+                    },
+                    {
+                        "id":  "VTP_Base_Filler Plate",
+                        "zone":  "Base",
+                        "label":  "Filler Plate",
+                        "stock":  "091-30117-067"
+                    },
+                    {
+                        "id":  "VTP_Base_Floor",
+                        "zone":  "Base",
+                        "label":  "Floor",
+                        "stock":  "091-30117-056"
+                    },
+                    {
+                        "id":  "VTP_Base_Formed Angle",
+                        "zone":  "Base",
+                        "label":  "Formed Angle",
+                        "stock":  "091-30117-079"
+                    },
+                    {
+                        "id":  "VTP_Base_Formed Channel",
+                        "zone":  "Base",
+                        "label":  "Formed Channel",
+                        "stock":  "091-30117-051"
+                    },
+                    {
+                        "id":  "VTP_Base_Lifting Lug",
+                        "zone":  "Base",
+                        "label":  "Lifting Lug",
+                        "stock":  "091-30117-066"
+                    },
+                    {
+                        "id":  "VTP_Base_Perimeter Angle",
+                        "zone":  "Base",
+                        "label":  "Perimeter Angle",
+                        "stock":  "091-30117-054"
+                    },
+                    {
+                        "id":  "VTP_Base_Structural Aluminum Angle",
+                        "zone":  "Base",
+                        "label":  "Structural Aluminum Angle",
+                        "stock":  "091-30117-189"
+                    },
+                    {
+                        "id":  "VTP_Base_Structural Aluminum Channel",
+                        "zone":  "Base",
+                        "label":  "Structural Aluminum Channel",
+                        "stock":  "091-30117-188"
+                    },
+                    {
+                        "id":  "VTP_Base_Structural Steel Angle",
+                        "zone":  "Base",
+                        "label":  "Structural Steel Angle",
+                        "stock":  "091-30117-187"
+                    },
+                    {
+                        "id":  "VTP_Base_Structural Steel Channel",
+                        "zone":  "Base",
+                        "label":  "Structural Steel Channel",
+                        "stock":  "091-30117-186"
+                    },
+                    {
+                        "id":  "VTP_Base_Sub Floor Attachment Angle",
+                        "zone":  "Base",
+                        "label":  "Sub Floor Attachment Angle",
+                        "stock":  "091-30117-061"
+                    },
+                    {
+                        "id":  "VTP_Base_Sub Floor Attachment Flat",
+                        "zone":  "Base",
+                        "label":  "Sub Floor Attachment Flat",
+                        "stock":  "091-30117-062"
+                    },
+                    {
+                        "id":  "VTP_Base_Sub Floor",
+                        "zone":  "Base",
+                        "label":  "Sub Floor",
+                        "stock":  "091-30117-080"
+                    },
+                    {
+                        "id":  "VTP_Roof_Channel Bracket",
+                        "zone":  "Roof",
+                        "label":  "Channel Bracket",
+                        "stock":  "091-30117-077"
+                    },
+                    {
+                        "id":  "VTP_Roof_Liner",
+                        "zone":  "Roof",
+                        "label":  "Liner",
+                        "stock":  "091-30117-084"
+                    },
+                    {
+                        "id":  "VTP_Roof_Peaked Roof Split Cover",
+                        "zone":  "Roof",
+                        "label":  "Peaked Roof Split Cover",
+                        "stock":  "091-30117-076"
+                    },
+                    {
+                        "id":  "VTP_Roof_Roof Cap Split Cover",
+                        "zone":  "Roof",
+                        "label":  "Roof Cap Split Cover",
+                        "stock":  "091-30117-011"
+                    },
+                    {
+                        "id":  "VTP_Roof_Roof Cap",
+                        "zone":  "Roof",
+                        "label":  "Roof Cap",
+                        "stock":  "091-30117-058"
+                    },
+                    {
+                        "id":  "VTP_Roof_Roof Seal-Off Angle",
+                        "zone":  "Roof",
+                        "label":  "Roof Seal-Off Angle",
+                        "stock":  "091-30119-007"
+                    },
+                    {
+                        "id":  "VTP_Roof_Roof Thermal Break Split Cover",
+                        "zone":  "Roof",
+                        "label":  "Roof Thermal Break Split Cover",
+                        "stock":  "091-30117-089"
+                    },
+                    {
+                        "id":  "VTP_Roof_Roof Unit Split Cover",
+                        "zone":  "Roof",
+                        "label":  "Roof Unit Split Cover",
+                        "stock":  "091-30117-075"
+                    },
+                    {
+                        "id":  "VTP_Roof_Skin",
+                        "zone":  "Roof",
+                        "label":  "Skin",
+                        "stock":  "091-30117-083"
+                    },
+                    {
+                        "id":  "VTP_Roof_Sloped Roof Cap",
+                        "zone":  "Roof",
+                        "label":  "Sloped Roof Cap",
+                        "stock":  "091-30117-074"
+                    },
+                    {
+                        "id":  "VTP_Roof_Stacked Roof Cap Backup",
+                        "zone":  "Roof",
+                        "label":  "Stacked Roof Cap Backup",
+                        "stock":  "091-30117-195"
+                    },
+                    {
+                        "id":  "VTP_Roof_Super Angle",
+                        "zone":  "Roof",
+                        "label":  "Super Angle",
+                        "stock":  "091-30117-022"
+                    },
+                    {
+                        "id":  "VTP_Roof_Tiering Angle",
+                        "zone":  "Roof",
+                        "label":  "Tiering Angle",
+                        "stock":  "091-30117-057"
+                    },
+                    {
+                        "id":  "VTP_Roof_Tiering Seal Angle",
+                        "zone":  "Roof",
+                        "label":  "Tiering Seal Angle",
+                        "stock":  "091-30117-177"
+                    },
+                    {
+                        "id":  "VTP_Roof_Top Seal Plate",
+                        "zone":  "Roof",
+                        "label":  "Top Seal Plate",
+                        "stock":  "091-30119-008"
+                    },
+                    {
+                        "id":  "VTP_Roof_Variable Roof Corner Cap",
+                        "zone":  "Roof",
+                        "label":  "Variable Roof Corner Cap",
+                        "stock":  "091-30117-001"
+                    },
+                    {
+                        "id":  "VTP_Wall_Channel Bracket",
+                        "zone":  "Wall",
+                        "label":  "Channel Bracket",
+                        "stock":  "091-30117-046"
+                    },
+                    {
+                        "id":  "VTP_Wall_Corner Cap",
+                        "zone":  "Wall",
+                        "label":  "Corner Cap",
+                        "stock":  "091-30117-072"
+                    },
+                    {
+                        "id":  "VTP_Wall_Corner Liner",
+                        "zone":  "Wall",
+                        "label":  "Corner Liner",
+                        "stock":  "091-30117-073"
+                    },
+                    {
+                        "id":  "VTP_Wall_Door Nesting Channel",
+                        "zone":  "Wall",
+                        "label":  "Door Nesting Channel",
+                        "stock":  "091-30117-048"
+                    },
+                    {
+                        "id":  "VTP_Wall_Formed Angle",
+                        "zone":  "Wall",
+                        "label":  "Formed Angle",
+                        "stock":  "091-30117-053"
+                    },
+                    {
+                        "id":  "VTP_Wall_Horizontal Channel",
+                        "zone":  "Wall",
+                        "label":  "Horizontal Channel",
+                        "stock":  "091-30117-064"
+                    },
+                    {
+                        "id":  "VTP_Wall_Liner",
+                        "zone":  "Wall",
+                        "label":  "Liner",
+                        "stock":  "091-30117-082"
+                    },
+                    {
+                        "id":  "VTP_Wall_Skin",
+                        "zone":  "Wall",
+                        "label":  "Skin",
+                        "stock":  "091-30117-081"
+                    },
+                    {
+                        "id":  "VTP_Wall_SST Channel Cap",
+                        "zone":  "Wall",
+                        "label":  "SST Channel Cap",
+                        "stock":  "091-30117-196"
+                    },
+                    {
+                        "id":  "VTP_Wall_Vertical Channel",
+                        "zone":  "Wall",
+                        "label":  "Vertical Channel",
+                        "stock":  "091-30117-065"
+                    },
+                    {
+                        "id":  "VTP_Wall_Wall Attachment Angle",
+                        "zone":  "Wall",
+                        "label":  "Wall Attachment Angle",
+                        "stock":  "091-30117-049"
+                    },
+                    {
+                        "id":  "VTP_Wall_Wall Seal-Off Angle",
+                        "zone":  "Wall",
+                        "label":  "Wall Seal-Off Angle",
+                        "stock":  "091-30119-006"
+                    },
+                    {
+                        "id":  "VTP_Wall_Wall Unit Split Cover",
+                        "zone":  "Wall",
+                        "label":  "Wall Unit Split Cover",
+                        "stock":  "091-30117-087"
+                    },
+                    {
+                        "id":  "VTP_Roof_Horizontal Channel",
+                        "zone":  "Roof",
+                        "label":  "Horizontal Channel",
+                        "stock":  null,
+                        "stocks":  [
+                                       "091-30117-085",
+                                       "091-30117-069",
+                                       "091-30117-068"
+                                   ]
+                    },
+                    {
+                        "id":  "VTP_Roof_Vertical Channel",
+                        "zone":  "Roof",
+                        "label":  "Vertical Channel",
+                        "stock":  null,
+                        "stocks":  [
+                                       "091-30117-086",
+                                       "091-30117-070"
+                                   ]
+                    }
+                ],
+    "version":  1,
+    "buttons":  [
+                    {
+                        "label":  "Liner",
+                        "path":  "Roof/Sheets",
+                        "ruleId":  "VTP_Roof_Liner"
+                    },
+                    {
+                        "label":  "Skin",
+                        "path":  "Roof/Sheets",
+                        "ruleId":  "VTP_Roof_Skin"
+                    },
+                    {
+                        "label":  "Horizontal Channel",
+                        "path":  "Roof/Channels",
+                        "ruleId":  "VTP_Roof_Horizontal Channel"
+                    },
+                    {
+                        "label":  "Vertical Channel",
+                        "path":  "Roof/Channels",
+                        "ruleId":  "VTP_Roof_Vertical Channel"
+                    },
+                    {
+                        "label":  "Roof Seal-Off Angle",
+                        "path":  "Roof/Angles",
+                        "ruleId":  "VTP_Roof_Roof Seal-Off Angle"
+                    },
+                    {
+                        "label":  "Super Angle",
+                        "path":  "Roof/Angles",
+                        "ruleId":  "VTP_Roof_Super Angle"
+                    },
+                    {
+                        "label":  "Tiering Angle",
+                        "path":  "Roof/Angles",
+                        "ruleId":  "VTP_Roof_Tiering Angle"
+                    },
+                    {
+                        "label":  "Tiering Seal Angle",
+                        "path":  "Roof/Angles",
+                        "ruleId":  "VTP_Roof_Tiering Seal Angle"
+                    },
+                    {
+                        "label":  "Roof Cap",
+                        "path":  "Roof/Caps",
+                        "ruleId":  "VTP_Roof_Roof Cap"
+                    },
+                    {
+                        "label":  "Sloped Roof Cap",
+                        "path":  "Roof/Caps",
+                        "ruleId":  "VTP_Roof_Sloped Roof Cap"
+                    },
+                    {
+                        "label":  "Stacked Roof Cap Backup",
+                        "path":  "Roof/Caps",
+                        "ruleId":  "VTP_Roof_Stacked Roof Cap Backup"
+                    },
+                    {
+                        "label":  "Variable Roof Corner Cap",
+                        "path":  "Roof/Caps",
+                        "ruleId":  "VTP_Roof_Variable Roof Corner Cap"
+                    },
+                    {
+                        "label":  "Peaked Roof Split Cover",
+                        "path":  "Roof/Covers",
+                        "ruleId":  "VTP_Roof_Peaked Roof Split Cover"
+                    },
+                    {
+                        "label":  "Roof Cap Split Cover",
+                        "path":  "Roof/Covers",
+                        "ruleId":  "VTP_Roof_Roof Cap Split Cover"
+                    },
+                    {
+                        "label":  "Roof Thermal Break Split Cover",
+                        "path":  "Roof/Covers",
+                        "ruleId":  "VTP_Roof_Roof Thermal Break Split Cover"
+                    },
+                    {
+                        "label":  "Roof Unit Split Cover",
+                        "path":  "Roof/Covers",
+                        "ruleId":  "VTP_Roof_Roof Unit Split Cover"
+                    },
+                    {
+                        "label":  "Channel Bracket",
+                        "path":  "Roof/Misc.",
+                        "ruleId":  "VTP_Roof_Channel Bracket"
+                    },
+                    {
+                        "label":  "Top Seal Plate",
+                        "path":  "Roof/Misc.",
+                        "ruleId":  "VTP_Roof_Top Seal Plate"
+                    },
+                    {
+                        "label":  "Liner",
+                        "path":  "Wall/Sheets",
+                        "ruleId":  "VTP_Wall_Liner"
+                    },
+                    {
+                        "label":  "Skin",
+                        "path":  "Wall/Sheets",
+                        "ruleId":  "VTP_Wall_Skin"
+                    },
+                    {
+                        "label":  "Horizontal Channel",
+                        "path":  "Wall/Channels",
+                        "ruleId":  "VTP_Wall_Horizontal Channel"
+                    },
+                    {
+                        "label":  "Vertical Channel",
+                        "path":  "Wall/Channels",
+                        "ruleId":  "VTP_Wall_Vertical Channel"
+                    },
+                    {
+                        "label":  "Formed Angle",
+                        "path":  "Wall/Angles",
+                        "ruleId":  "VTP_Wall_Formed Angle"
+                    },
+                    {
+                        "label":  "Wall Attachment Angle",
+                        "path":  "Wall/Angles",
+                        "ruleId":  "VTP_Wall_Wall Attachment Angle"
+                    },
+                    {
+                        "label":  "Wall Seal-Off Angle",
+                        "path":  "Wall/Angles",
+                        "ruleId":  "VTP_Wall_Wall Seal-Off Angle"
+                    },
+                    {
+                        "label":  "Corner Cap",
+                        "path":  "Wall/Corners",
+                        "ruleId":  "VTP_Wall_Corner Cap"
+                    },
+                    {
+                        "label":  "Corner Liner",
+                        "path":  "Wall/Corners",
+                        "ruleId":  "VTP_Wall_Corner Liner"
+                    },
+                    {
+                        "label":  "Channel Bracket",
+                        "path":  "Wall/Misc.",
+                        "ruleId":  "VTP_Wall_Channel Bracket"
+                    },
+                    {
+                        "label":  "Door Nesting Channel",
+                        "path":  "Wall/Misc.",
+                        "ruleId":  "VTP_Wall_Door Nesting Channel"
+                    },
+                    {
+                        "label":  "SST Channel Cap",
+                        "path":  "Wall/Misc.",
+                        "ruleId":  "VTP_Wall_SST Channel Cap"
+                    },
+                    {
+                        "label":  "Wall Unit Split Cover",
+                        "path":  "Wall/Misc.",
+                        "ruleId":  "VTP_Wall_Wall Unit Split Cover"
+                    },
+                    {
+                        "label":  "Floor",
+                        "path":  "Base/Sheets",
+                        "ruleId":  "VTP_Base_Floor"
+                    },
+                    {
+                        "label":  "Sub Floor",
+                        "path":  "Base/Sheets",
+                        "ruleId":  "VTP_Base_Sub Floor"
+                    },
+                    {
+                        "label":  "Angle",
+                        "path":  "Base/Formed",
+                        "ruleId":  "VTP_Base_Formed Angle"
+                    },
+                    {
+                        "label":  "Channel",
+                        "path":  "Base/Formed",
+                        "ruleId":  "VTP_Base_Formed Channel"
+                    },
+                    {
+                        "label":  "Steel Angle",
+                        "path":  "Base/Structural",
+                        "ruleId":  "VTP_Base_Structural Steel Angle"
+                    },
+                    {
+                        "label":  "Steel Channel",
+                        "path":  "Base/Structural",
+                        "ruleId":  "VTP_Base_Structural Steel Channel"
+                    },
+                    {
+                        "label":  "Aluminum Angle",
+                        "path":  "Base/Structural",
+                        "ruleId":  "VTP_Base_Structural Aluminum Angle"
+                    },
+                    {
+                        "label":  "Aluminum Channel",
+                        "path":  "Base/Structural",
+                        "ruleId":  "VTP_Base_Structural Aluminum Channel"
+                    },
+                    {
+                        "label":  "Perimeter Angle",
+                        "path":  "Base/Perimeter",
+                        "ruleId":  "VTP_Base_Perimeter Angle"
+                    },
+                    {
+                        "label":  "Corridor Perimeter Angle",
+                        "path":  "Base/Perimeter",
+                        "ruleId":  "VTP_Base_Corridor Perimeter Angle"
+                    },
+                    {
+                        "label":  "Steel Filler Plate",
+                        "path":  "Base/Filler Plates / Lug",
+                        "ruleId":  "VTP_Base_Filler Plate"
+                    },
+                    {
+                        "label":  "Aluminum Filler Plate",
+                        "path":  "Base/Filler Plates / Lug",
+                        "ruleId":  "VTP_Base_Filler Plate Aluminum"
+                    },
+                    {
+                        "label":  "Lifting Lug",
+                        "path":  "Base/Filler Plates / Lug",
+                        "ruleId":  "VTP_Base_Lifting Lug"
+                    },
+                    {
+                        "label":  "Coil Panel Nesting Channel",
+                        "path":  "Base/Misc.",
+                        "ruleId":  "VTP_Base_Coil Panel Nesting Channel"
+                    },
+                    {
+                        "label":  "Electrical/Pipe Chase Cover",
+                        "path":  "Base/Misc.",
+                        "ruleId":  "VTP_Base_Electrical, Pipe Chase Cover"
+                    },
+                    {
+                        "label":  "Angle",
+                        "path":  "Base/Misc.",
+                        "ruleId":  "VTP_Base_Sub Floor Attachment Angle"
+                    },
+                    {
+                        "label":  "Flat",
+                        "path":  "Base/Misc.",
+                        "ruleId":  "VTP_Base_Sub Floor Attachment Flat"
+                    }
+                ],
+    "simpleButtons":  [
+                          {
+                              "zone":  "Roof",
+                              "label":  "Liner",
+                              "ruleIds":  [
+                                              "VTP_Roof_Liner"
+                                          ]
+                          },
+                          {
+                              "zone":  "Roof",
+                              "label":  "Skin",
+                              "ruleIds":  [
+                                              "VTP_Roof_Skin"
+                                          ]
+                          },
+                          {
+                              "zone":  "Roof",
+                              "label":  "Horizontal Channel",
+                              "ruleIds":  [
+                                              "VTP_Roof_Horizontal Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Roof",
+                              "label":  "Vertical Channel",
+                              "ruleIds":  [
+                                              "VTP_Roof_Vertical Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Roof",
+                              "label":  "Misc.",
+                              "ruleIds":  [
+                                              "VTP_Roof_Roof Seal-Off Angle",
+                                              "VTP_Roof_Super Angle",
+                                              "VTP_Roof_Tiering Angle",
+                                              "VTP_Roof_Tiering Seal Angle",
+                                              "VTP_Roof_Roof Cap",
+                                              "VTP_Roof_Sloped Roof Cap",
+                                              "VTP_Roof_Stacked Roof Cap Backup",
+                                              "VTP_Roof_Variable Roof Corner Cap",
+                                              "VTP_Roof_Peaked Roof Split Cover",
+                                              "VTP_Roof_Roof Cap Split Cover",
+                                              "VTP_Roof_Roof Thermal Break Split Cover",
+                                              "VTP_Roof_Roof Unit Split Cover",
+                                              "VTP_Roof_Channel Bracket",
+                                              "VTP_Roof_Top Seal Plate"
+                                          ]
+                          },
+                          {
+                              "zone":  "Wall",
+                              "label":  "Liner",
+                              "ruleIds":  [
+                                              "VTP_Wall_Liner"
+                                          ]
+                          },
+                          {
+                              "zone":  "Wall",
+                              "label":  "Skin",
+                              "ruleIds":  [
+                                              "VTP_Wall_Skin"
+                                          ]
+                          },
+                          {
+                              "zone":  "Wall",
+                              "label":  "Horizontal Channel",
+                              "ruleIds":  [
+                                              "VTP_Wall_Horizontal Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Wall",
+                              "label":  "Vertical Channel",
+                              "ruleIds":  [
+                                              "VTP_Wall_Vertical Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Wall",
+                              "label":  "Misc.",
+                              "ruleIds":  [
+                                              "VTP_Wall_Formed Angle",
+                                              "VTP_Wall_Wall Attachment Angle",
+                                              "VTP_Wall_Wall Seal-Off Angle",
+                                              "VTP_Wall_Corner Cap",
+                                              "VTP_Wall_Corner Liner",
+                                              "VTP_Wall_Channel Bracket",
+                                              "VTP_Wall_Door Nesting Channel",
+                                              "VTP_Wall_SST Channel Cap",
+                                              "VTP_Wall_Wall Unit Split Cover"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Floor",
+                              "ruleIds":  [
+                                              "VTP_Base_Floor"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Sub Floor",
+                              "ruleIds":  [
+                                              "VTP_Base_Sub Floor"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Formed Channel",
+                              "ruleIds":  [
+                                              "VTP_Base_Formed Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Formed Angle",
+                              "ruleIds":  [
+                                              "VTP_Base_Formed Angle"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Structural Channel",
+                              "ruleIds":  [
+                                              "VTP_Base_Structural Steel Channel",
+                                              "VTP_Base_Structural Aluminum Channel"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Structural Angle",
+                              "ruleIds":  [
+                                              "VTP_Base_Structural Steel Angle",
+                                              "VTP_Base_Structural Aluminum Angle"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Perimeter",
+                              "ruleIds":  [
+                                              "VTP_Base_Perimeter Angle",
+                                              "VTP_Base_Corridor Perimeter Angle"
+                                          ]
+                          },
+                          {
+                              "zone":  "Base",
+                              "label":  "Misc.",
+                              "ruleIds":  [
+                                              "VTP_Base_Coil Panel Nesting Channel",
+                                              "VTP_Base_Electrical, Pipe Chase Cover",
+                                              "VTP_Base_Sub Floor Attachment Angle",
+                                              "VTP_Base_Sub Floor Attachment Flat",
+                                              "VTP_Base_Filler Plate",
+                                              "VTP_Base_Filler Plate Aluminum",
+                                              "VTP_Base_Lifting Lug"
+                                          ]
+                          }
+                      ]
+}
