@@ -1,0 +1,737 @@
+{
+    "version":  3,
+    "holeDiameterIn":  0.203,
+    "notes":  "v3 catalog mirrors Patterns.md + Hole Punch column picker. filled=false rows need Top/Bottom/C-C. Wall Exterior + Placement External still adds wallExteriorPlacementExternalBottomExtraIn to bottom at punch time.",
+    "wallExteriorPlacementExternalBottomExtraIn":  0.5,
+    "defaults":  {
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+    "wall":  [
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Interior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  0.75,
+                     "bottomInsetIn":  0.75,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Interior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  0.75,
+                     "bottomInsetIn":  0.75,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Single > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Single > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Single > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Single > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|internal",
+                     "path":  "Wall > NOA > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  3.5,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "noa|exterior|overlap",
+                     "path":  "Wall > NOA > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  3.5,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  2.5
+                 },
+                 {
+                     "key":  "noa|interior|internal",
+                     "path":  "Wall > NOA > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|overlap",
+                     "path":  "Wall > NOA > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier1|exterior|internal",
+                     "path":  "Wall > Tiered > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "tiered|tier1|exterior|overlap",
+                     "path":  "Wall > Tiered > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "tiered|tier1|interior|internal",
+                     "path":  "Wall > Tiered > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier1|interior|overlap",
+                     "path":  "Wall > Tiered > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier2|exterior|internal",
+                     "path":  "Wall > Tiered > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "tiered|tier2|exterior|overlap",
+                     "path":  "Wall > Tiered > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "tiered|tier2|interior|internal",
+                     "path":  "Wall > Tiered > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier2|interior|overlap",
+                     "path":  "Wall > Tiered > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 }
+             ],
+    "roof":  [
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Single > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Single > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Single > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Single > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|internal",
+                     "path":  "Roof > NOA > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|overlap",
+                     "path":  "Roof > NOA > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|internal",
+                     "path":  "Roof > NOA > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|overlap",
+                     "path":  "Roof > NOA > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 }
+             ],
+    "deck":  [
+                 {
+                     "key":  "4|24",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "3|24",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "2|24",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "4|23.5",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "3|23.5",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "2|23.5",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "4|16",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "3|16",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "2|16",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "4|15.67",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "3|15.67",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "2|15.67",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "4|12",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "3|12",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "2|12",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "4|11.75",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "3|11.75",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "2|11.75",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  10
+                 }
+             ]
+}

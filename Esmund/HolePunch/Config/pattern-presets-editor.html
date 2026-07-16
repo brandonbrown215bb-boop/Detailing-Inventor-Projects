@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hole Punch — Pattern Catalog Editor</title>
+  <style>
+    :root {
+      --bg: #1a1a1c;
+      --panel: #252528;
+      --text: #e8e8e8;
+      --muted: #9a9a9a;
+      --accent: #2a74a5;
+      --border: #3a3a3e;
+      --miss: #3a2a1a;
+      --miss-border: #8a5a2a;
+      --ok-row: #1a2a22;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      grid-column: 1 / -1;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    header h1 { margin: 0; font-size: 15px; font-weight: 650; }
+    header .hint { color: var(--muted); font-size: 12px; flex: 1; min-width: 220px; line-height: 1.35; }
+    button, .file-btn {
+      background: var(--accent); color: #fff; border: 0; border-radius: 4px;
+      padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    button.secondary, .file-btn.secondary { background: #3a3a40; }
+    .file-btn { display: inline-block; }
+    .file-btn input { display: none; }
+    main { padding: 12px 16px; overflow: auto; max-height: calc(100vh - 58px); }
+    aside {
+      border-left: 1px solid var(--border);
+      background: var(--panel);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 58px);
+    }
+    aside h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+    textarea#jsonOut {
+      flex: 1; width: 100%; min-height: 280px;
+      background: #121214; color: #d8d8d8; border: 1px solid var(--border);
+      border-radius: 4px; padding: 10px; font-family: Consolas, monospace; font-size: 11px;
+      resize: none;
+    }
+    .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tabs button { background: #333; }
+    .tabs button.active { background: var(--accent); }
+    .card {
+      background: #1e1e22; border: 1px solid var(--border); border-radius: 6px;
+      padding: 12px; margin-bottom: 12px;
+    }
+    .card h3 { margin: 0 0 10px; font-size: 14px; }
+    .row {
+      display: grid; grid-template-columns: 160px 1fr; gap: 8px; align-items: center;
+      margin-bottom: 8px; font-size: 12px;
+    }
+    .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .row3 label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); }
+    input[type="text"], input[type="number"], input[type="search"] {
+      width: 100%; background: #121214; color: var(--text); border: 1px solid #555;
+      border-radius: 4px; padding: 6px 8px; font-size: 12px;
+    }
+    .muted { color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .status { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .status.ok { color: #6fcf97; }
+    .status.err { color: #f08080; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .filter { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .filter input[type="search"] { flex: 1; min-width: 180px; }
+    .entry {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: var(--ok-row);
+    }
+    .entry.incomplete {
+      background: var(--miss);
+      border-color: var(--miss-border);
+    }
+    .entry .path { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .entry .key { font-size: 10px; color: var(--muted); font-family: Consolas, monospace; margin-bottom: 8px; word-break: break-all; }
+    .badge {
+      display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: 3px; margin-left: 8px; vertical-align: middle;
+    }
+    .badge.ok { background: #2d6a4f; color: #fff; }
+    .badge.need { background: #8a5a2a; color: #fff; }
+    .summary { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hole Punch pattern catalog</h1>
+    <p class="hint">
+      Edit Top / Bottom / Max C-C for every Wall, Roof, and Deck combo the punch dialog can pick.
+      Yellow rows need values (missing from Patterns.md). Download JSON over the installed
+      <code>pattern-presets.json</code> — Hole Punch loads these at startup.
+    </p>
+    <label class="file-btn secondary">Open JSON<input type="file" id="fileOpen" accept=".json,application/json" /></label>
+    <button type="button" id="btnReloadDefault" class="secondary">Load starter</button>
+    <button type="button" id="btnDownload">Download JSON</button>
+  </header>
+
+  <main>
+    <div class="card" id="globals"></div>
+    <div class="tabs" id="tabs">
+      <button type="button" data-tab="wall" class="active">Wall</button>
+      <button type="button" data-tab="roof">Roof</button>
+      <button type="button" data-tab="deck">Deck</button>
+    </div>
+    <div class="filter">
+      <input type="search" id="filterText" placeholder="Filter by path or key…" />
+      <label class="muted"><input type="checkbox" id="onlyIncomplete" /> Incomplete only</label>
+      <span class="summary" id="summary"></span>
+    </div>
+    <div id="list"></div>
+  </main>
+
+  <aside>
+    <h2>Live JSON</h2>
+    <p class="muted" style="margin:0 0 8px">
+      Save over:<br />
+      <code>%APPDATA%\Autodesk\ApplicationPlugins\SkinChannelPunch\pattern-presets.json</code>
+    </p>
+    <div class="status" id="status">Ready</div>
+    <textarea id="jsonOut" spellcheck="false"></textarea>
+    <div class="toolbar">
+      <button type="button" id="btnApplyJson" class="secondary">Apply JSON → form</button>
+      <button type="button" id="btnFormat" class="secondary">Format</button>
+    </div>
+  </aside>
+
+  <script>
+    const STARTER ={
+    "version":  3,
+    "holeDiameterIn":  0.203,
+    "notes":  "v3 catalog mirrors Patterns.md + Hole Punch column picker. filled=false rows need Top/Bottom/C-C. Wall Exterior + Placement External still adds wallExteriorPlacementExternalBottomExtraIn to bottom at punch time.",
+    "wallExteriorPlacementExternalBottomExtraIn":  0.5,
+    "defaults":  {
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+    "wall":  [
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Interior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  0.75,
+                     "bottomInsetIn":  0.75,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Full Foam > Interior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  0.75,
+                     "bottomInsetIn":  0.75,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|internal",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Single > Not Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  6.5
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|internal",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|overlap",
+                     "path":  "Wall > IBC Baseline > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Single > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Single > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Single > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Single > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|internal",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|overlap",
+                     "path":  "Wall > IBC 1.5 > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|internal",
+                     "path":  "Wall > NOA > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  3.5,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  27
+                 },
+                 {
+                     "key":  "noa|exterior|overlap",
+                     "path":  "Wall > NOA > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  3.5,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  2.5
+                 },
+                 {
+                     "key":  "noa|interior|internal",
+                     "path":  "Wall > NOA > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|overlap",
+                     "path":  "Wall > NOA > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier1|exterior|internal",
+                     "path":  "Wall > Tiered > Tier 1 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "tiered|tier1|exterior|overlap",
+                     "path":  "Wall > Tiered > Tier 1 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "tiered|tier1|interior|internal",
+                     "path":  "Wall > Tiered > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier1|interior|overlap",
+                     "path":  "Wall > Tiered > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier2|exterior|internal",
+                     "path":  "Wall > Tiered > Tier 2 > Exterior > Internal Channel",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  36
+                 },
+                 {
+                     "key":  "tiered|tier2|exterior|overlap",
+                     "path":  "Wall > Tiered > Tier 2 > Exterior > Overlap",
+                     "filled":  true,
+                     "topInsetIn":  7,
+                     "bottomInsetIn":  1.25,
+                     "maxCenterToCenterIn":  9
+                 },
+                 {
+                     "key":  "tiered|tier2|interior|internal",
+                     "path":  "Wall > Tiered > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "tiered|tier2|interior|overlap",
+                     "path":  "Wall > Tiered > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 }
+             ],
+    "roof":  [
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|yes|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|internal",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|single|no|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Single > Not Full Foam > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier1|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|exterior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|internal",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_baseline|stacked|tier2|interior|overlap",
+                     "path":  "Roof > IBC Baseline > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Single > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Single > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Single > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|single|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Single > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier1|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 1 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|exterior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|internal",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "ibc_1_5|stacked|tier2|interior|overlap",
+                     "path":  "Roof > IBC 1.5 > Stacked > Tier 2 > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|internal",
+                     "path":  "Roof > NOA > Exterior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|exterior|overlap",
+                     "path":  "Roof > NOA > Exterior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|internal",
+                     "path":  "Roof > NOA > Interior > Internal Channel",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 },
+                 {
+                     "key":  "noa|interior|overlap",
+                     "path":  "Roof > NOA > Interior > Overlap",
+                     "filled":  false,
+                     "topInsetIn":  null,
+                     "bottomInsetIn":  null,
+                     "maxCenterToCenterIn":  null
+                 }
+             ],
+    "deck":  [
+                 {
+                     "key":  "4|24",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "3|24",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "2|24",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 24",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "4|23.5",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "3|23.5",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "2|23.5",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 23.5",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  5
+                 },
+                 {
+                     "key":  "4|16",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "3|16",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "2|16",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 16",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  7
+                 },
+                 {
+                     "key":  "4|15.67",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "3|15.67",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "2|15.67",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 15.67",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  7.5
+                 },
+                 {
+                     "key":  "4|12",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "3|12",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "2|12",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 12",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "4|11.75",
+                     "path":  "Deck > Thickness 4 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  4.25,
+                     "bottomInsetIn":  4.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "3|11.75",
+                     "path":  "Deck > Thickness 3 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  3.25,
+                     "bottomInsetIn":  3.25,
+                     "maxCenterToCenterIn":  10
+                 },
+                 {
+                     "key":  "2|11.75",
+                     "path":  "Deck > Thickness 2 > Channel Spacing 11.75",
+                     "filled":  true,
+                     "topInsetIn":  2.25,
+                     "bottomInsetIn":  2.25,
+                     "maxCenterToCenterIn":  10
+                 }
+             ]
+};
+
+    let model = structuredClone(STARTER);
+    let activeTab = "wall";
+
+    const listEl = document.getElementById("list");
+    const globalsEl = document.getElementById("globals");
+    const jsonOut = document.getElementById("jsonOut");
+    const status = document.getElementById("status");
+    const summary = document.getElementById("summary");
+    const filterText = document.getElementById("filterText");
+    const onlyIncomplete = document.getElementById("onlyIncomplete");
+
+    function numOrNull(v) {
+      if (v === "" || v === null || v === undefined) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function entryFilled(e) {
+      return e.topInsetIn != null && e.bottomInsetIn != null && e.maxCenterToCenterIn != null
+        && Number.isFinite(Number(e.topInsetIn))
+        && Number.isFinite(Number(e.bottomInsetIn))
+        && Number.isFinite(Number(e.maxCenterToCenterIn));
+    }
+
+    function ensureArrays() {
+      if (!Array.isArray(model.wall)) model.wall = [];
+      if (!Array.isArray(model.roof)) model.roof = [];
+      if (!Array.isArray(model.deck)) model.deck = [];
+      if (!model.defaults) model.defaults = { topInsetIn: 7, bottomInsetIn: 1.25, maxCenterToCenterIn: 36 };
+    }
+
+    function escapeAttr(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;");
+    }
+
+    function renderGlobals() {
+      ensureArrays();
+      const d = model.defaults;
+      globalsEl.innerHTML = `
+        <h3>Globals</h3>
+        <p class="muted">Hole diameter is read-only in the punch dialog. Exterior Placement External adds the bottom extra at punch time (not stored per row).</p>
+        <div class="row"><span>Hole diameter (in)</span>
+          <input type="number" step="0.001" data-g="holeDiameterIn" value="${model.holeDiameterIn ?? 0.203}" />
+        </div>
+        <div class="row"><span>Ext. placement bottom +</span>
+          <input type="number" step="0.125" data-g="wallExteriorPlacementExternalBottomExtraIn" value="${model.wallExteriorPlacementExternalBottomExtraIn ?? 0.5}" />
+        </div>
+        <div class="row3" style="margin-top:8px">
+          <label>Default top
+            <input type="number" step="0.125" data-g="defaults.topInsetIn" value="${d.topInsetIn ?? 7}" />
+          </label>
+          <label>Default bottom
+            <input type="number" step="0.125" data-g="defaults.bottomInsetIn" value="${d.bottomInsetIn ?? 1.25}" />
+          </label>
+          <label>Default max c-c
+            <input type="number" step="0.125" data-g="defaults.maxCenterToCenterIn" value="${d.maxCenterToCenterIn ?? 36}" />
+          </label>
+        </div>
+        <div class="row" style="margin-top:8px"><span>Notes</span>
+          <input type="text" data-g="notes" value="${escapeAttr(model.notes || "")}" />
+        </div>`;
+    }
+
+    function valAttr(v) {
+      return v == null || v === "" ? "" : String(v);
+    }
+
+    function updateSummary() {
+      const tabInc = (model[activeTab] || []).filter(e => !entryFilled(e)).length;
+      const total = (model[activeTab] || []).length;
+      summary.textContent = `${activeTab}: ${total - tabInc} filled, ${tabInc} to fill`;
+    }
+
+    function renderList() {
+      ensureArrays();
+      const rows = model[activeTab] || [];
+      const q = (filterText.value || "").trim().toLowerCase();
+      let shown = 0;
+      let html = "";
+      rows.forEach((e, i) => {
+        const filled = entryFilled(e);
+        e.filled = filled;
+        if (onlyIncomplete.checked && filled) return;
+        const hay = ((e.path || "") + " " + (e.key || "")).toLowerCase();
+        if (q && !hay.includes(q)) return;
+        shown++;
+        html += `<div class="entry ${filled ? "" : "incomplete"}" data-i="${i}">
+          <div class="path">${escapeAttr(e.path || "(no path)")}
+            <span class="badge ${filled ? "ok" : "need"}">${filled ? "OK" : "FILL"}</span>
+          </div>
+          <div class="key">${escapeAttr(e.key || "")}</div>
+          <div class="row3">
+            <label>Top inset (in)
+              <input type="number" step="0.125" data-f="topInsetIn" data-i="${i}" value="${valAttr(e.topInsetIn)}" placeholder="—" />
+            </label>
+            <label>Bottom inset (in)
+              <input type="number" step="0.125" data-f="bottomInsetIn" data-i="${i}" value="${valAttr(e.bottomInsetIn)}" placeholder="—" />
+            </label>
+            <label>Max c-c (in)
+              <input type="number" step="0.125" data-f="maxCenterToCenterIn" data-i="${i}" value="${valAttr(e.maxCenterToCenterIn)}" placeholder="—" />
+            </label>
+          </div>
+        </div>`;
+      });
+      updateSummary();
+      if (shown === 0) summary.textContent += " · showing 0";
+      else summary.textContent += " · showing " + shown;
+      listEl.innerHTML = html || `<p class="muted">No rows match this filter.</p>`;
+    }
+
+    function readGlobals() {
+      globalsEl.querySelectorAll("input[data-g]").forEach(inp => {
+        const g = inp.getAttribute("data-g");
+        if (g.startsWith("defaults.")) {
+          const k = g.slice("defaults.".length);
+          model.defaults[k] = numOrNull(inp.value) ?? 0;
+        } else if (g === "notes") {
+          model.notes = inp.value;
+        } else if (g === "holeDiameterIn" || g === "wallExteriorPlacementExternalBottomExtraIn") {
+          model[g] = numOrNull(inp.value) ?? 0;
+        }
+      });
+    }
+
+    function readListIntoModel() {
+      listEl.querySelectorAll("input[data-f]").forEach(inp => {
+        const i = Number(inp.getAttribute("data-i"));
+        const f = inp.getAttribute("data-f");
+        const rows = model[activeTab];
+        if (!rows || !rows[i]) return;
+        rows[i][f] = numOrNull(inp.value);
+        rows[i].filled = entryFilled(rows[i]);
+      });
+    }
+
+    function syncAll() {
+      try {
+        readGlobals();
+        readListIntoModel();
+        ["wall", "roof", "deck"].forEach(k => {
+          (model[k] || []).forEach(e => { e.filled = entryFilled(e); });
+        });
+        model.version = 3;
+        jsonOut.value = JSON.stringify(model, null, 2);
+        status.textContent = "Form → JSON OK";
+        status.className = "status ok";
+      } catch (err) {
+        status.textContent = "Sync error: " + err.message;
+        status.className = "status err";
+      }
+    }
+
+    function render() {
+      renderGlobals();
+      renderList();
+      syncAll();
+    }
+
+    function refreshRowBadges() {
+      listEl.querySelectorAll(".entry").forEach(div => {
+        const i = Number(div.getAttribute("data-i"));
+        const e = model[activeTab][i];
+        if (!e) return;
+        div.querySelectorAll("input[data-f]").forEach(inp => {
+          e[inp.getAttribute("data-f")] = numOrNull(inp.value);
+        });
+        const filled = entryFilled(e);
+        e.filled = filled;
+        div.classList.toggle("incomplete", !filled);
+        const badge = div.querySelector(".badge");
+        if (badge) {
+          badge.className = "badge " + (filled ? "ok" : "need");
+          badge.textContent = filled ? "OK" : "FILL";
+        }
+      });
+      updateSummary();
+      syncAll();
+    }
+
+    document.getElementById("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-tab]");
+      if (!btn) return;
+      readListIntoModel();
+      activeTab = btn.getAttribute("data-tab");
+      document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b === btn));
+      renderList();
+      syncAll();
+    });
+
+    listEl.addEventListener("input", () => refreshRowBadges());
+    globalsEl.addEventListener("input", () => syncAll());
+    filterText.addEventListener("input", () => { readListIntoModel(); renderList(); syncAll(); });
+    onlyIncomplete.addEventListener("change", () => { readListIntoModel(); renderList(); syncAll(); });
+
+    document.getElementById("btnDownload").addEventListener("click", () => {
+      syncAll();
+      const blob = new Blob([jsonOut.value], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "pattern-presets.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById("btnReloadDefault").addEventListener("click", () => {
+      model = structuredClone(STARTER);
+      activeTab = "wall";
+      document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === "wall"));
+      filterText.value = "";
+      onlyIncomplete.checked = false;
+      render();
+    });
+
+    document.getElementById("fileOpen").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        model = JSON.parse(await file.text());
+        ensureArrays();
+        render();
+        status.textContent = "Loaded " + file.name;
+        status.className = "status ok";
+      } catch (err) {
+        status.textContent = "Load failed: " + err.message;
+        status.className = "status err";
+      }
+      e.target.value = "";
+    });
+
+    document.getElementById("btnApplyJson").addEventListener("click", () => {
+      try {
+        model = JSON.parse(jsonOut.value);
+        ensureArrays();
+        render();
+        status.textContent = "JSON → form OK";
+        status.className = "status ok";
+      } catch (err) {
+        status.textContent = "Invalid JSON: " + err.message;
+        status.className = "status err";
+      }
+    });
+
+    document.getElementById("btnFormat").addEventListener("click", () => {
+      try {
+        jsonOut.value = JSON.stringify(JSON.parse(jsonOut.value), null, 2);
+        status.textContent = "Formatted";
+        status.className = "status ok";
+      } catch (err) {
+        status.textContent = "Invalid JSON: " + err.message;
+        status.className = "status err";
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
