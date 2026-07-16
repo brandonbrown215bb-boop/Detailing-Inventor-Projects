@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 set "TARGET_DIR=%APPDATA%\Autodesk\Inventor 2020\Addins"
 
 :: Source Paths (Relative to this batch file's location in the solution folder)
-set "BIN_DIR=UnitConstructionVerifier\bin\Debug\net48"
+set "BIN_DIR=UnitConstructionVerifier\bin\Release\net48"
 set "SRC_DIR=UnitConstructionVerifier"
 
 echo ===================================================

@@ -447,12 +447,7 @@
 
                             <!-- Expectations Form -->
                             <Grid Grid.Row="0" Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
+                                <StackPanel>
                                     <TextBlock Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}"/>
                                     <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
@@ -490,10 +485,9 @@
                                                 <ComboBoxItem Content="No"/>
                                             </ComboBox>
                                         </StackPanel>
+                                        <Button Content="Apply Casing to All Roofs" Style="{StaticResource SecondaryButton}" Height="24" Padding="12,2" Margin="0,4,16,4" Click="OnApplyRoofToAll"/>
                                     </WrapPanel>
                                 </StackPanel>
-
-                                <Button Grid.Column="1" Content="Apply Casing to All Roofs" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" Height="28" Click="OnApplyRoofToAll"/>
                             </Grid>
 
                             <!-- Parts Grid -->
@@ -582,12 +576,7 @@
                             </Grid.RowDefinitions>
 
                             <Grid Grid.Row="0" Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0">
+                                <StackPanel>
                                     <TextBlock Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}"/>
                                     <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
@@ -624,10 +613,9 @@
                                                 <ComboBoxItem Content="No"/>
                                             </ComboBox>
                                         </StackPanel>
+                                        <Button Content="Apply Casing to All Walls" Style="{StaticResource SecondaryButton}" Height="24" Padding="12,2" Margin="0,4,16,4" Click="OnApplyWallToAll"/>
                                     </WrapPanel>
                                 </StackPanel>
-
-                                <Button Grid.Column="1" Content="Apply Casing to All Walls" Style="{StaticResource SecondaryButton}" VerticalAlignment="Bottom" Height="28" Click="OnApplyWallToAll"/>
                             </Grid>
 
                             <Grid Grid.Row="1">

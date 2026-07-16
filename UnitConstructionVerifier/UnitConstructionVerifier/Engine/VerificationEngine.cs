@@ -140,7 +140,13 @@ namespace UnitConstructionVerifier.Engine
                 {
                     gauge = resolvedGauge;
                     // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
-                    if (string.IsNullOrEmpty(material) || material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(material) || 
+                        material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || 
+                        material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || 
+                        material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase) ||
+                        (material.Equals("STL HOT ROLL", StringComparison.OrdinalIgnoreCase) && 
+                         !string.IsNullOrEmpty(expectedMaterialHint) && 
+                         (expectedMaterialHint.ToUpperInvariant().Contains("ALM") || expectedMaterialHint.ToUpperInvariant().Contains("ALUMINUM"))))
                     {
                         material = resolvedMaterial;
                     }

@@ -147,8 +147,10 @@ namespace UnitConstructionVerifier.Extraction
                     }
                 }
 
-
-                // ── Sheet Metal Component Definition override ─────────────────
+                // ── Sheet Metal Component Definition ──────────────────────────
+                // Only use the live sheet metal thickness to update the Thickness field.
+                // Do NOT let it overwrite MtlGauge — the user-defined INPUT_PARAMETER_Mtl_Gauge
+                // property is the authoritative gauge source and may have just been written.
                 try
                 {
                     if (doc.ComponentDefinition is SheetMetalComponentDefinition smDef)
@@ -159,6 +161,7 @@ namespace UnitConstructionVerifier.Extraction
                 }
                 catch { }
 
+                // Only fall back to Thickness for gauge display if the user property is truly absent
                 if (string.IsNullOrWhiteSpace(props.MtlGauge))
                 {
                     props.MtlGauge = props.Thickness;

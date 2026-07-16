@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using UnitConstructionVerifier;
 using UnitConstructionVerifier.Engine;
 using UnitConstructionVerifier.Models;
 using UnitConstructionVerifier.Persistence;
@@ -564,10 +565,12 @@ namespace UnitConstructionVerifier.UI
                 if (row.IsEditPending)
                 {
                     _pendingEdits[key] = row.NewValue;
+                    DebugLogger.Log($"[PendingEdit] ADD key='{key}' value='{row.NewValue}' | total pending={_pendingEdits.Count}");
                 }
                 else
                 {
                     _pendingEdits.Remove(key);
+                    DebugLogger.Log($"[PendingEdit] REMOVE key='{key}' (not pending) | total pending={_pendingEdits.Count}");
                 }
             }
         }
@@ -616,13 +619,21 @@ namespace UnitConstructionVerifier.UI
         {
             if (grid.ItemsSource is IEnumerable<IptVerificationRow> rows)
             {
+                int count = 0;
                 foreach (var row in rows)
                 {
                     if (row.IsMismatch)
                     {
+                        DebugLogger.Log($"[SyncAll] mismatch row: param='{row.Parameter}' actual='{row.Actual}' expected='{row.Expected}' file='{System.IO.Path.GetFileName(row.FilePath)}'");
                         row.NewValue = row.Expected;
+                        count++;
                     }
                 }
+                DebugLogger.Log($"[SyncAll] synced {count} mismatches. _pendingEdits.Count={_pendingEdits.Count}");
+            }
+            else
+            {
+                DebugLogger.Log($"[SyncAll] grid.ItemsSource is not IEnumerable<IptVerificationRow> — type={(grid.ItemsSource?.GetType().Name ?? "null")}");
             }
         }
 
@@ -640,6 +651,10 @@ namespace UnitConstructionVerifier.UI
 
         private void OnWriteChanges(object sender, RoutedEventArgs e)
         {
+            DebugLogger.Log($"[OnWriteChanges] called. _pendingEdits.Count={_pendingEdits.Count}");
+            foreach (var kvp in _pendingEdits)
+                DebugLogger.Log($"  pending: key='{kvp.Key}' value='{kvp.Value}'");
+
             // Force commit any active cell edits in all grids
             try
             {
@@ -654,6 +669,7 @@ namespace UnitConstructionVerifier.UI
 
             if (_pendingEdits.Count == 0)
             {
+                DebugLogger.Log("[OnWriteChanges] _pendingEdits is empty — returning early.");
                 MessageBox.Show("No pending edits to write.", "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -678,13 +694,13 @@ namespace UnitConstructionVerifier.UI
                 {
                     edits.Thickness = value;
                 }
-                else if (parameter == "Gauge & Material" || parameter == "Formed Channel Material")
+                else if (parameter.Contains("Gauge & Material") || parameter == "Formed Channel Material")
                 {
                     PersistenceManager.ParseGaugeAndMaterial(value, out string g, out string m);
                     edits.MtlGauge = g;
                     edits.YCMATL = m;
                 }
-                else if (parameter == "Base Material")
+                else if (parameter.Contains("Material"))
                 {
                     edits.YCMATL = value;
                 }
@@ -858,7 +874,13 @@ namespace UnitConstructionVerifier.UI
                 {
                     gauge = resolvedGauge;
                     // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
-                    if (string.IsNullOrEmpty(material) || material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(material) || 
+                        material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || 
+                        material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || 
+                        material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase) ||
+                        (material.Equals("STL HOT ROLL", StringComparison.OrdinalIgnoreCase) && 
+                         !string.IsNullOrEmpty(expectedMaterialHint) && 
+                         (expectedMaterialHint.ToUpperInvariant().Contains("ALM") || expectedMaterialHint.ToUpperInvariant().Contains("ALUMINUM"))))
                     {
                         material = resolvedMaterial;
                     }

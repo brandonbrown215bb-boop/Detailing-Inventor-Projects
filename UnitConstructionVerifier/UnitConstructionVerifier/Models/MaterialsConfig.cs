@@ -367,7 +367,14 @@ namespace UnitConstructionVerifier.Models
 
             if (double.TryParse(thicknessStr.Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
             {
+                string mappedHint = null;
+                if (!string.IsNullOrWhiteSpace(materialHint))
+                {
+                    mappedHint = MapMaterial(materialHint).ToUpperInvariant();
+                }
+
                 // 1. Precise match (tolerance 0.000009)
+                var preciseCandidates = new List<string>();
                 foreach (var kvp in ThicknessMap)
                 {
                     if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
@@ -376,14 +383,34 @@ namespace UnitConstructionVerifier.Models
                     {
                         if (Math.Abs(val - mapVal) < 0.000009)
                         {
-                            return ParseKey(kvp.Key, out gauge, out material);
+                            preciseCandidates.Add(kvp.Key);
                         }
                     }
                 }
 
+                if (preciseCandidates.Count > 0)
+                {
+                    if (preciseCandidates.Count > 1 && !string.IsNullOrEmpty(mappedHint))
+                    {
+                        foreach (string key in preciseCandidates)
+                        {
+                            if (ParseKey(key, out string g, out string m))
+                            {
+                                string mUpper = m.ToUpperInvariant();
+                                if (mUpper == mappedHint || mappedHint.Contains(mUpper) || mUpper.Contains(mappedHint))
+                                {
+                                    gauge = g;
+                                    material = m;
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return ParseKey(preciseCandidates[0], out gauge, out material);
+                }
+
                 // 2. Closest match fallback (tolerance 0.00015)
-                string bestKey = null;
-                double minDiff = double.MaxValue;
+                var candidates = new List<Tuple<string, double>>();
                 foreach (var kvp in ThicknessMap)
                 {
                     if (!IsMatchingMaterialGroup(kvp.Key, materialHint)) continue;
@@ -391,17 +418,63 @@ namespace UnitConstructionVerifier.Models
                     if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
                     {
                         double diff = Math.Abs(val - mapVal);
-                        if (diff < 0.00015 && diff < minDiff)
+                        if (diff < 0.00015)
                         {
-                            minDiff = diff;
-                            bestKey = kvp.Key;
+                            candidates.Add(Tuple.Create(kvp.Key, diff));
                         }
                     }
                 }
 
-                if (bestKey != null)
+                if (candidates.Count > 0)
                 {
-                    return ParseKey(bestKey, out gauge, out material);
+                    if (!string.IsNullOrEmpty(mappedHint))
+                    {
+                        var matchingHintCandidates = new List<Tuple<string, double>>();
+                        foreach (var cand in candidates)
+                        {
+                            if (ParseKey(cand.Item1, out string g, out string m))
+                            {
+                                string mUpper = m.ToUpperInvariant();
+                                if (mUpper == mappedHint || mappedHint.Contains(mUpper) || mUpper.Contains(mappedHint))
+                                {
+                                    matchingHintCandidates.Add(cand);
+                                }
+                            }
+                        }
+
+                        if (matchingHintCandidates.Count > 0)
+                        {
+                            string bestKey = null;
+                            double minDiff = double.MaxValue;
+                            foreach (var cand in matchingHintCandidates)
+                            {
+                                if (cand.Item2 < minDiff)
+                                {
+                                    minDiff = cand.Item2;
+                                    bestKey = cand.Item1;
+                                }
+                            }
+                            if (bestKey != null)
+                            {
+                                return ParseKey(bestKey, out gauge, out material);
+                            }
+                        }
+                    }
+
+                    string closestKey = null;
+                    double smallestDiff = double.MaxValue;
+                    foreach (var cand in candidates)
+                    {
+                        if (cand.Item2 < smallestDiff)
+                        {
+                            smallestDiff = cand.Item2;
+                            closestKey = cand.Item1;
+                        }
+                    }
+                    if (closestKey != null)
+                    {
+                        return ParseKey(closestKey, out gauge, out material);
+                    }
                 }
             }
             return false;

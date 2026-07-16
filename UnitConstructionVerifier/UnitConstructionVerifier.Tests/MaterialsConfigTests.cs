@@ -121,6 +121,18 @@ namespace UnitConstructionVerifier.Tests
             Assert.IsTrue(resolved);
             Assert.AreEqual("7", gaugeNone);
             Assert.AreEqual("STL DIA HR", materialNone);
+
+            // Resolve 0.050 with ALM SHT hint (should resolve to 18 GA ALM SHT instead of 18 GA ALM PRF)
+            resolved = MaterialsConfig.ResolveFromThickness("0.050", "ALM SHT", out string gaugeAlmSht, out string materialAlmSht);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("18", gaugeAlmSht);
+            Assert.AreEqual("ALM SHT", materialAlmSht);
+
+            // Resolve 0.050 with ALM PRF hint (should resolve to 18 GA ALM PRF)
+            resolved = MaterialsConfig.ResolveFromThickness("0.050", "ALM PRF", out string gaugeAlmPrf, out string materialAlmPrf);
+            Assert.IsTrue(resolved);
+            Assert.AreEqual("18", gaugeAlmPrf);
+            Assert.AreEqual("ALM PRF", materialAlmPrf);
         }
 
         [Test]

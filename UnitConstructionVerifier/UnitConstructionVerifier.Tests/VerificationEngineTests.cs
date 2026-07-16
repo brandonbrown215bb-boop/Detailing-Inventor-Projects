@@ -694,5 +694,45 @@ namespace UnitConstructionVerifier.Tests
             Assert.IsTrue(result.IsPass);
             Assert.AreEqual(0, result.Mismatches.Count);
         }
+
+        [Test]
+        public void TestBaseVerification_FormedChannel_AluminumBase()
+        {
+            var userData = new UnitConstructionData
+            {
+                BaseRows = new List<BaseSurfaceRow>
+                {
+                    new BaseSurfaceRow
+                    {
+                        SourceSurfaceIam = "Base.iam",
+                        BaseMaterial = "ALM ANGLE",
+                        FormedChannelGauge = "8",
+                        FormedChannelMaterial = "ALM SHT"
+                    }
+                }
+            };
+
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Base.iam",
+                        PartNumber = "091Z009992-0513",
+                        ModelNumber = "091-30117-051", // Formed Channel stock number
+                        Description = "Channel, Formed, 2x7.625x98.87",
+                        MtlGauge = "0.190",
+                        YCMATL = "STL HOT ROLL" // overridden from template STL GALV in property extraction
+                    }
+                }
+            };
+
+            var engine = new VerificationEngine(userData, iptData);
+            var result = engine.Run();
+
+            Assert.IsTrue(result.IsPass);
+            Assert.AreEqual(0, result.Mismatches.Count);
+        }
     }
 }

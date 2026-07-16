@@ -35,4 +35,13 @@ Guidelines for parsing, sorting, and validating Air Handling Unit (AHU) segment 
   1. Rename the existing in-place DLL to `UnitConstructionVerifier.dll.old` (or `UnitConstructionVerifier.dll.old_<timestamp>` to avoid collisions with other locked backup files).
   2. Copy the new `UnitConstructionVerifier.dll`, manifest, configurations, and dependency files into the directory.
   3. The updated add-in will load automatically upon restarting Inventor.
+- **Build/Deploy Config Alignment**: The `deploy.bat` `BIN_DIR` variable MUST match the build configuration used. All standard builds use `-c Release`, so `BIN_DIR` must point to `UnitConstructionVerifier\bin\Release\net48`. Never build with `-c Debug` for deployment purposes. The deploy script has been corrected to `bin\Release\net48`.
+- **DLL Timestamp Verification**: Before diagnosing silent add-in failures (e.g. code changes not taking effect), ALWAYS verify the deployed DLL's timestamp matches the latest build. A mismatch means the wrong binary is deployed:
+  ```powershell
+  # Check deployed DLL
+  Get-Item "$env:APPDATA\Autodesk\Inventor 2020\Addins\UnitConstructionVerifier.dll" | Select-Object LastWriteTime, Length
+  # Check Release build output
+  Get-Item "UnitConstructionVerifier\bin\Release\net48\UnitConstructionVerifier.dll" | Select-Object LastWriteTime, Length
+  ```
+  If `LastWriteTime` on the deployed DLL is older than the build output, re-run `deploy.bat` and restart Inventor.
 
