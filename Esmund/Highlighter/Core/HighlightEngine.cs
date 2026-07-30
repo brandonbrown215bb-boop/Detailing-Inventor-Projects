@@ -31,7 +31,137 @@ namespace Highlighter.Core
             {
             }
 
-            return FindByPath(topOccs, path);
+            string[] segments = path.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+            {
+                return null;
+            }
+
+            return ResolveSegments(topOccs, segments, 0);
+        }
+
+        private static ComponentOccurrence ResolveSegments(ComponentOccurrences occurrences, string[] segments, int index)
+        {
+            if (occurrences == null || index >= segments.Length)
+            {
+                return null;
+            }
+
+            string target = segments[index];
+            string prefix = string.Join(":", segments, 0, index + 1);
+
+            for (int i = 1; i <= occurrences.Count; i++)
+            {
+                ComponentOccurrence occ;
+                try { occ = occurrences[i]; }
+                catch { continue; }
+
+                if (!NameMatchesSegment(occ, target, prefix))
+                {
+                    continue;
+                }
+
+                if (index == segments.Length - 1)
+                {
+                    return occ;
+                }
+
+                try
+                {
+                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
+                        && occ.SubOccurrences != null
+                        && occ.SubOccurrences.Count > 0)
+                    {
+                        ComponentOccurrence nested = ResolveSegmentsEnum(occ.SubOccurrences, segments, index + 1);
+                        if (nested != null)
+                        {
+                            return nested;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return null;
+        }
+
+        private static ComponentOccurrence ResolveSegmentsEnum(
+            ComponentOccurrencesEnumerator occurrences,
+            string[] segments,
+            int index)
+        {
+            if (occurrences == null || index >= segments.Length)
+            {
+                return null;
+            }
+
+            string target = segments[index];
+            string prefix = string.Join(":", segments, 0, index + 1);
+
+            for (int i = 1; i <= occurrences.Count; i++)
+            {
+                ComponentOccurrence occ;
+                try { occ = occurrences[i]; }
+                catch { continue; }
+
+                if (!NameMatchesSegment(occ, target, prefix))
+                {
+                    continue;
+                }
+
+                if (index == segments.Length - 1)
+                {
+                    return occ;
+                }
+
+                try
+                {
+                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
+                        && occ.SubOccurrences != null
+                        && occ.SubOccurrences.Count > 0)
+                    {
+                        ComponentOccurrence nested = ResolveSegmentsEnum(occ.SubOccurrences, segments, index + 1);
+                        if (nested != null)
+                        {
+                            return nested;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return null;
+        }
+
+        private static bool NameMatchesSegment(ComponentOccurrence occ, string segment, string fullPrefix)
+        {
+            string name;
+            try { name = occ.Name; }
+            catch { return false; }
+
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            if (name.Equals(segment, StringComparison.OrdinalIgnoreCase)
+                || name.Equals(fullPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string local = LocalName(name);
+            return local.Equals(segment, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string LocalName(string name)
+        {
+            int i = name.LastIndexOf(':');
+            return i >= 0 ? name.Substring(i + 1) : name;
         }
 
         public static void CollectOutlineItems(
@@ -116,108 +246,6 @@ namespace Highlighter.Core
             {
                 return false;
             }
-        }
-
-        private static ComponentOccurrence FindByPath(ComponentOccurrences occurrences, string path)
-        {
-            if (occurrences == null)
-            {
-                return null;
-            }
-
-            for (int i = 1; i <= occurrences.Count; i++)
-            {
-                ComponentOccurrence occ;
-                try
-                {
-                    occ = occurrences[i];
-                }
-                catch
-                {
-                    continue;
-                }
-
-                try
-                {
-                    if (string.Equals(occ.Name, path, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return occ;
-                    }
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
-                        && occ.SubOccurrences != null
-                        && occ.SubOccurrences.Count > 0)
-                    {
-                        ComponentOccurrence nested = FindByPathEnum(occ.SubOccurrences, path);
-                        if (nested != null)
-                        {
-                            return nested;
-                        }
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return null;
-        }
-
-        private static ComponentOccurrence FindByPathEnum(ComponentOccurrencesEnumerator occurrences, string path)
-        {
-            if (occurrences == null)
-            {
-                return null;
-            }
-
-            for (int i = 1; i <= occurrences.Count; i++)
-            {
-                ComponentOccurrence occ;
-                try
-                {
-                    occ = occurrences[i];
-                }
-                catch
-                {
-                    continue;
-                }
-
-                try
-                {
-                    if (string.Equals(occ.Name, path, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return occ;
-                    }
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
-                        && occ.SubOccurrences != null
-                        && occ.SubOccurrences.Count > 0)
-                    {
-                        ComponentOccurrence nested = FindByPathEnum(occ.SubOccurrences, path);
-                        if (nested != null)
-                        {
-                            return nested;
-                        }
-                    }
-                }
-                catch
-                {
-                }
-            }
-
-            return null;
         }
 
         private static void CollectPrimaryFaceOutline(

@@ -1,8 +1,15 @@
 @echo off
+setlocal
 cd /d "%~dp0"
-dotnet build Highlighter.csproj -c Release
+
+dotnet build "%~dp0Highlighter.csproj" -c Release
 if errorlevel 1 exit /b 1
-if not exist pack mkdir pack
-copy /y "bin\Release\net48\Highlighter.dll" pack\ >nul
-xcopy /y /i /q "bin\Release\net48\assets" pack\assets\ >nul
-echo Built pack\
+
+if exist "%~dp0pack" rmdir /s /q "%~dp0pack"
+mkdir "%~dp0pack"
+
+robocopy "%~dp0bin\Release\net48" "%~dp0pack" /E /XF *.config /NFL /NDL /NJH /NJS /NC /NS /NP >nul
+if %ERRORLEVEL% GEQ 8 exit /b 1
+
+echo Built: pack\
+exit /b 0

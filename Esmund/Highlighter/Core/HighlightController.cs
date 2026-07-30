@@ -331,12 +331,11 @@ namespace Highlighter.Core
 
             try
             {
-                ComponentOccurrences top = asm.ComponentDefinition.Occurrences;
                 var pending = new List<Tuple<HighlightPartType, List<object>, HighlightRgb>>();
                 foreach (HighlightPartType type in _active.OrderBy(t => (int)t))
                 {
-                    List<string> paths = HighlightTypeCatalog.CollectPathNames(asm, type);
-                    if (paths.Count == 0)
+                    List<ComponentOccurrence> occurrences = HighlightTypeCatalog.CollectOccurrences(asm, type);
+                    if (occurrences.Count == 0)
                     {
                         continue;
                     }
@@ -344,17 +343,15 @@ namespace Highlighter.Core
                     var items = new List<object>();
                     var itemSeen = new HashSet<string>(StringComparer.Ordinal);
 
-                    foreach (string path in paths)
+                    foreach (ComponentOccurrence occ in occurrences)
                     {
                         if (_selectiveApplied && _selectedRoots.Count > 0
-                            && !VisibilitySession.IsUnderAnyRoot(path, _selectedRoots)
-                            && !RootContainsPart(path))
+                            && !IsUnderSelectedRoots(occ))
                         {
                             continue;
                         }
 
-                        ComponentOccurrence occ = HighlightEngine.ResolvePath(top, path);
-                        if (occ == null || occ.Definition?.Document as PartDocument == null)
+                        if (occ?.Definition?.Document as PartDocument == null)
                         {
                             continue;
                         }
@@ -375,8 +372,11 @@ namespace Highlighter.Core
                             }
                         }
 
+                        string occKey;
+                        try { occKey = occ.Name ?? string.Empty; } catch { occKey = string.Empty; }
+
                         ApplyTransparency(occ);
-                        HighlightEngine.CollectOutlineItems(occ, path, itemSeen, items);
+                        HighlightEngine.CollectOutlineItems(occ, occKey, itemSeen, items);
                     }
 
                     if (items.Count == 0)
@@ -497,9 +497,49 @@ namespace Highlighter.Core
         }
 
         /// <summary>
-        /// Part path may be a short leaf name while selected root is a longer assembly path —
-        /// resolve occurrence and check ancestry against selected roots.
+        /// Check whether an occurrence sits under any selectively picked surface root.
         /// </summary>
+        private bool IsUnderSelectedRoots(ComponentOccurrence occ)
+        {
+            if (occ == null || _selectedRoots == null || _selectedRoots.Count == 0)
+            {
+                return false;
+            }
+
+            ComponentOccurrence cur = occ;
+            int guard = 0;
+            while (cur != null && guard++ < 64)
+            {
+                string name;
+                try { name = cur.Name; }
+                catch { break; }
+
+                if (string.IsNullOrEmpty(name))
+                {
+                    break;
+                }
+
+                if (_selectedRoots.Contains(name))
+                {
+                    return true;
+                }
+
+                foreach (string root in _selectedRoots)
+                {
+                    if (name.Equals(root, StringComparison.OrdinalIgnoreCase)
+                        || name.StartsWith(root + ":", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                try { cur = cur.ParentOccurrence; }
+                catch { break; }
+            }
+
+            return false;
+        }
+
         private bool RootContainsPart(string partPath)
         {
             AssemblyDocument asm = _app.ActiveDocument as AssemblyDocument ?? _assembly;

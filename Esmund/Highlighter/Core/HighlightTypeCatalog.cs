@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Inventor;
 
@@ -15,7 +15,10 @@ namespace Highlighter.Core
     }
 
     /// <summary>
-    /// VisTog stock taxonomy for skins/liners/floors.
+    /// Classify by Design Tracking Stock Number (VisTog-style).
+    /// From a skid: only descend into 391Z surface subassemblies (liners live there).
+    /// From an open 391Z surface: walk the whole surface assembly tree.
+    /// Corner stock 091-30117-073 is excluded.
     /// </summary>
     internal static class HighlightTypeCatalog
     {
@@ -23,62 +26,19 @@ namespace Highlighter.Core
         {
             public HighlightPartType Type { get; set; }
             public string Stock { get; set; }
-            public string Suffix { get; set; }
-            public string[] MomTokens { get; set; }
-            public string[] DescriptionTokens { get; set; }
         }
 
         private static readonly TypeRule[] Rules =
         {
-            new TypeRule
-            {
-                Type = HighlightPartType.WallSkin,
-                Stock = "091-30117-081",
-                Suffix = "081",
-                MomTokens = new[] { "WALL SKIN", "SKIN" },
-                DescriptionTokens = new[] { "WALL SKIN", "EXT-WALL SKIN", "WALL SKIN" }
-            },
-            new TypeRule
-            {
-                Type = HighlightPartType.WallLiner,
-                Stock = "091-30117-082",
-                Suffix = "082",
-                MomTokens = new[] { "WALL LINER", "LINER" },
-                DescriptionTokens = new[] { "WALL LINER", "LINER" }
-            },
-            new TypeRule
-            {
-                Type = HighlightPartType.RoofSkin,
-                Stock = "091-30117-083",
-                Suffix = "083",
-                MomTokens = new[] { "ROOF SKIN", "SKIN" },
-                DescriptionTokens = new[] { "ROOF SKIN" }
-            },
-            new TypeRule
-            {
-                Type = HighlightPartType.RoofLiner,
-                Stock = "091-30117-084",
-                Suffix = "084",
-                MomTokens = new[] { "ROOF LINER", "LINER" },
-                DescriptionTokens = new[] { "ROOF LINER" }
-            },
-            new TypeRule
-            {
-                Type = HighlightPartType.BaseFloor,
-                Stock = "091-30117-056",
-                Suffix = "056",
-                MomTokens = new[] { "FLOOR" },
-                DescriptionTokens = new[] { "FLOOR", "BASE FLOOR" }
-            },
-            new TypeRule
-            {
-                Type = HighlightPartType.BaseSubfloor,
-                Stock = "091-30117-080",
-                Suffix = "080",
-                MomTokens = new[] { "SUB FLOOR", "SUBFLOOR" },
-                DescriptionTokens = new[] { "SUB FLOOR", "SUBFLOOR", "SUB-FLOOR" }
-            },
+            new TypeRule { Type = HighlightPartType.WallSkin, Stock = "091-30117-081" },
+            new TypeRule { Type = HighlightPartType.WallLiner, Stock = "091-30117-082" },
+            new TypeRule { Type = HighlightPartType.RoofSkin, Stock = "091-30117-083" },
+            new TypeRule { Type = HighlightPartType.RoofLiner, Stock = "091-30117-084" },
+            new TypeRule { Type = HighlightPartType.BaseFloor, Stock = "091-30117-056" },
+            new TypeRule { Type = HighlightPartType.BaseSubfloor, Stock = "091-30117-080" },
         };
+
+        private static readonly Dictionary<string, HighlightPartType> StockLookup = BuildStockLookup();
 
         public static string DisplayName(HighlightPartType type)
         {
@@ -94,264 +54,151 @@ namespace Highlighter.Core
             }
         }
 
-        public static HighlightPartType? Classify(ComponentOccurrence occurrence)
+        /// <summary>
+        /// Collect matching part occurrences without path round-trip (VisTog-style walk).
+        /// </summary>
+        public static List<ComponentOccurrence> CollectOccurrences(AssemblyDocument assembly, HighlightPartType type)
         {
-            if (occurrence == null)
-            {
-                return null;
-            }
-
+            var list = new List<ComponentOccurrence>();
+            if (assembly == null) return list;
+            bool inside391Z = Is391ZDocument((Document)(object)assembly);
             try
             {
-                Document doc = occurrence.Definition?.Document as Document;
-                if (doc == null)
-                {
-                    return null;
-                }
-
-                string name = occurrence.Name ?? string.Empty;
-                string display = doc.DisplayName ?? string.Empty;
-                string file = doc.FullFileName ?? string.Empty;
-                string model = null;
-                TryGetMomString(doc, "MODEL_NUMBER", out model);
-                string libType = null;
-                TryGetMomString(doc, "LIBRARY_FILE_TYPE", out libType);
-                string partType = null;
-                TryGetMomString(doc, "PART_TYPE", out partType);
-
-                string partNumber = string.Empty;
-                string description = string.Empty;
-                try
-                {
-                    PropertySet dts = doc.PropertySets["Design Tracking Properties"];
-                    partNumber = dts["Part Number"].Value?.ToString() ?? string.Empty;
-                    description = dts["Description"].Value?.ToString() ?? string.Empty;
-                }
-                catch
-                {
-                }
-
-                // Stock match first (most specific).
-                foreach (TypeRule rule in Rules)
-                {
-                    if (ContainsStock(name, rule.Stock, rule.Suffix)
-                        || ContainsStock(display, rule.Stock, rule.Suffix)
-                        || ContainsStock(file, rule.Stock, rule.Suffix)
-                        || ContainsStock(model, rule.Stock, rule.Suffix)
-                        || ContainsStock(partNumber, rule.Stock, rule.Suffix))
-                    {
-                        return rule.Type;
-                    }
-                }
-
-                // Disambiguate skins/liners by zone + description/library.
-                string blob = ((libType ?? string.Empty) + " " + (partType ?? string.Empty) + " " + description)
-                    .ToUpperInvariant();
-
-                if (blob.Contains("SUB FLOOR") || blob.Contains("SUBFLOOR") || blob.Contains("SUB-FLOOR"))
-                {
-                    return HighlightPartType.BaseSubfloor;
-                }
-
-                if (blob.Contains("FLOOR") && !blob.Contains("ROOF") && !blob.Contains("WALL"))
-                {
-                    return HighlightPartType.BaseFloor;
-                }
-
-                if (blob.Contains("ROOF") && blob.Contains("LINER"))
-                {
-                    return HighlightPartType.RoofLiner;
-                }
-
-                if (blob.Contains("ROOF") && blob.Contains("SKIN"))
-                {
-                    return HighlightPartType.RoofSkin;
-                }
-
-                if (blob.Contains("WALL") && blob.Contains("LINER"))
-                {
-                    return HighlightPartType.WallLiner;
-                }
-
-                if (blob.Contains("WALL") && blob.Contains("SKIN"))
-                {
-                    return HighlightPartType.WallSkin;
-                }
+                WalkOccurrences(assembly.ComponentDefinition.Occurrences, type, list, inside391Z);
             }
-            catch
+            catch { }
+            return list;
+        }
+
+        public static HighlightPartType? Classify(ComponentOccurrence occurrence)
+        {
+            if (occurrence == null) return null;
+            try
             {
+                if (occurrence.DefinitionDocumentType != DocumentTypeEnum.kPartDocumentObject) return null;
+                Document doc = GetReferencedDocument(occurrence);
+                if (doc == null) return null;
+                string stock = GetDesignTrackingStock(doc);
+                if (string.IsNullOrWhiteSpace(stock)) return null;
+                if (StockLookup.TryGetValue(NormalizeStock(stock), out HighlightPartType type)) return type;
             }
-
+            catch { }
             return null;
         }
 
-        public static List<string> CollectPathNames(AssemblyDocument assembly, HighlightPartType type)
-        {
-            var names = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (assembly == null)
-            {
-                return names;
-            }
-
-            try
-            {
-                CollectIndexed(assembly.ComponentDefinition.Occurrences, type, names, seen);
-            }
-            catch
-            {
-            }
-
-            return names;
-        }
-
-        private static void CollectIndexed(
+        private static void WalkOccurrences(
             ComponentOccurrences occurrences,
             HighlightPartType type,
-            List<string> names,
-            HashSet<string> seen)
+            List<ComponentOccurrence> matches,
+            bool inside391Z)
         {
-            if (occurrences == null)
-            {
-                return;
-            }
-
+            if (occurrences == null) return;
             for (int i = 1; i <= occurrences.Count; i++)
             {
                 ComponentOccurrence occ;
-                try
-                {
-                    occ = occurrences[i];
-                }
-                catch
-                {
-                    continue;
-                }
-
-                TryAdd(occ, type, names, seen);
-
-                try
-                {
-                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
-                        && occ.SubOccurrences != null
-                        && occ.SubOccurrences.Count > 0)
-                    {
-                        CollectIndexedEnum(occ.SubOccurrences, type, names, seen);
-                    }
-                }
-                catch
-                {
-                }
+                try { occ = occurrences[i]; } catch { continue; }
+                WalkOne(occ, type, matches, inside391Z);
             }
         }
 
-        private static void CollectIndexedEnum(
+        private static void WalkEnum(
             ComponentOccurrencesEnumerator occurrences,
             HighlightPartType type,
-            List<string> names,
-            HashSet<string> seen)
+            List<ComponentOccurrence> matches,
+            bool inside391Z)
         {
-            if (occurrences == null)
-            {
-                return;
-            }
-
+            if (occurrences == null) return;
             for (int i = 1; i <= occurrences.Count; i++)
             {
                 ComponentOccurrence occ;
-                try
-                {
-                    occ = occurrences[i];
-                }
-                catch
-                {
-                    continue;
-                }
-
-                TryAdd(occ, type, names, seen);
-
-                try
-                {
-                    if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject
-                        && occ.SubOccurrences != null
-                        && occ.SubOccurrences.Count > 0)
-                    {
-                        CollectIndexedEnum(occ.SubOccurrences, type, names, seen);
-                    }
-                }
-                catch
-                {
-                }
+                try { occ = occurrences[i]; } catch { continue; }
+                WalkOne(occ, type, matches, inside391Z);
             }
         }
 
-        private static void TryAdd(
+        private static void WalkOne(
             ComponentOccurrence occ,
             HighlightPartType type,
-            List<string> names,
-            HashSet<string> seen)
+            List<ComponentOccurrence> matches,
+            bool inside391Z)
         {
-            if (Classify(occ) != type)
-            {
-                return;
-            }
+            if (Classify(occ) == type) matches.Add(occ);
 
-            string path;
+            if (occ.DefinitionDocumentType != DocumentTypeEnum.kAssemblyDocumentObject) return;
+
+            bool descend = inside391Z || Is391ZOccurrence(occ);
+            if (!descend) return;
+
             try
             {
-                path = occ.Name;
+                if (occ.SubOccurrences != null && occ.SubOccurrences.Count > 0)
+                {
+                    WalkEnum(occ.SubOccurrences, type, matches, inside391Z: true);
+                }
             }
-            catch
-            {
-                return;
-            }
-
-            if (!string.IsNullOrWhiteSpace(path) && seen.Add(path))
-            {
-                names.Add(path);
-            }
+            catch { }
         }
 
-        private static bool ContainsStock(string text, string stock, string suffix)
+        private static bool Is391ZDocument(Document document)
         {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            string t = text.Replace('_', '-');
-            if (t.IndexOf(stock, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            return t.IndexOf("30117-" + suffix, StringComparison.OrdinalIgnoreCase) >= 0
-                || t.IndexOf("30117" + suffix, StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool TryGetMomString(Document doc, string attrName, out string value)
-        {
-            value = null;
             try
             {
-                if (doc?.AttributeSets == null || !doc.AttributeSets.get_NameIsUsed("MOM_DATA"))
-                {
-                    return false;
-                }
-
-                AttributeSet set = doc.AttributeSets["MOM_DATA"];
-                if (!set.get_NameIsUsed(attrName))
-                {
-                    return false;
-                }
-
-                value = set[attrName].Value?.ToString()?.Trim();
-                return !string.IsNullOrEmpty(value);
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(document?.FullFileName ?? string.Empty);
+                return fileName.StartsWith("391Z", StringComparison.OrdinalIgnoreCase);
             }
-            catch
+            catch { return false; }
+        }
+
+        private static bool Is391ZOccurrence(ComponentOccurrence occurrence)
+        {
+            Document doc = GetReferencedDocument(occurrence);
+            return doc != null && Is391ZDocument(doc);
+        }
+
+        private static Dictionary<string, HighlightPartType> BuildStockLookup()
+        {
+            var map = new Dictionary<string, HighlightPartType>(StringComparer.OrdinalIgnoreCase);
+            foreach (TypeRule rule in Rules)
             {
-                return false;
+                if (string.IsNullOrWhiteSpace(rule.Stock)) continue;
+                map[NormalizeStock(rule.Stock)] = rule.Type;
             }
+            return map;
+        }
+
+        private static string NormalizeStock(string stock)
+        {
+            return string.IsNullOrWhiteSpace(stock) ? string.Empty : stock.Trim().Replace('_', '-');
+        }
+
+        private static string GetDesignTrackingStock(Document doc)
+        {
+            try
+            {
+                object raw = doc.PropertySets["Design Tracking Properties"]["Stock Number"].Value;
+                if (raw == null) return string.Empty;
+                return Convert.ToString(raw)?.Trim() ?? string.Empty;
+            }
+            catch { return string.Empty; }
+        }
+
+        internal static Document GetReferencedDocument(ComponentOccurrence occurrence)
+        {
+            if (occurrence == null) return null;
+            try
+            {
+                var document = occurrence.ReferencedDocumentDescriptor.ReferencedDocument as Document;
+                if (document != null) return document;
+            }
+            catch { }
+            try
+            {
+                ComponentDefinition definition = occurrence.Definition;
+                if (definition is PartComponentDefinition partDefinition) return partDefinition.Document as Document;
+                if (definition is AssemblyComponentDefinition assemblyDefinition) return assemblyDefinition.Document as Document;
+            }
+            catch { }
+            return null;
         }
     }
 }
