@@ -1,7 +1,7 @@
 **/bin/
 **/obj/
 **/pack/
-**/node_modules/
 *.user
 *.pdb
 .vs/
+UnitConstructionVerifier_Dist.zip

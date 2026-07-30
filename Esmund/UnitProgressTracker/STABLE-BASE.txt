@@ -1,0 +1,36 @@
+Unit Progress Tracker — current stable base
+=========================================
+
+Version: 1.0.23
+Marked: 2026-07-29 (end of session)
+
+Archive: releases/UnitSurfaceViewer_Source_v1.0.23_2026-07-29.zip
+SHA256: 0B13E4267B2BB8443279F5C619A1CE0DA45484A1320B8DF5B7EAFE14B6F4C0E3
+OneDrive: C:\Users\esmun\OneDrive\Ce3\7-29\UnitSurfaceViewer_Source_v1.0.23_2026-07-29.zip
+Progress: docs/PROGRESS_2026-07-29.md
+
+Restore point for future work. Extract the zip (or use this repo folder after
+npm install) — do not open index.html in a browser.
+
+Run
+---
+  cd UnitSurfaceViewer
+  npm install
+  pip install pywin32
+  npm start
+
+Stable behavior (verified 2026-07-29)
+-------------------------------------
+- Blank startup — no auto-rescan of last folder
+- Electron preload bridge works; header shows v1.0.23
+- Open Folder, File menu, Options all functional
+- Inventor scan: progress overlay, Cancel scan, 15-minute timeout
+- Open folder uses geometry cache when present; File → Rescan for full Inventor read
+- Save project as… (v3) embeds geometry for offline load
+- Load project… uses saved geometry without Inventor scan
+- BOM tab: import BOM_FLAT xlsx, shell folder nest, set/relocate root, create folders, open in Explorer
+- BOM list: search, sort, skid/segment filters, SQ custom filter
+
+Not in this zip
+---------------
+- node_modules (run npm install after extract)

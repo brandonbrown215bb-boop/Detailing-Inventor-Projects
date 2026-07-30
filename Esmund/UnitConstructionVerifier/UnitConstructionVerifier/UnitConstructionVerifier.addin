@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Inventor Add-In manifest.
+  Deploy this file alongside the DLL to:
+  %APPDATA%\Autodesk\Inventor 2020\Addins\UnitConstructionVerifier.addin
+-->
+<Addin Type="Standard">
+  <ClassId>{B1C2D3E4-F5A6-7890-BCDE-F01234567891}</ClassId>
+  <ClientId>{B1C2D3E4-F5A6-7890-BCDE-F01234567891}</ClientId>
+  <DisplayName>Unit Construction Verifier</DisplayName>
+  <Description>Reads DOCUMENT_CONFIG_JSON from the active assembly and verifies construction specifications against model data.</Description>
+  <Assembly>UnitConstructionVerifier.dll</Assembly>
+  <LoadOnStartUp>1</LoadOnStartUp>
+  <SupportedSoftwareVersionGreaterThan>23.</SupportedSoftwareVersionGreaterThan>
+  <DataVersion>1</DataVersion>
+  <Version>1.0.0</Version>
+</Addin>

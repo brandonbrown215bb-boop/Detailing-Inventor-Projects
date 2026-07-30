@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Unit Progress Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <h1>Unit Progress Tracker <span id="appVersion" class="app-version"></span></h1>
+      <span id="folderLabel" class="folder-label">No folder loaded</span>
+      <div id="scanProgress" class="scan-progress" hidden>
+        <div id="scanProgressTrack" class="scan-progress-track indeterminate">
+          <div id="scanProgressFill" class="scan-progress-fill"></div>
+        </div>
+        <span id="scanProgressText" class="scan-progress-text">Scanning…</span>
+      </div>
+      <span id="appStatus" class="app-status" hidden></span>
+    </div>
+    <div class="header-actions">
+      <button type="button" id="openFolderBtn" class="btn primary">Open Folder…</button>
+      <button type="button" id="fitViewBtn" class="btn" disabled>Fit View</button>
+      <div class="menu-dropdown">
+        <button type="button" id="fileMenuBtn" class="btn" aria-haspopup="true" aria-expanded="false">File ▾</button>
+        <div id="fileMenuPanel" class="menu-panel" hidden>
+          <button type="button" class="menu-item" id="menuSaveProject">Save project</button>
+          <button type="button" class="menu-item" id="menuSaveProjectAs">Save project as…</button>
+          <button type="button" class="menu-item" id="menuLoadProject">Load project…</button>
+          <div class="menu-separator"></div>
+          <button type="button" class="menu-item" id="menuRecent">Recent…</button>
+          <button type="button" class="menu-item" id="menuRescan" disabled>Rescan</button>
+          <div class="menu-separator"></div>
+          <button type="button" class="menu-item" id="menuImportBom">Import BOM…</button>
+          <button type="button" class="menu-item" id="menuImportJson" disabled>Import JSON</button>
+          <button type="button" class="menu-item" id="menuExportJson" disabled>Export JSON</button>
+          <button type="button" class="menu-item" id="menuExportMd" disabled>Export Markdown</button>
+        </div>
+      </div>
+      <button type="button" id="optionsBtn" class="btn">Options</button>
+    </div>
+  </header>
+
+  <main class="app-main" id="appMain">
+    <aside class="surface-list-panel" id="leftPanel">
+      <div class="panel-head">
+        <div class="panel-tabs">
+          <button type="button" id="viewSurfacesTab" class="panel-tab active" aria-pressed="true">Surfaces</button>
+          <button type="button" id="viewBomTab" class="panel-tab" aria-pressed="false">BOM</button>
+        </div>
+        <div class="panel-head-actions" id="surfacePanelActions">
+          <button type="button" id="showAllBtn" class="btn small" disabled title="Show all hidden surfaces">Show all</button>
+          <span id="surfaceCount" class="badge">0</span>
+        </div>
+      </div>
+      <div id="surfaceListView">
+      <div id="loadErrors" class="load-errors" hidden></div>
+      <div class="list-display-controls">
+        <label class="list-control">
+          <span class="list-control-label">Name</span>
+          <select id="listNameMode" class="list-control-input">
+            <option value="both">Both</option>
+            <option value="long">Long</option>
+            <option value="short">Short</option>
+          </select>
+        </label>
+        <label class="list-control">
+          <span class="list-control-label">Sort</span>
+          <select id="listSortMode" class="list-control-input">
+            <option value="default">Default</option>
+            <option value="skid">Skid</option>
+            <option value="type">Type</option>
+            <option value="skid-type">Skid + type</option>
+          </select>
+        </label>
+        <label class="list-control check"><input type="checkbox" id="listShowTypeTag" checked /> Type</label>
+        <label class="list-control check"><input type="checkbox" id="listShowSkidTag" checked /> Skid</label>
+        <label class="list-control check"><input type="checkbox" id="listShowSideTag" checked /> Side</label>
+      </div>
+      <ul id="surfaceList" class="surface-list"></ul>
+      </div>
+      <div id="bomPanel" class="bom-panel" hidden></div>
+    </aside>
+
+    <div class="panel-resizer panel-resizer-left" id="leftResizer" title="Drag to resize surface list"></div>
+
+    <section class="viewer-wrap">
+      <div id="viewerHost" class="viewer-host">
+        <div id="viewerEmpty" class="viewer-empty" hidden></div>
+        <div id="scanOverlay" class="scan-overlay" hidden>
+          <div class="scan-overlay-card">
+            <div class="scan-overlay-title">Scanning surfaces</div>
+            <div class="scan-progress-track indeterminate" id="scanOverlayTrack">
+              <div class="scan-progress-fill" id="scanOverlayFill"></div>
+            </div>
+            <div id="scanOverlayText" class="scan-overlay-text">Starting…</div>
+            <button type="button" id="scanCancelBtn" class="btn scan-cancel-btn" hidden>Cancel scan</button>
+          </div>
+        </div>
+      </div>
+      <div id="legend" class="legend" hidden></div>
+      <div id="opacityControl" class="opacity-control" hidden>
+        <label for="opacitySlider">Surface opacity</label>
+        <div class="opacity-row">
+          <input type="range" id="opacitySlider" min="25" max="100" step="1" value="90" />
+          <span id="opacityValue" class="opacity-value">90%</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="panel-resizer panel-resizer-right" id="rightResizer" title="Drag to resize detail panel"></div>
+
+    <aside id="detailPanel" class="detail-panel" hidden>
+      <div class="panel-head">
+        <h2 id="detailTitle">Surface</h2>
+        <button type="button" id="closeDetailBtn" class="icon-btn" aria-label="Close panel">&times;</button>
+      </div>
+      <div class="detail-meta" id="detailMeta"></div>
+      <div id="detailSurfaceFields">
+        <label class="field-label" for="stateSelect">Status</label>
+        <select id="stateSelect" class="field-input"></select>
+      </div>
+      <div class="field-label">Checklist</div>
+      <ul id="checklist" class="checklist"></ul>
+      <label class="field-label" for="notesInput">Notes</label>
+      <textarea id="notesInput" class="field-input notes" rows="10" placeholder="Add notes for this surface…"></textarea>
+
+      <details class="detail-collapsible" id="renumberHistorySection">
+        <summary>Renumber &amp; history</summary>
+        <div class="detail-collapsible-body">
+          <label class="field-label" for="renumberInput">Surface number</label>
+          <p class="hint inline-hint">Renumber for tracking without a new JSON file (same geometry). Retires the current number.</p>
+          <div class="renumber-row">
+            <input id="renumberInput" class="field-input" type="text" placeholder="New surface number" />
+            <button type="button" id="applyRenumberBtn" class="btn small primary">Apply renumber</button>
+          </div>
+          <div id="fileKeyNote" class="file-key-note"></div>
+
+          <div class="field-label">Surface history</div>
+          <p class="hint inline-hint">Link a retired surface number when a part is renumbered or replaced.</p>
+          <ul id="historyList" class="history-list"></ul>
+          <div class="history-actions">
+            <select id="linkPreviousSelect" class="field-input"></select>
+            <button type="button" id="linkRenumberBtn" class="btn small" title="Same geometry — copy status and notes">Link (renumber)</button>
+            <button type="button" id="linkReplaceBtn" class="btn small" title="Changed geometry — keep history only">Link (replace)</button>
+          </div>
+        </div>
+      </details>
+    </aside>
+  </main>
+
+  <div id="surfaceInfoPopup" class="surface-info-popup" hidden></div>
+
+  <dialog id="recentDialog" class="options-dialog recent-dialog">
+    <header class="dialog-header">
+      <h2>Recent projects</h2>
+      <button type="button" id="recentCloseBtn" class="icon-btn" aria-label="Close">&times;</button>
+    </header>
+    <ul id="recentList" class="recent-list"></ul>
+    <footer class="dialog-footer">
+      <button type="button" id="recentCloseFooterBtn" class="btn">Close</button>
+    </footer>
+  </dialog>
+
+  <dialog id="bomAddDialog" class="options-dialog bom-add-dialog">
+    <form id="bomAddForm" class="bom-add-form">
+      <header class="dialog-header">
+        <h2>Add 391- entry</h2>
+        <button type="button" id="bomAddCloseBtn" class="icon-btn" aria-label="Close">&times;</button>
+      </header>
+      <section class="bom-add-body">
+        <p class="hint">Adds a 391- assembly to the shell export list. Pick a skid first — segment choices match that skid.</p>
+        <div id="bomAddError" class="bom-add-error" hidden></div>
+        <label class="field-label" for="bomAddPart">Part number</label>
+        <input id="bomAddPart" class="field-input" type="text" placeholder="391-60228-261" autocomplete="off" required />
+        <label class="field-label" for="bomAddSkid">Skid</label>
+        <select id="bomAddSkid" class="field-input" required>
+          <option value="">Select skid…</option>
+        </select>
+        <label class="field-label" for="bomAddSegment">Segment</label>
+        <select id="bomAddSegment" class="field-input" required disabled>
+          <option value="">Select skid first…</option>
+        </select>
+        <label class="field-label" for="bomAddDesc">Description</label>
+        <input id="bomAddDesc" class="field-input" type="text" placeholder="DDFAN SKID 222EPFN CL3" autocomplete="off" required />
+        <label class="field-label" for="bomAddExt">Ext. description</label>
+        <input id="bomAddExt" class="field-input" type="text" placeholder="118X160 2X2" autocomplete="off" />
+        <label class="field-label" for="bomAddQty">Quantity</label>
+        <input id="bomAddQty" class="field-input" type="text" value="1" autocomplete="off" />
+      </section>
+      <footer class="dialog-footer">
+        <button type="button" id="bomAddCancelBtn" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Add entry</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="optionsDialog" class="options-dialog">
+    <form method="dialog" id="optionsForm">
+      <header class="dialog-header">
+        <h2>Options</h2>
+        <button type="button" id="optionsCloseBtn" class="icon-btn" aria-label="Close">&times;</button>
+      </header>
+      <section class="options-section">
+        <div class="section-head">
+          <h3>Status colors</h3>
+          <button type="button" id="addStateBtn" class="btn small">Add state</button>
+        </div>
+        <p class="hint">Solid color or hazard-stripe wrap for each status in the 3D view.</p>
+        <div id="statesEditor" class="states-editor"></div>
+      </section>
+      <section class="options-section">
+        <div class="section-head">
+          <h3>3D view</h3>
+        </div>
+        <p class="hint">Surface opacity, floor grid, and FPS movement (WASD, sprint, ascend/descend keys).</p>
+        <div class="opacity-editor">
+          <input type="range" id="optionsOpacitySlider" min="25" max="100" step="1" value="90" />
+          <span id="optionsOpacityValue" class="opacity-value">90%</span>
+        </div>
+        <label class="options-check"><input type="checkbox" id="optionsShowGrid" checked /> Show floor grid (sized to skids)</label>
+        <label class="options-check"><input type="checkbox" id="optionsFpsControls" checked /> Enable FPS movement controls</label>
+        <div class="mouse-map-editor" id="mouseMapEditor"></div>
+        <div class="sticker-editor" id="stickerEditor"></div>
+      </section>
+      <section class="options-section">
+        <div class="section-head">
+          <h3>Appearance</h3>
+        </div>
+        <p class="hint">Font and colors for header, panels, and surface list.</p>
+        <div class="theme-editor" id="themeEditor"></div>
+      </section>
+      <section class="options-section">
+        <div class="section-head">
+          <h3>Checklist items</h3>
+          <button type="button" id="addChecklistBtn" class="btn small">Add item</button>
+        </div>
+        <p class="hint">Checklist items appear on each surface detail panel.</p>
+        <div id="checklistEditor" class="checklist-editor"></div>
+      </section>
+      <footer class="dialog-footer">
+        <button type="button" id="resetOptionsBtn" class="btn">Reset defaults</button>
+        <button type="submit" class="btn primary">Save options</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
