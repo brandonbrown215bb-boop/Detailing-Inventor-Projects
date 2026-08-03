@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "tool_version": "0.1.1",
+  "project": "Detailing-Inventor-Projects",
+  "claim_ttl_hours": 24,
+  "statuses": [
+    "inbox",
+    "ready",
+    "active",
+    "blocked",
+    "review",
+    "parked",
+    "done"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {
+      "path": "docs/architecture/README.md",
+      "scope": [
+        "src/**"
+      ],
+      "verified_at_commit": "3c2ecdac70959b4cfc4a568a961778f1ef8f6c0d"
+    }
+  ]
+}

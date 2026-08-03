@@ -214,3 +214,23 @@ publish/
 *.lck
 *.$$$
 *.ipj.bak
+
+# AGENT_GROUND_START
+.agents/state/
+.obsidian/
+.graphify/
+graphify-out/
+.qmd/
+# AGENT_GROUND_END
+.questboard/BOARD.local.md
+
+# Agent session scratch dirs (transient, not deliverables)
+.cursor/
+.agents/teamwork_preview_*/
+.agents/explorer_survey_*/
+.agents/orchestrator/
+.agents/sentinel/
+.agents/sub_orch_*/
+.agents/e2e_testing_orch/
+.agents/test_writer_*/
+.agents/ORIGINAL_REQUEST.md
