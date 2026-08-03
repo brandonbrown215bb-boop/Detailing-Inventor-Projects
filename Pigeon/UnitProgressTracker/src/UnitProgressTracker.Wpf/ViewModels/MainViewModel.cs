@@ -1,0 +1,643 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using Microsoft.Win32;
+using UnitProgressTracker.Core.Models;
+using UnitProgressTracker.Core.Services;
+
+namespace UnitProgressTracker.Wpf.ViewModels;
+
+public class RelayCommand : ICommand
+{
+    private readonly Action<object?> _execute;
+    private readonly Predicate<object?>? _canExecute;
+
+    public RelayCommand(Action<object?> execute, Predicate<object?>? canExecute = null)
+    {
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+        _canExecute = canExecute;
+    }
+
+    public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
+    public void Execute(object? parameter) => _execute(parameter);
+    public event EventHandler? CanExecuteChanged
+    {
+        add => CommandManager.RequerySuggested += value;
+        remove => CommandManager.RequerySuggested -= value;
+    }
+}
+
+public class AsyncRelayCommand : ICommand
+{
+    private readonly Func<object?, Task> _execute;
+    private readonly Predicate<object?>? _canExecute;
+    private bool _isExecuting;
+
+    public AsyncRelayCommand(Func<object?, Task> execute, Predicate<object?>? canExecute = null)
+    {
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+        _canExecute = canExecute;
+    }
+
+    public bool CanExecute(object? parameter) => !_isExecuting && (_canExecute?.Invoke(parameter) ?? true);
+
+    public async void Execute(object? parameter)
+    {
+        _isExecuting = true;
+        CommandManager.InvalidateRequerySuggested();
+        try { await _execute(parameter); }
+        finally
+        {
+            _isExecuting = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public event EventHandler? CanExecuteChanged
+    {
+        add => CommandManager.RequerySuggested += value;
+        remove => CommandManager.RequerySuggested -= value;
+    }
+}
+
+public class MainViewModel : INotifyPropertyChanged
+{
+    private string? _currentFolderPath;
+    private SurfaceModel? _selectedSurface;
+    private ShellFolderEntry? _selectedBomEntry;
+    private string _searchText = string.Empty;
+    private string _shellRootPath = string.Empty;
+    private int _selectedTabIndex = 0;
+    private string _statusMessage = "Ready. Open a unit folder to begin.";
+    private string _selectedSkidFilter = "All Skids";
+    private string _selectedSegmentFilter = "All Segments";
+    private bool _isCustomSqOnly;
+    private bool _showMisplacedDetails;
+    private bool _wireframeVisible = true;
+    private double _globalOpacity = 1.0;
+    private bool _isScanning;
+    private double _scanProgress;
+    private string _scanProgressLabel = string.Empty;
+    private CancellationTokenSource? _scanCts;
+
+    public ObservableCollection<SurfaceModel> Surfaces { get; } = new();
+    public ObservableCollection<StatusState> StatusStates { get; } = new();
+    public ObservableCollection<ShellFolderEntry> BomEntries { get; } = new();
+    public ObservableCollection<ShellFolderEntry> FilteredBomEntries { get; } = new();
+    public ObservableCollection<BomRow> MisplacedRows { get; } = new();
+    public ObservableCollection<string> AvailableSkids { get; } = new();
+    public ObservableCollection<string> AvailableSegments { get; } = new();
+    public ShellFolderPlan? CurrentBomPlan { get; private set; }
+
+    // Callbacks wired by MainWindow
+    public Action? RequestViewportRefresh { get; set; }
+    public Action<string>? RequestHighlightSurface { get; set; }
+    public Action<bool>? RequestSetWireframe { get; set; }
+    public Action<double>? RequestSetOpacity { get; set; }
+    public Action<bool, string>? RequestSetSurfaceVisibility { get; set; }
+
+    // -----------------------------------------------------------------------
+    // Properties
+    // -----------------------------------------------------------------------
+
+    public string? CurrentFolderPath
+    {
+        get => _currentFolderPath;
+        set { _currentFolderPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasFolder)); }
+    }
+
+    public bool HasFolder => !string.IsNullOrWhiteSpace(CurrentFolderPath);
+
+    public SurfaceModel? SelectedSurface
+    {
+        get => _selectedSurface;
+        set
+        {
+            _selectedSurface = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasSelectedSurface));
+            OnPropertyChanged(nameof(ChecklistItems));
+            if (value != null)
+                RequestHighlightSurface?.Invoke(value.SurfaceNumber);
+        }
+    }
+
+    public bool HasSelectedSurface => SelectedSurface != null;
+
+    // Expose checklist as a bindable list for the right-panel ItemsControl
+    public IEnumerable<ChecklistItemViewModel> ChecklistItems
+    {
+        get
+        {
+            if (SelectedSurface == null) return Enumerable.Empty<ChecklistItemViewModel>();
+            return SelectedSurface.Checklist.Select(kv => new ChecklistItemViewModel(kv.Key, kv.Value, this));
+        }
+    }
+
+    public ShellFolderEntry? SelectedBomEntry
+    {
+        get => _selectedBomEntry;
+        set { _selectedBomEntry = value; OnPropertyChanged(); }
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set { _searchText = value; OnPropertyChanged(); FilterBomEntries(); }
+    }
+
+    public string ShellRootPath
+    {
+        get => _shellRootPath;
+        set { _shellRootPath = value; OnPropertyChanged(); RecalculateEntryAbsolutePaths(); }
+    }
+
+    public int SelectedTabIndex
+    {
+        get => _selectedTabIndex;
+        set { _selectedTabIndex = value; OnPropertyChanged(); }
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set { _statusMessage = value; OnPropertyChanged(); }
+    }
+
+    public string SelectedSkidFilter
+    {
+        get => _selectedSkidFilter;
+        set { _selectedSkidFilter = value; OnPropertyChanged(); FilterBomEntries(); }
+    }
+
+    public string SelectedSegmentFilter
+    {
+        get => _selectedSegmentFilter;
+        set { _selectedSegmentFilter = value; OnPropertyChanged(); FilterBomEntries(); }
+    }
+
+    public bool IsCustomSqOnly
+    {
+        get => _isCustomSqOnly;
+        set { _isCustomSqOnly = value; OnPropertyChanged(); FilterBomEntries(); }
+    }
+
+    public bool HasMisplacedCoilPanels => MisplacedRows.Count > 0;
+    public int MisplacedCoilPanelsCount => MisplacedRows.Count;
+    public string MisplacedCoilPanelMessage => $"{MisplacedCoilPanelsCount} row(s) have segment '<--'. These lines do not belong to a skid sequence and will be skipped in folder creation.";
+
+    public bool ShowMisplacedDetails
+    {
+        get => _showMisplacedDetails;
+        set { _showMisplacedDetails = value; OnPropertyChanged(); OnPropertyChanged(nameof(MisplacedDetailsToggleText)); }
+    }
+
+    public string MisplacedDetailsToggleText => ShowMisplacedDetails ? "Hide Details" : "View Details";
+
+    // R5 — Wireframe toggle
+    public bool WireframeVisible
+    {
+        get => _wireframeVisible;
+        set
+        {
+            _wireframeVisible = value;
+            OnPropertyChanged();
+            RequestSetWireframe?.Invoke(value);
+        }
+    }
+
+    // R5 — Global opacity
+    public double GlobalOpacity
+    {
+        get => _globalOpacity;
+        set
+        {
+            _globalOpacity = Math.Clamp(value, 0.1, 1.0);
+            OnPropertyChanged();
+            RequestSetOpacity?.Invoke(_globalOpacity);
+        }
+    }
+
+    // R4 — Async scan state
+    public bool IsScanning
+    {
+        get => _isScanning;
+        set { _isScanning = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsNotScanning)); }
+    }
+
+    public bool IsNotScanning => !_isScanning;
+
+    public double ScanProgress
+    {
+        get => _scanProgress;
+        set { _scanProgress = value; OnPropertyChanged(); }
+    }
+
+    public string ScanProgressLabel
+    {
+        get => _scanProgressLabel;
+        set { _scanProgressLabel = value; OnPropertyChanged(); }
+    }
+
+    // -----------------------------------------------------------------------
+    // Commands
+    // -----------------------------------------------------------------------
+
+    public ICommand ImportExcelBomCommand { get; }
+    public ICommand SetShellRootFolderCommand { get; }
+    public ICommand CreateShellFoldersCommand { get; }
+    public ICommand OpenShellFolderCommand { get; }
+    public ICommand AddBomRowCommand { get; }
+    public ICommand DeleteBomRowCommand { get; }
+    public ICommand ToggleMisplacedDetailsCommand { get; }
+    public ICommand ExportMarkdownCommand { get; }
+    public ICommand ToggleWireframeCommand { get; }
+    public ICommand ToggleSurfaceVisibilityCommand { get; }
+    public ICommand CancelScanCommand { get; }
+    public ICommand AsyncScanFolderCommand { get; }
+
+    public MainViewModel()
+    {
+        foreach (var state in StatusState.DefaultStates)
+            StatusStates.Add(state);
+
+        AvailableSkids.Add("All Skids");
+        AvailableSegments.Add("All Segments");
+
+        ImportExcelBomCommand = new RelayCommand(_ => ExecuteImportExcelBom());
+        SetShellRootFolderCommand = new RelayCommand(_ => ExecuteSetShellRootFolder());
+        CreateShellFoldersCommand = new RelayCommand(_ => CreateShellFolders(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && BomEntries.Count > 0);
+        OpenShellFolderCommand = new RelayCommand(_ => ExecuteOpenShellFolder(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && Directory.Exists(ShellRootPath));
+        AddBomRowCommand = new RelayCommand(_ => ExecuteAddBomRow());
+        DeleteBomRowCommand = new RelayCommand(_ => ExecuteDeleteBomRow(), _ => SelectedBomEntry != null);
+        ToggleMisplacedDetailsCommand = new RelayCommand(_ => ShowMisplacedDetails = !ShowMisplacedDetails);
+        ExportMarkdownCommand = new RelayCommand(_ => ExecuteExportMarkdown(), _ => Surfaces.Count > 0);
+        ToggleWireframeCommand = new RelayCommand(_ => WireframeVisible = !WireframeVisible);
+        ToggleSurfaceVisibilityCommand = new RelayCommand(p => ExecuteToggleSurfaceVisibility(p as SurfaceModel));
+        CancelScanCommand = new RelayCommand(_ => _scanCts?.Cancel(), _ => IsScanning);
+        AsyncScanFolderCommand = new AsyncRelayCommand(_ => ExecuteAsyncScanAsync());
+    }
+
+    // -----------------------------------------------------------------------
+    // Surface loading
+    // -----------------------------------------------------------------------
+
+    public void LoadFolder(string folderPath)
+    {
+        CurrentFolderPath = folderPath;
+        StatusMessage = $"Scanning surfaces in {Path.GetFileName(folderPath)}...";
+
+        var scanned = GeometryScanner.ScanJsonFolder(folderPath);
+        Surfaces.Clear();
+        foreach (var surf in scanned) Surfaces.Add(surf);
+
+        StatusMessage = $"Loaded {Surfaces.Count} surfaces.";
+        RequestViewportRefresh?.Invoke();
+    }
+
+    public async Task ExecuteAsyncScanAsync()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentFolderPath)) return;
+
+        _scanCts = new CancellationTokenSource();
+        IsScanning = true;
+        ScanProgress = 0;
+        ScanProgressLabel = "Starting scan...";
+        Surfaces.Clear();
+
+        try
+        {
+            var progress = new Progress<IamScanProgress>(p =>
+            {
+                ScanProgress = p.Percent;
+                ScanProgressLabel = p.Total > 0
+                    ? $"Scanning {p.Scanned}/{p.Total} — {p.CurrentFile}"
+                    : "Done.";
+            });
+
+            var results = await AsyncGeometryScanner.ScanFolderAsync(
+                CurrentFolderPath,
+                progress,
+                _scanCts.Token);
+
+            foreach (var surf in results) Surfaces.Add(surf);
+            StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded.";
+            RequestViewportRefresh?.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Scan cancelled.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Scan error: {ex.Message}";
+        }
+        finally
+        {
+            IsScanning = false;
+            ScanProgressLabel = string.Empty;
+            _scanCts?.Dispose();
+            _scanCts = null;
+        }
+    }
+
+    public void SelectSurfaceByNumber(string surfaceNumber)
+    {
+        var found = Surfaces.FirstOrDefault(s => string.Equals(s.SurfaceNumber, surfaceNumber, StringComparison.OrdinalIgnoreCase));
+        if (found != null) SelectedSurface = found;
+    }
+
+    public string GetStatusColor(string stateId)
+    {
+        var match = StatusStates.FirstOrDefault(s => s.Id == stateId);
+        return match?.ColorHex ?? "#94a3b8";
+    }
+
+    public void UpdateSelectedSurfaceStatus(string stateId)
+    {
+        if (SelectedSurface != null)
+        {
+            SelectedSurface.StateId = stateId;
+            RequestViewportRefresh?.Invoke();
+            OnPropertyChanged(nameof(SelectedSurface));
+        }
+    }
+
+    public void UpdateChecklistItem(string key, bool value)
+    {
+        if (SelectedSurface != null)
+        {
+            SelectedSurface.Checklist[key] = value;
+            OnPropertyChanged(nameof(ChecklistItems));
+        }
+    }
+
+    private void ExecuteToggleSurfaceVisibility(SurfaceModel? surface)
+    {
+        if (surface == null) return;
+        surface.IsHidden = !surface.IsHidden;
+        RequestSetSurfaceVisibility?.Invoke(surface.IsHidden, surface.SurfaceNumber);
+        OnPropertyChanged(nameof(SelectedSurface));
+    }
+
+    // -----------------------------------------------------------------------
+    // Markdown export (R3)
+    // -----------------------------------------------------------------------
+
+    private void ExecuteExportMarkdown()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export Audit Report",
+            Filter = "Markdown Files (*.md)|*.md|All Files (*.*)|*.*",
+            DefaultExt = "md",
+            FileName = $"audit-report-{DateTime.Now:yyyy-MM-dd}"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                MarkdownExporter.SaveAuditReport(dialog.FileName, Surfaces, StatusStates);
+                StatusMessage = $"Audit report exported to {Path.GetFileName(dialog.FileName)}.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Export error: {ex.Message}";
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // BOM commands
+    // -----------------------------------------------------------------------
+
+    public void ExecuteImportExcelBom()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select Excel or CSV BOM File",
+            Filter = "BOM Files (*.xlsx;*.csv)|*.xlsx;*.csv|Excel Files (*.xlsx)|*.xlsx|CSV Files (*.csv)|*.csv|All Files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                var importer = new ExcelBomImporter();
+                var result = importer.ImportBom(dialog.FileName);
+                LoadBomRows(result.KeptRows);
+                StatusMessage = $"Imported {result.KeptCount} kept BOM rows from {Path.GetFileName(dialog.FileName)} ({result.DroppedCount} hardware/factor rows dropped).";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error importing BOM: {ex.Message}";
+            }
+        }
+    }
+
+    public void ExecuteSetShellRootFolder()
+    {
+        var dialog = new OpenFolderDialog { Title = "Select Shell Root Export Folder" };
+        if (dialog.ShowDialog() == true)
+        {
+            ShellRootPath = dialog.FolderName;
+            StatusMessage = $"Shell root path set to: {ShellRootPath}";
+        }
+    }
+
+    public void ExecuteOpenShellFolder()
+    {
+        if (!string.IsNullOrWhiteSpace(ShellRootPath) && Directory.Exists(ShellRootPath))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", ShellRootPath) { UseShellExecute = true });
+        }
+    }
+
+    public void ExecuteAddBomRow()
+    {
+        var newRow = new BomRow
+        {
+            PartNumber = "391-NEW",
+            Quantity = "1",
+            Unit = "EA",
+            Skid = "1 [FR-MB]",
+            Segment = "MB",
+            Description = "New Component Assembly"
+        };
+
+        List<BomRow> currentRows = GetCurrentBomRows();
+        currentRows.Add(newRow);
+        LoadBomRows(currentRows);
+
+        var addedEntry = BomEntries.FirstOrDefault(e => e.PartNumber == "391-NEW");
+        if (addedEntry != null) SelectedBomEntry = addedEntry;
+    }
+
+    public void ExecuteDeleteBomRow()
+    {
+        if (SelectedBomEntry == null) return;
+
+        string targetKey = SelectedBomEntry.EntryKey;
+        List<BomRow> currentRows = GetCurrentBomRows();
+        currentRows.RemoveAll(r => BomShellEngine.BuildEntryKey(r.PartNumber, r.Skid, r.Segment, r.Description, r.ExtDescription) == targetKey);
+        LoadBomRows(currentRows);
+    }
+
+    private List<BomRow> GetCurrentBomRows()
+    {
+        var list = BomEntries.Select(entry => new BomRow
+        {
+            PartNumber = entry.PartNumber,
+            Quantity = entry.Quantity,
+            Unit = entry.Unit,
+            Skid = entry.Skid,
+            Segment = entry.Segment,
+            Description = entry.Description,
+            ExtDescription = entry.ExtDescription
+        }).ToList();
+
+        foreach (var m in MisplacedRows) list.Add(m);
+        return list;
+    }
+
+    public void LoadBomRows(IEnumerable<BomRow> rows)
+    {
+        var engine = new BomShellEngine();
+        CurrentBomPlan = engine.BuildPlan(rows, ShellRootPath);
+
+        BomEntries.Clear();
+        foreach (var entry in CurrentBomPlan.Entries) BomEntries.Add(entry);
+
+        MisplacedRows.Clear();
+        foreach (var m in CurrentBomPlan.Misplaced) MisplacedRows.Add(m);
+
+        OnPropertyChanged(nameof(HasMisplacedCoilPanels));
+        OnPropertyChanged(nameof(MisplacedCoilPanelsCount));
+
+        UpdateDropdownFilters();
+        FilterBomEntries();
+
+        StatusMessage = $"Loaded BOM: {CurrentBomPlan.Entries.Count} shell folders planned, {CurrentBomPlan.Misplaced.Count} misplaced coil lines.";
+    }
+
+    public void CreateShellFolders()
+    {
+        if (string.IsNullOrWhiteSpace(ShellRootPath) || !Directory.Exists(ShellRootPath))
+        {
+            StatusMessage = "Error: Please select a valid shell root folder first.";
+            return;
+        }
+
+        if (CurrentBomPlan?.Entries.Count > 0 || BomEntries.Count > 0)
+        {
+            var targetEntries = CurrentBomPlan?.Entries ?? BomEntries.ToList();
+            int created = BomShellEngine.CreateShellFolders(ShellRootPath, targetEntries);
+            StatusMessage = $"Successfully created {created} shell export folders in {ShellRootPath}.";
+        }
+    }
+
+    private void UpdateDropdownFilters()
+    {
+        string currentSkid = SelectedSkidFilter;
+        string currentSeg = SelectedSegmentFilter;
+
+        AvailableSkids.Clear();
+        AvailableSkids.Add("All Skids");
+        foreach (var sk in BomEntries.Select(e => e.Skid).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(s => s))
+            AvailableSkids.Add(sk);
+
+        AvailableSegments.Clear();
+        AvailableSegments.Add("All Segments");
+        foreach (var sg in BomEntries.Select(e => e.Segment).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().OrderBy(s => s))
+            AvailableSegments.Add(sg);
+
+        _selectedSkidFilter = AvailableSkids.Contains(currentSkid) ? currentSkid : "All Skids";
+        _selectedSegmentFilter = AvailableSegments.Contains(currentSeg) ? currentSeg : "All Segments";
+        OnPropertyChanged(nameof(SelectedSkidFilter));
+        OnPropertyChanged(nameof(SelectedSegmentFilter));
+    }
+
+    private void FilterBomEntries()
+    {
+        var query = BomEntries.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(SelectedSkidFilter) && SelectedSkidFilter != "All Skids")
+            query = query.Where(e => string.Equals(e.Skid, SelectedSkidFilter, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(SelectedSegmentFilter) && SelectedSegmentFilter != "All Segments")
+            query = query.Where(e => string.Equals(e.Segment, SelectedSegmentFilter, StringComparison.OrdinalIgnoreCase));
+
+        if (IsCustomSqOnly)
+            query = query.Where(e => e.IsCustomSq);
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            string term = SearchText.Trim();
+            query = query.Where(e =>
+                (!string.IsNullOrEmpty(e.PartNumber) && e.PartNumber.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(e.Description) && e.Description.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(e.ExtDescription) && e.ExtDescription.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(e.Skid) && e.Skid.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(e.Segment) && e.Segment.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(e.RelativePath) && e.RelativePath.Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        FilteredBomEntries.Clear();
+        foreach (var entry in query) FilteredBomEntries.Add(entry);
+    }
+
+    private void RecalculateEntryAbsolutePaths()
+    {
+        foreach (var entry in BomEntries)
+        {
+            entry.AbsolutePath = !string.IsNullOrWhiteSpace(ShellRootPath)
+                ? Path.Combine(ShellRootPath, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar))
+                : null;
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    // Public surface so MainWindow can notify after directly mutating a model property
+    public void OnPropertyChangedPublic(string propertyName) => OnPropertyChanged(propertyName);
+}
+
+// Helper VM for the checklist ItemsControl binding
+public class ChecklistItemViewModel : INotifyPropertyChanged
+{
+    private readonly MainViewModel _parent;
+    public string Key { get; }
+
+    private bool _isChecked;
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            _isChecked = value;
+            OnPropertyChanged();
+            _parent.UpdateChecklistItem(Key, value);
+        }
+    }
+
+    public ChecklistItemViewModel(string key, bool isChecked, MainViewModel parent)
+    {
+        Key = key;
+        _isChecked = isChecked;
+        _parent = parent;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
