@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows;
 using UnitConstructionVerifier.Extraction;
 using UnitConstructionVerifier.Models;
+using UnitConstructionVerifier.Operations;
 using UnitConstructionVerifier.Persistence;
 using UnitConstructionVerifier.UI;
 using InvApp      = Inventor.Application;
@@ -27,6 +28,7 @@ namespace UnitConstructionVerifier
         private readonly InvApp _app;
         private InvBtnDef?      _buttonDef;
         private InvBtnSink?     _onExecuteHandler;
+        private VerifierWindow? _activeWindow;
 
         internal VerifierCommand(InvApp app) => _app = app;
 
@@ -238,12 +240,37 @@ namespace UnitConstructionVerifier
                 DebugLogger.Log($"Loading overrides for {iamPath}");
                 PersistenceManager.LoadOverrides(iamPath, data);
 
-                // Show the dialog (pass iptResult for verification)
+                // Show modeless so Inventor pan/rotate still works while verifying.
                 DebugLogger.Log("Showing VerifierWindow");
+                if (_activeWindow != null)
+                {
+                    try
+                    {
+                        if (_activeWindow.IsLoaded)
+                        {
+                            _activeWindow.Activate();
+                            _activeWindow.Focus();
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        _activeWindow = null;
+                    }
+                }
+
                 var window = new VerifierWindow(data, iamPath, _app);
                 window.SetIptScanResult(iptResult);
-                window.ShowDialog();
-                DebugLogger.Log("VerifierWindow closed");
+                window.Closed += (_, __) =>
+                {
+                    if (ReferenceEquals(_activeWindow, window))
+                    {
+                        _activeWindow = null;
+                    }
+                };
+                _activeWindow = window;
+                window.Show();
+                DebugLogger.Log("VerifierWindow opened (modeless)");
             }
             catch (Exception ex)
             {

@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using UnitConstructionVerifier;
+using System.Windows.Input;
+using System.Windows.Media;
 using UnitConstructionVerifier.Engine;
 using UnitConstructionVerifier.Models;
+using UnitConstructionVerifier.Operations;
 using UnitConstructionVerifier.Persistence;
 
 namespace UnitConstructionVerifier.UI
@@ -19,6 +22,14 @@ namespace UnitConstructionVerifier.UI
         private bool                          _isUpdatingUi;
         private readonly Inventor.Application _inventorApp;
         private readonly Dictionary<string, string> _pendingEdits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private byte _xRayColorR = XRayHighlightColors.Default.R;
+        private byte _xRayColorG = XRayHighlightColors.Default.G;
+        private byte _xRayColorB = XRayHighlightColors.Default.B;
+        private PartPreviewWindow? _partPreviewWindow;
+        private bool _isRefreshingPartsGrid;
+        private bool _keepVerifierAboveInventor;
+        private bool _pendingVerifierStackRestore;
+        private bool _pendingVerifierFocusRestore;
 
         public VerifierWindow(UnitConstructionData data, string iamPath, Inventor.Application inventorApp)
         {
@@ -43,6 +54,10 @@ namespace UnitConstructionVerifier.UI
 
             // Load global other specs
             PopulateGlobalSpecs();
+            InitializeXRayColorPicker();
+
+            Activated += (_, __) => _keepVerifierAboveInventor = true;
+            Closing += OnVerifierWindowClosing;
         }
 
         public void SetIptScanResult(IptScanResult iptResult)
@@ -134,7 +149,11 @@ namespace UnitConstructionVerifier.UI
                 _isUpdatingUi = false;
             }
 
+            CaptureStackStateBeforeInventor();
             RefreshPartsGrid(selected);
+            HighlightSurfaceInInventor(selected);
+            TryRefreshWireframePreview();
+            RestoreStackAfterInventor();
         }
 
         private void OnRoofExpectationsChanged(object sender, RoutedEventArgs e)
@@ -226,7 +245,11 @@ namespace UnitConstructionVerifier.UI
                 _isUpdatingUi = false;
             }
 
+            CaptureStackStateBeforeInventor();
             RefreshPartsGrid(selected);
+            HighlightSurfaceInInventor(selected);
+            TryRefreshWireframePreview();
+            RestoreStackAfterInventor();
         }
 
         private void OnWallExpectationsChanged(object sender, RoutedEventArgs e)
@@ -317,7 +340,11 @@ namespace UnitConstructionVerifier.UI
                 _isUpdatingUi = false;
             }
 
+            CaptureStackStateBeforeInventor();
             RefreshPartsGrid(selected);
+            HighlightSurfaceInInventor(selected);
+            TryRefreshWireframePreview();
+            RestoreStackAfterInventor();
         }
 
         private void UpdateBaseExpectations()
@@ -367,6 +394,19 @@ namespace UnitConstructionVerifier.UI
         {
             if (_iptResult == null) return;
 
+            _isRefreshingPartsGrid = true;
+            try
+            {
+                RefreshPartsGridCore(surfaceRow);
+            }
+            finally
+            {
+                _isRefreshingPartsGrid = false;
+            }
+        }
+
+        private void RefreshPartsGridCore(object surfaceRow)
+        {
             var gridRows = new List<IptVerificationRow>();
 
             if (surfaceRow is RoofSurfaceRow roof)
@@ -565,12 +605,10 @@ namespace UnitConstructionVerifier.UI
                 if (row.IsEditPending)
                 {
                     _pendingEdits[key] = row.NewValue;
-                    DebugLogger.Log($"[PendingEdit] ADD key='{key}' value='{row.NewValue}' | total pending={_pendingEdits.Count}");
                 }
                 else
                 {
                     _pendingEdits.Remove(key);
-                    DebugLogger.Log($"[PendingEdit] REMOVE key='{key}' (not pending) | total pending={_pendingEdits.Count}");
                 }
             }
         }
@@ -580,9 +618,9 @@ namespace UnitConstructionVerifier.UI
             bool isEdit = EditModeCheckBox.IsChecked == true;
 
             // Enable/disable column editing
-            if (RoofPartsGrid.Columns.Count > 5) RoofPartsGrid.Columns[5].IsReadOnly = !isEdit;
-            if (WallPartsGrid.Columns.Count > 5) WallPartsGrid.Columns[5].IsReadOnly = !isEdit;
-            if (BasePartsGrid.Columns.Count > 5) BasePartsGrid.Columns[5].IsReadOnly = !isEdit;
+            if (RoofPartsGrid.Columns.Count > 6) RoofPartsGrid.Columns[6].IsReadOnly = !isEdit;
+            if (WallPartsGrid.Columns.Count > 6) WallPartsGrid.Columns[6].IsReadOnly = !isEdit;
+            if (BasePartsGrid.Columns.Count > 6) BasePartsGrid.Columns[6].IsReadOnly = !isEdit;
 
             // Show/hide sync panels
             RoofSyncButtonsPanel.Visibility = isEdit ? Visibility.Visible : Visibility.Collapsed;
@@ -619,21 +657,13 @@ namespace UnitConstructionVerifier.UI
         {
             if (grid.ItemsSource is IEnumerable<IptVerificationRow> rows)
             {
-                int count = 0;
                 foreach (var row in rows)
                 {
                     if (row.IsMismatch)
                     {
-                        DebugLogger.Log($"[SyncAll] mismatch row: param='{row.Parameter}' actual='{row.Actual}' expected='{row.Expected}' file='{System.IO.Path.GetFileName(row.FilePath)}'");
                         row.NewValue = row.Expected;
-                        count++;
                     }
                 }
-                DebugLogger.Log($"[SyncAll] synced {count} mismatches. _pendingEdits.Count={_pendingEdits.Count}");
-            }
-            else
-            {
-                DebugLogger.Log($"[SyncAll] grid.ItemsSource is not IEnumerable<IptVerificationRow> — type={(grid.ItemsSource?.GetType().Name ?? "null")}");
             }
         }
 
@@ -651,10 +681,6 @@ namespace UnitConstructionVerifier.UI
 
         private void OnWriteChanges(object sender, RoutedEventArgs e)
         {
-            DebugLogger.Log($"[OnWriteChanges] called. _pendingEdits.Count={_pendingEdits.Count}");
-            foreach (var kvp in _pendingEdits)
-                DebugLogger.Log($"  pending: key='{kvp.Key}' value='{kvp.Value}'");
-
             // Force commit any active cell edits in all grids
             try
             {
@@ -669,7 +695,6 @@ namespace UnitConstructionVerifier.UI
 
             if (_pendingEdits.Count == 0)
             {
-                DebugLogger.Log("[OnWriteChanges] _pendingEdits is empty — returning early.");
                 MessageBox.Show("No pending edits to write.", "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -690,20 +715,25 @@ namespace UnitConstructionVerifier.UI
                     groupedEdits[filePath] = edits;
                 }
 
-                if (parameter == "Thickness")
+                if (!Operations.PartPropertyEditsMapper.TryApply(edits, parameter, value))
                 {
-                    edits.Thickness = value;
+                    System.Diagnostics.Debug.WriteLine($"[UCV] Ignored pending edit for unrecognized parameter: {parameter}");
                 }
-                else if (parameter.Contains("Gauge & Material") || parameter == "Formed Channel Material")
-                {
-                    PersistenceManager.ParseGaugeAndMaterial(value, out string g, out string m);
-                    edits.MtlGauge = g;
-                    edits.YCMATL = m;
-                }
-                else if (parameter.Contains("Material"))
-                {
-                    edits.YCMATL = value;
-                }
+            }
+
+            var emptyFiles = groupedEdits
+                .Where(kvp => !Operations.PartPropertyEditsMapper.HasAnyValue(kvp.Value))
+                .Select(kvp => kvp.Key)
+                .ToList();
+            foreach (string filePath in emptyFiles)
+            {
+                groupedEdits.Remove(filePath);
+            }
+
+            if (groupedEdits.Count == 0)
+            {
+                MessageBox.Show("No pending edits mapped to writable part properties.", "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
 
             // Confirm modifications
@@ -874,13 +904,7 @@ namespace UnitConstructionVerifier.UI
                 {
                     gauge = resolvedGauge;
                     // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
-                    if (string.IsNullOrEmpty(material) || 
-                        material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || 
-                        material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || 
-                        material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase) ||
-                        (material.Equals("STL HOT ROLL", StringComparison.OrdinalIgnoreCase) && 
-                         !string.IsNullOrEmpty(expectedMaterialHint) && 
-                         (expectedMaterialHint.ToUpperInvariant().Contains("ALM") || expectedMaterialHint.ToUpperInvariant().Contains("ALUMINUM"))))
+                    if (string.IsNullOrEmpty(material) || material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase))
                     {
                         material = resolvedMaterial;
                     }
@@ -928,11 +952,81 @@ namespace UnitConstructionVerifier.UI
                 FormedChannelMaterialCombo.ItemsSource = materials;
                 PerimeterAngleGaugeCombo.ItemsSource = gauges;
                 PerimeterAngleMaterialCombo.ItemsSource = materials;
+
+                ApplyExpectationComboWidths(gauges, materials);
             }
             finally
             {
                 _isUpdatingUi = false;
             }
+        }
+
+        private void ApplyExpectationComboWidths(List<string> gauges, List<string> materials)
+        {
+            double gaugeWidth = MeasureItemsTextWidth(gauges) + 28;
+            double materialWidth = MeasureItemsTextWidth(materials) + 28;
+
+            foreach (ComboBox combo in new[]
+            {
+                RoofExteriorGaugeCombo, RoofInteriorGaugeCombo, RoofChannelGaugeCombo, RoofTrimGaugeCombo,
+                WallExteriorGaugeCombo, WallInteriorGaugeCombo, WallChannelGaugeCombo,
+                FormedChannelGaugeCombo, FloorGaugeCombo, SubFloorGaugeCombo, PerimeterAngleGaugeCombo
+            })
+            {
+                combo.Width = gaugeWidth;
+            }
+
+            foreach (ComboBox combo in new[]
+            {
+                RoofExteriorMaterialCombo, RoofInteriorMaterialCombo, RoofChannelMaterialCombo, RoofTrimMaterialCombo,
+                WallExteriorMaterialCombo, WallInteriorMaterialCombo, WallChannelMaterialCombo,
+                FormedChannelMaterialCombo, FloorMaterialCombo, SubFloorMaterialCombo, PerimeterAngleMaterialCombo
+            })
+            {
+                combo.Width = materialWidth;
+            }
+
+            SizeComboToItems(BaseHeightCombo, "6\"", "8\"", "10\"", "12\"");
+            SizeComboToItems(BaseMatCombo, "STL C CHNL", "ALM C CHNL");
+            SizeComboToItems(RoofThermalCombo, "Yes", "No");
+            SizeComboToItems(WallThermalCombo, "Yes", "No");
+            SizeComboToItems(FloorThermalCombo, "Yes", "No");
+        }
+
+        private static void SizeComboToItems(ComboBox combo, params string[] items)
+        {
+            combo.Width = MeasureItemsTextWidth(items) + 28;
+        }
+
+        private static double MeasureItemsTextWidth(System.Collections.IEnumerable items)
+        {
+            var typeface = new Typeface(
+                new FontFamily("Segoe UI"),
+                FontStyles.Normal,
+                FontWeights.Normal,
+                FontStretches.Normal);
+
+            double max = 0;
+            foreach (object item in items)
+            {
+                string text = item switch
+                {
+                    ComboBoxItem comboBoxItem => comboBoxItem.Content?.ToString() ?? string.Empty,
+                    _ => item?.ToString() ?? string.Empty
+                };
+
+                var formatted = new FormattedText(
+                    text,
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    12,
+                    Brushes.White,
+                    1.0);
+                max = Math.Max(max, formatted.Width);
+            }
+
+            return max;
         }
 
         private void SelectComboItemByContent(ComboBox combo, string content)
@@ -1004,6 +1098,501 @@ namespace UnitConstructionVerifier.UI
             else
             {
                 MessageBox.Show($"File does not exist or path is invalid:\n{filePath}", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void OnPartsGridSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isRefreshingPartsGrid)
+            {
+                return;
+            }
+
+            if (sender is DataGrid grid)
+            {
+                CaptureStackStateBeforeInventor();
+                HighlightSelectedPartInGrid(grid);
+                TryRefreshWireframePreview();
+                RestoreStackAfterInventor();
+            }
+        }
+
+        private void HighlightSelectedPartInGrid(DataGrid grid)
+        {
+            if (grid.SelectedItem is not IptVerificationRow row)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(row.FilePath))
+            {
+                return;
+            }
+
+            string? surfaceIamPath = GetSurfaceIamPathForPartsGrid(grid);
+            if (string.IsNullOrWhiteSpace(surfaceIamPath))
+            {
+                InventorSelectionHelper.HighlightByFilePath(_inventorApp, _iamPath, row.FilePath);
+                return;
+            }
+
+            InventorSelectionHelper.HighlightPartInSurface(
+                _inventorApp,
+                _iamPath,
+                surfaceIamPath,
+                row.PartNumber,
+                row.FilePath,
+                XRayCheckBox.IsChecked == true);
+        }
+
+        private void OnXRayChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingUi)
+            {
+                return;
+            }
+
+            DataGrid? activeGrid = GetActivePartsGrid();
+            if (activeGrid != null)
+            {
+                HighlightSelectedPartInGrid(activeGrid);
+                return;
+            }
+
+            InventorSelectionHelper.ClearHighlight(_inventorApp);
+        }
+
+        private void InitializeXRayColorPicker()
+        {
+            if (XRayColorSettings.TryLoad(out byte r, out byte g, out byte b))
+            {
+                _xRayColorR = r;
+                _xRayColorG = g;
+                _xRayColorB = b;
+            }
+
+            InventorSelectionHelper.SetXRayOutlineColor(_xRayColorR, _xRayColorG, _xRayColorB);
+            UpdateXRayColorSwatch();
+
+            foreach (XRayHighlightColor option in XRayHighlightColors.Options)
+            {
+                XRayHighlightColor captured = option;
+                var row = new Button
+                {
+                    Height = 26,
+                    Margin = new Thickness(0, 0, 0, 2),
+                    Padding = new Thickness(6, 0, 8, 0),
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    Background = new SolidColorBrush(Color.FromRgb(captured.R, captured.G, captured.B)),
+                    BorderBrush = (Brush)FindResource("BorderColor"),
+                    BorderThickness = new Thickness(1),
+                    Cursor = Cursors.Hand,
+                    Tag = captured
+                };
+
+                var content = new StackPanel { Orientation = Orientation.Horizontal };
+                content.Children.Add(new Border
+                {
+                    Width = 14,
+                    Height = 14,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    Background = row.Background,
+                    BorderBrush = (Brush)FindResource("BorderColor"),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(2)
+                });
+                content.Children.Add(new TextBlock
+                {
+                    Text = captured.Name,
+                    Foreground = GetContrastForeground(captured.R, captured.G, captured.B),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                row.Content = content;
+                row.Click += OnXRayColorOptionClick;
+                XRayColorListPanel.Children.Add(row);
+            }
+        }
+
+        private void OnXRayColorButtonClick(object sender, RoutedEventArgs e)
+        {
+            XRayColorPopup.IsOpen = !XRayColorPopup.IsOpen;
+        }
+
+        private void OnXRayColorOptionClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not XRayHighlightColor color)
+            {
+                return;
+            }
+
+            SelectXRayColor(color.R, color.G, color.B);
+            XRayColorPopup.IsOpen = false;
+        }
+
+        private void SelectXRayColor(byte r, byte g, byte b)
+        {
+            _xRayColorR = r;
+            _xRayColorG = g;
+            _xRayColorB = b;
+            InventorSelectionHelper.SetXRayOutlineColor(r, g, b);
+            XRayColorSettings.Save(r, g, b);
+            UpdateXRayColorSwatch();
+
+            DataGrid? activeGrid = GetActivePartsGrid();
+            if (activeGrid != null)
+            {
+                HighlightSelectedPartInGrid(activeGrid);
+                return;
+            }
+
+            object? selectedSurface = MainTabControl.SelectedIndex switch
+            {
+                0 => RoofSurfaceList.SelectedItem,
+                1 => WallSurfaceList.SelectedItem,
+                2 => BaseSurfaceList.SelectedItem,
+                _ => null
+            };
+
+            if (selectedSurface != null)
+            {
+                CaptureStackStateBeforeInventor();
+                HighlightSurfaceInInventor(selectedSurface);
+                RestoreStackAfterInventor();
+            }
+        }
+
+        private void UpdateXRayColorSwatch()
+        {
+            XRayColorButton.Background = new SolidColorBrush(Color.FromRgb(_xRayColorR, _xRayColorG, _xRayColorB));
+        }
+
+        private static Brush GetContrastForeground(byte r, byte g, byte b)
+        {
+            double luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+            return luminance > 0.62
+                ? new SolidColorBrush(Color.FromRgb(30, 30, 46))
+                : new SolidColorBrush(Colors.White);
+        }
+
+        private void OnMainTabChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.Source, MainTabControl))
+            {
+                return;
+            }
+
+            CaptureStackStateBeforeInventor();
+            TryRefreshWireframePreview();
+            RestoreStackAfterInventor();
+        }
+
+        private void CaptureStackStateBeforeInventor()
+        {
+            _partPreviewWindow?.CaptureStackState();
+            InventorWindowStackHelper.Capture(
+                this,
+                ref _keepVerifierAboveInventor,
+                ref _pendingVerifierStackRestore,
+                ref _pendingVerifierFocusRestore);
+        }
+
+        private void RestoreStackAfterInventor()
+        {
+            if (_partPreviewWindow?.IsVisible == true &&
+                _partPreviewWindow.TakePendingStackRestore(out bool previewFocus))
+            {
+                _partPreviewWindow.ScheduleStackRestore(previewFocus);
+            }
+
+            if (InventorWindowStackHelper.TakePending(
+                    ref _pendingVerifierStackRestore,
+                    ref _pendingVerifierFocusRestore,
+                    out bool verifierFocus))
+            {
+                InventorWindowStackHelper.ScheduleRestore(this, verifierFocus);
+            }
+        }
+
+        private void OnNormalSelectionClick(object sender, RoutedEventArgs e)
+        {
+            _isUpdatingUi = true;
+            try
+            {
+                XRayCheckBox.IsChecked = false;
+            }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            InventorSelectionHelper.RestoreNormal(_inventorApp);
+        }
+
+        private void OnVerifierWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            InventorSelectionHelper.RestoreNormal(_inventorApp);
+        }
+
+        private void OnPartsGridPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            CaptureStackStateBeforeInventor();
+        }
+
+        private DataGrid? GetActivePartsGridForCurrentTab()
+        {
+            return MainTabControl.SelectedIndex switch
+            {
+                0 => RoofPartsGrid,
+                1 => WallPartsGrid,
+                2 => BasePartsGrid,
+                _ => null
+            };
+        }
+
+        private DataGrid? GetActivePartsGrid()
+        {
+            DataGrid? grid = GetActivePartsGridForCurrentTab();
+            if (grid == null)
+            {
+                return null;
+            }
+
+            bool hasSurface = MainTabControl.SelectedIndex switch
+            {
+                0 => RoofSurfaceList.SelectedItem != null,
+                1 => WallSurfaceList.SelectedItem != null,
+                2 => BaseSurfaceList.SelectedItem != null,
+                _ => false
+            };
+
+            if (!hasSurface || grid.SelectedItem == null)
+            {
+                return null;
+            }
+
+            return grid;
+        }
+
+        private bool TryBuildWireframePreview(out string title, out WireframeData? wireframe)
+        {
+            title = string.Empty;
+            wireframe = null;
+
+            DataGrid? grid = GetActivePartsGrid();
+            if (grid?.SelectedItem is not IptVerificationRow row || string.IsNullOrWhiteSpace(row.FilePath))
+            {
+                return false;
+            }
+
+            string? surfaceIamPath = GetSurfaceIamPathForPartsGrid(grid);
+            if (string.IsNullOrWhiteSpace(surfaceIamPath))
+            {
+                return false;
+            }
+
+            Inventor.ComponentOccurrence? occurrence = InventorSelectionHelper.FindFirstPartOccurrenceInSurface(
+                _inventorApp,
+                _iamPath,
+                surfaceIamPath,
+                row.PartNumber,
+                row.FilePath);
+            if (occurrence == null)
+            {
+                return false;
+            }
+
+            wireframe = PartWireframeExtractor.ExtractFromOccurrence(occurrence);
+            if (wireframe == null || wireframe.Segments.Count == 0)
+            {
+                return false;
+            }
+
+            title = row.PartNumber;
+            return true;
+        }
+
+        private void TryRefreshWireframePreview()
+        {
+            if (_partPreviewWindow == null || !_partPreviewWindow.IsVisible)
+            {
+                return;
+            }
+
+            if (TryBuildWireframePreview(out string title, out WireframeData? wireframe))
+            {
+                _partPreviewWindow.ShowWireframe(title, wireframe, resetView: false);
+                return;
+            }
+
+            _partPreviewWindow.ShowWireframe("Select a part in the active tab", null, resetView: false);
+        }
+
+        private void OnWireframePreviewClick(object sender, RoutedEventArgs e)
+        {
+            if (!TryBuildWireframePreview(out string title, out WireframeData? wireframe))
+            {
+                MessageBox.Show(
+                    "Select a part row in the active tab and surface first.",
+                    "Wireframe Preview",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            if (_partPreviewWindow == null)
+            {
+                _partPreviewWindow = new PartPreviewWindow
+                {
+                    Owner = this,
+                    Left = Left + Width + 12,
+                    Top = Top
+                };
+                _partPreviewWindow.Closed += (_, __) => _partPreviewWindow = null;
+            }
+
+            _partPreviewWindow.ShowWireframe(title, wireframe, resetView: true);
+            _partPreviewWindow.MarkKeepAboveInventor();
+            if (!_partPreviewWindow.IsVisible)
+            {
+                _partPreviewWindow.Show();
+            }
+            else
+            {
+                _partPreviewWindow.Activate();
+            }
+        }
+
+        private string? GetSurfaceIamPathForPartsGrid(DataGrid grid)
+        {
+            if (ReferenceEquals(grid, RoofPartsGrid))
+            {
+                return (RoofSurfaceList.SelectedItem as RoofSurfaceRow)?.SourceSurfaceIam;
+            }
+
+            if (ReferenceEquals(grid, WallPartsGrid))
+            {
+                return (WallSurfaceList.SelectedItem as WallSurfaceRow)?.SourceSurfaceIam;
+            }
+
+            if (ReferenceEquals(grid, BasePartsGrid))
+            {
+                return (BaseSurfaceList.SelectedItem as BaseSurfaceRow)?.SourceSurfaceIam;
+            }
+
+            return null;
+        }
+
+        private void HighlightSurfaceInInventor(object surfaceRow)
+        {
+            string? surfaceIamPath = surfaceRow switch
+            {
+                RoofSurfaceRow roof => roof.SourceSurfaceIam,
+                WallSurfaceRow wall => wall.SourceSurfaceIam,
+                BaseSurfaceRow baseRow => baseRow.SourceSurfaceIam,
+                _ => null
+            };
+
+            if (string.IsNullOrWhiteSpace(surfaceIamPath))
+            {
+                return;
+            }
+
+            InventorSelectionHelper.HighlightByFilePath(_inventorApp, _iamPath, surfaceIamPath);
+        }
+
+        private void OnSurfaceListPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not ListBox listBox)
+            {
+                return;
+            }
+
+            // Ignore copy-button clicks in the row template.
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            ListBoxItem? listBoxItem = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+            if (listBoxItem?.DataContext == null)
+            {
+                return;
+            }
+
+            // Re-highlight when the row is already selected (SelectionChanged won't fire).
+            CaptureStackStateBeforeInventor();
+            if (!listBoxItem.IsSelected)
+            {
+                return;
+            }
+
+            HighlightSurfaceInInventor(listBoxItem.DataContext);
+            TryRefreshWireframePreview();
+            RestoreStackAfterInventor();
+        }
+
+        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                {
+                    return match;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return null;
+        }
+
+        private void OnCopyPartNumberClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button)
+            {
+                string? text = button.Tag as string;
+                if (string.IsNullOrWhiteSpace(text) && button.DataContext is IptVerificationRow row)
+                {
+                    text = row.PartNumber;
+                }
+
+                CopyTextToClipboard(text);
+            }
+
+            e.Handled = true;
+        }
+
+        private void OnCopySurfaceNumberClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button)
+            {
+                CopyTextToClipboard(button.Tag as string);
+            }
+
+            e.Handled = true;
+        }
+
+        private static void CopyTextToClipboard(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            try
+            {
+                Clipboard.SetText(text.Trim());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not copy to clipboard:\n{ex.Message}", "Copy Failed",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text;
 using Inventor;
 using UnitConstructionVerifier.Models;
 
@@ -23,14 +22,9 @@ namespace UnitConstructionVerifier.Operations
             errorMessage = string.Empty;
             PartDocument doc = null;
             bool wasOpened = false;
-            var log = new StringBuilder();
-            string fileName = System.IO.Path.GetFileName(iptPath);
 
             try
             {
-                log.AppendLine($"[UCV Write] {fileName}");
-                log.AppendLine($"  Gauge={edits.MtlGauge ?? "(null)"}, YCMATL={edits.YCMATL ?? "(null)"}, Thickness={edits.Thickness ?? "(null)"}");
-
                 // Optimization: Search already-loaded documents first.
                 foreach (Document openDoc in _app.Documents)
                 {
@@ -40,8 +34,6 @@ namespace UnitConstructionVerifier.Operations
                         break;
                     }
                 }
-
-                log.AppendLine($"  wasOpened={wasOpened} (doc {(doc == null ? "NOT" : "")} found in open docs)");
 
                 // If not found in the open documents collection, open it silently in the background
                 if (doc == null)
@@ -62,7 +54,6 @@ namespace UnitConstructionVerifier.Operations
 
                     doc = _app.Documents.Open(iptPath, OpenVisible: false) as PartDocument;
                     wasOpened = true;
-                    log.AppendLine($"  Opened doc explicitly. wasOpened=true");
                 }
 
                 if (doc == null)
@@ -71,14 +62,19 @@ namespace UnitConstructionVerifier.Operations
                     return false;
                 }
 
+                if (!PartPropertyEditsMapper.HasAnyValue(edits))
+                {
+                    errorMessage = "No recognized property changes for this row.";
+                    if (wasOpened)
+                    {
+                        try { doc.Close(SkipSave: true); } catch { }
+                    }
+
+                    return false;
+                }
+
                 PropertySets sets = doc.PropertySets;
                 PropertySet userDefined = sets["Inventor User Defined Properties"];
-
-                // Read existing property values for diagnostics
-                string existingThick = ReadUserProperty(userDefined, "Thickness");
-                string existingYcmatl = ReadUserProperty(userDefined, "YCMATL");
-                string existingGauge = ReadUserProperty(userDefined, "INPUT_PARAMETER_Mtl_Gauge");
-                log.AppendLine($"  Existing props: Thickness='{existingThick}', YCMATL='{existingYcmatl}', Gauge='{existingGauge}'");
 
                 // Symmetrical Sync: Keep Gauge and Thickness in sync if only one is updated
                 if (edits.Thickness != null && edits.MtlGauge == null)
@@ -86,102 +82,88 @@ namespace UnitConstructionVerifier.Operations
                     string material = edits.YCMATL;
                     if (string.IsNullOrEmpty(material))
                     {
-                        material = existingYcmatl;
+                        material = ReadUserProperty(userDefined, "YCMATL");
                         if (string.IsNullOrEmpty(material))
+                        {
                             material = ReadUserProperty(userDefined, "INPUT_PARAMETER_MaterialType");
+                        }
                     }
                     string mappedGauge = MaterialsConfig.MapGauge(edits.Thickness, material);
                     if (!string.IsNullOrEmpty(mappedGauge) && mappedGauge != edits.Thickness)
+                    {
                         edits.MtlGauge = mappedGauge;
+                    }
                 }
                 else if (edits.MtlGauge != null && edits.Thickness == null)
                 {
+                    // Resolve the material context to apply the correct JCI 5-digit thickness material code
                     string material = edits.YCMATL;
                     if (string.IsNullOrEmpty(material))
                     {
-                        material = existingYcmatl;
+                        material = ReadUserProperty(userDefined, "YCMATL");
                         if (string.IsNullOrEmpty(material))
+                        {
                             material = ReadUserProperty(userDefined, "INPUT_PARAMETER_MaterialType");
+                        }
                     }
 
                     string mappedThick = MapGaugeToThicknessDecimal(edits.MtlGauge, material);
-                    log.AppendLine($"  MapGaugeToThickness('{edits.MtlGauge}', '{material}') => '{mappedThick}'");
                     if (!string.IsNullOrEmpty(mappedThick))
+                    {
                         edits.Thickness = mappedThick;
+                    }
                 }
-
-                log.AppendLine($"  After sync: Gauge={edits.MtlGauge ?? "(null)"}, YCMATL={edits.YCMATL ?? "(null)"}, Thickness={edits.Thickness ?? "(null)"}");
 
                 bool dirty = false;
 
                 // 1. Thickness
                 if (edits.Thickness != null)
                 {
-                    bool tDirty = WriteUserProperty(userDefined, "Thickness", edits.Thickness);
-                    bool mDirty = WriteModelParameter(doc, "Thickness", edits.Thickness);
-                    log.AppendLine($"  WriteThickness('{edits.Thickness}'): prop={tDirty}, model={mDirty}");
-                    dirty |= tDirty;
-                    dirty |= mDirty;
+                    dirty |= WriteUserProperty(userDefined, "Thickness", edits.Thickness);
+                    
+                    // Update sheet metal parameter if applicable
+                    dirty |= WriteModelParameter(doc, "Thickness", edits.Thickness);
                 }
 
-                // 2. YCMATL (Material style) — write to ALL material property aliases so the reader's fallback chain is consistent
+                // 2. YCMATL (Material style)
                 if (edits.YCMATL != null)
                 {
-                    bool yDirty  = WriteUserProperty(userDefined, "YCMATL", edits.YCMATL);
-                    bool y2Dirty = WriteUserProperty(userDefined, "INPUT_PARAMETER_MaterialType", edits.YCMATL);
-                    bool sDirty  = SyncPhysicalMaterial(doc, edits.YCMATL);
-                    log.AppendLine($"  WriteYCMATL('{edits.YCMATL}'): YCMATL={yDirty}, INPUT_PARAMETER_MaterialType={y2Dirty}, physMtl={sDirty}");
-                    dirty |= yDirty;
-                    dirty |= y2Dirty;
-                    dirty |= sDirty;
+                    dirty |= WriteUserProperty(userDefined, "YCMATL", edits.YCMATL);
+                    
+                    // Physical Material Sync
+                    dirty |= SyncPhysicalMaterial(doc, edits.YCMATL);
                 }
 
                 // 3. MtlGauge (Gauge)
                 if (edits.MtlGauge != null)
                 {
-                    bool gDirty = WriteUserProperty(userDefined, "INPUT_PARAMETER_Mtl_Gauge", edits.MtlGauge);
-                    log.AppendLine($"  WriteGauge('{edits.MtlGauge}'): prop={gDirty}");
-                    dirty |= gDirty;
+                    dirty |= WriteUserProperty(userDefined, "INPUT_PARAMETER_Mtl_Gauge", edits.MtlGauge);
                 }
-
-                log.AppendLine($"  dirty={dirty}");
 
                 // Update and save
                 if (dirty)
                 {
                     doc.Update();
-                    try
-                    {
-                        doc.Save();
-                        log.AppendLine($"  doc.Save() succeeded");
-                    }
-                    catch (Exception saveEx)
-                    {
-                        log.AppendLine($"  doc.Save() FAILED: {saveEx.Message}");
-                        errorMessage = $"Save failed: {saveEx.Message}";
-                        DebugLogger.Log(log.ToString());
-                        if (wasOpened) try { doc.Close(SkipSave: true); } catch { }
-                        return false;
-                    }
-
+                    doc.Save();
                     if (wasOpened)
+                    {
                         doc.Close(SkipSave: false);
+                    }
                 }
                 else if (wasOpened)
                 {
                     doc.Close(SkipSave: true);
                 }
 
-                DebugLogger.Log(log.ToString());
                 return true;
             }
             catch (Exception ex)
             {
-                log.AppendLine($"  EXCEPTION: {ex.Message}");
-                DebugLogger.Log(log.ToString());
                 errorMessage = ex.Message;
                 if (wasOpened && doc != null)
+                {
                     try { doc.Close(SkipSave: true); } catch {}
+                }
                 return false;
             }
         }
@@ -213,52 +195,88 @@ namespace UnitConstructionVerifier.Operations
                 {
                     // Clean numeric conversion (e.g. 2.0" or 0.056 -> double)
                     string cleanVal = valStr.Replace("\"", "").Trim();
-                    if (double.TryParse(cleanVal, out double inches))
+                    if (double.TryParse(cleanVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double inches))
                     {
                         // Convert to centimeters (Inventor's internal parameter unit)
                         double cmValue = inches * 2.54;
-                        Parameters pms = smDef.Parameters;
-                        
-                        foreach (Parameter p in pms)
+
+                        if (smDef.UseSheetMetalStyleThickness)
                         {
-                            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
-                            {
-                                // Disable sheet metal style override first
-                                if (smDef.UseSheetMetalStyleThickness)
-                                {
-                                    smDef.UseSheetMetalStyleThickness = false;
-                                }
+                            smDef.UseSheetMetalStyleThickness = false;
+                        }
 
-                                double currentVal = 0;
-                                if (p.Value is double dVal)
-                                {
-                                    currentVal = dVal;
-                                }
-                                else
-                                {
-                                    currentVal = Convert.ToDouble(p.Value);
-                                }
-
-                                if (Math.Abs(currentVal - cmValue) > 1e-7) // JCI 5-digit codes differ by ~0.0000254 cm; use tight tolerance
-                                {
-                                    double oldCmValue = currentVal;
-                                    double newCmValue = cmValue;
-
-                                    p.Value = cmValue;
-
-                                    // Adjust cut features extents
-                                    AdjustCutFeatureExtents(doc, oldCmValue, newCmValue);
-
-                                    return true;
-                                }
-                                break;
-                            }
+                        Parameter? thicknessParam = TryGetSheetMetalThicknessParameter(smDef, name);
+                        if (thicknessParam != null &&
+                            TrySetParameterValueCm(thicknessParam, cmValue, out double oldCmValue))
+                        {
+                            AdjustCutFeatureExtents(doc, oldCmValue, cmValue);
+                            return true;
                         }
                     }
                 }
             }
             catch {}
             return false;
+        }
+
+        private static Parameter? TryGetSheetMetalThicknessParameter(SheetMetalComponentDefinition smDef, string name)
+        {
+            try
+            {
+                if (string.Equals(name, "Thickness", StringComparison.OrdinalIgnoreCase))
+                {
+                    return smDef.Thickness;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                Parameters parameters = smDef.Parameters;
+                foreach (Parameter parameter in parameters)
+                {
+                    if (string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return parameter;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
+        }
+
+        private static bool TrySetParameterValueCm(Parameter parameter, double cmValue, out double oldCmValue)
+        {
+            oldCmValue = 0;
+
+            try
+            {
+                if (parameter.Value is double dVal)
+                {
+                    oldCmValue = dVal;
+                }
+                else
+                {
+                    oldCmValue = Convert.ToDouble(parameter.Value);
+                }
+
+                if (Math.Abs(oldCmValue - cmValue) <= 0.0001)
+                {
+                    return false;
+                }
+
+                parameter.Value = cmValue;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void AdjustCutFeatureExtents(PartDocument doc, double oldCmValue, double newCmValue)

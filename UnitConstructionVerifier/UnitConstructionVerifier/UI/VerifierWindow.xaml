@@ -84,6 +84,56 @@
             </Style.Triggers>
         </Style>
 
+        <!-- ── Compact clipboard copy button ── -->
+        <Style x:Key="CopyClipButton" TargetType="Button">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="{StaticResource BgPrimary}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="ToolTip" Value="Copy to clipboard"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CopyBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CopyBorder" Property="Background" Value="{StaticResource BgSurface}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="SurfaceListItemTemplate">
+            <Border Padding="6" ToolTip="{Binding Segments, StringFormat='Segments: \{0\}'}">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource CopyClipButton}" Content="⧉"
+                            ToolTip="Copy surface number"
+                            Click="OnCopySurfaceNumberClick"
+                            Tag="{Binding PartNumber}"/>
+                    <StackPanel>
+                        <TextBlock Text="{Binding PartNumber}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Segments, StringFormat='Segs: \{0\}'}" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
         <!-- ── DataGrid Style ── -->
         <Style TargetType="DataGrid">
             <Setter Property="Background"           Value="{StaticResource BgCard}"/>
@@ -401,97 +451,139 @@
                     <!-- Vertical separator -->
                     <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="16,0"/>
 
+                    <!-- X-Ray outline mode for part picks -->
+                    <CheckBox x:Name="XRayCheckBox" Content="X-Ray" Foreground="{StaticResource TextPrimary}" FontSize="12" VerticalAlignment="Center" Checked="OnXRayChanged" Unchecked="OnXRayChanged" Margin="0,0,6,0" TabIndex="5" ToolTip="Detailed edge outline within the active surface. Default mode shows a colored locator box instead."/>
+                    <Button x:Name="XRayColorButton" Width="22" Height="22" Padding="0" Margin="0,0,16,0" VerticalAlignment="Center" Click="OnXRayColorButtonClick" TabIndex="6" ToolTip="Locator box and X-Ray outline color">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="XRaySwatchBorder"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"/>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="XRaySwatchBorder" Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Popup x:Name="XRayColorPopup"
+                           PlacementTarget="{Binding ElementName=XRayColorButton}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="{StaticResource BgSurface}"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="4">
+                            <StackPanel x:Name="XRayColorListPanel"/>
+                        </Border>
+                    </Popup>
+
+                    <Button x:Name="NormalSelectionButton"
+                            Content="Normal"
+                            Height="24"
+                            Padding="10,0"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center"
+                            Click="OnNormalSelectionClick"
+                            TabIndex="7"
+                            ToolTip="Restore native Inventor green selection highlight and clear verifier picks"/>
+
                     <!-- Edit Mode Toggle -->
-                    <CheckBox x:Name="EditModeCheckBox" Content="Edit Mode" Foreground="{StaticResource AccentOrange}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Checked="OnEditModeChanged" Unchecked="OnEditModeChanged" TabIndex="5"/>
+                    <CheckBox x:Name="EditModeCheckBox" Content="Edit Mode" Foreground="{StaticResource AccentOrange}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Checked="OnEditModeChanged" Unchecked="OnEditModeChanged" TabIndex="8"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- ── Main Workspace Tabs ── -->
-        <TabControl Grid.Row="1" Background="{StaticResource BgPrimary}" BorderThickness="0" Margin="12,12,12,0">
+        <TabControl x:Name="MainTabControl" Grid.Row="1" Background="{StaticResource BgPrimary}" BorderThickness="0" Margin="12,12,12,0" SelectionChanged="OnMainTabChanged">
             
             <!-- ROOF TAB -->
             <TabItem Header="Roof Surfaces">
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="230"/>   <!-- Sidebar -->
-                        <ColumnDefinition Width="*"/>     <!-- Details -->
+                        <ColumnDefinition Width="230" MinWidth="160" MaxWidth="420"/>
+                        <ColumnDefinition Width="5"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Background="{StaticResource BgSurface}" CornerRadius="6,0,0,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,1,0,1">
-                        <ListBox x:Name="RoofSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnRoofSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox x:Name="RoofSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnRoofSelectionChanged" PreviewMouseLeftButtonDown="OnSurfaceListPreviewMouseDown" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemTemplate="{StaticResource SurfaceListItemTemplate}">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="ContextMenu" Value="{StaticResource SurfaceContextMenu}"/>
                                 </Style>
                             </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="6" ToolTip="{Binding Segments, StringFormat='Segments: \{0\}'}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding PartNumber}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Segments, StringFormat='Segs: \{0\}'}" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
                         </ListBox>
                     </Border>
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
 
-                    <Border Grid.Column="1" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
+                    <Border Grid.Column="2" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
                         <Grid>
                             <Grid x:Name="RoofDetailPanel" Visibility="Collapsed">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>   <!-- Expectations Form -->
-                                <RowDefinition Height="*"/>      <!-- Parts Grid -->
+                                <RowDefinition Height="*" MinHeight="100"/>
+                                <RowDefinition Height="5"/>
+                                <RowDefinition Height="2*" MinHeight="140"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Expectations Form -->
-                            <Grid Grid.Row="0" Margin="0,0,0,16">
-                                <StackPanel>
-                                    <TextBlock Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}"/>
-                                    <WrapPanel Margin="0,4,0,0">
+                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,0,8">
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                    <Button Grid.Column="1" Content="Apply Casing to All Roofs" Style="{StaticResource SecondaryButton}" Height="28" Padding="10,0" Click="OnApplyRoofToAll"/>
+                                </Grid>
+                                <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Panel Thickness:" Style="{StaticResource FormLabel}"/>
-                                            <TextBox x:Name="RoofThicknessText" Style="{StaticResource FormTextBox}" Width="60" TextChanged="OnRoofExpectationsChanged" TabIndex="10"/>
+                                            <TextBox x:Name="RoofThicknessText" Style="{StaticResource FormTextBox}" Width="52" TextChanged="OnRoofExpectationsChanged" TabIndex="10"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Ext Skin:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofExteriorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="11"/>
-                                            <ComboBox x:Name="RoofExteriorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="12"/>
+                                            <ComboBox x:Name="RoofExteriorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="11"/>
+                                            <ComboBox x:Name="RoofExteriorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="12"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Int Liner:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofInteriorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="13"/>
-                                            <ComboBox x:Name="RoofInteriorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="14"/>
+                                            <ComboBox x:Name="RoofInteriorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="13"/>
+                                            <ComboBox x:Name="RoofInteriorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="14"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Channel:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofChannelGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="15"/>
-                                            <ComboBox x:Name="RoofChannelMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="16"/>
+                                            <ComboBox x:Name="RoofChannelGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="15"/>
+                                            <ComboBox x:Name="RoofChannelMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="16"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Trim:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofTrimGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="17"/>
-                                            <ComboBox x:Name="RoofTrimMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="18"/>
+                                            <ComboBox x:Name="RoofTrimGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" Margin="0,0,6,0" TabIndex="17"/>
+                                            <ComboBox x:Name="RoofTrimMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnRoofExpectationsChanged" TabIndex="18"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Insulation:" Style="{StaticResource FormLabel}"/>
-                                            <TextBox x:Name="RoofInsulationText" Style="{StaticResource FormTextBox}" Width="140" TextChanged="OnRoofExpectationsChanged" TabIndex="19"/>
+                                            <TextBox x:Name="RoofInsulationText" Style="{StaticResource FormTextBox}" Width="110" TextChanged="OnRoofExpectationsChanged" TabIndex="19"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Width="70" Height="24" SelectionChanged="OnRoofThermalComboChanged" TabIndex="20">
+                                            <ComboBox x:Name="RoofThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnRoofThermalComboChanged" TabIndex="20">
                                                 <ComboBoxItem Content="Yes"/>
                                                 <ComboBoxItem Content="No"/>
                                             </ComboBox>
                                         </StackPanel>
-                                        <Button Content="Apply Casing to All Roofs" Style="{StaticResource SecondaryButton}" Height="24" Padding="12,2" Margin="0,4,16,4" Click="OnApplyRoofToAll"/>
                                     </WrapPanel>
-                                </StackPanel>
-                            </Grid>
+                            </StackPanel>
+                            </ScrollViewer>
+
+                            <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
 
                             <!-- Parts Grid -->
-                            <Grid Grid.Row="1">
+                            <Grid Grid.Row="2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
@@ -502,12 +594,15 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="Referenced Parts Verification (Scanned Live)" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" Margin="0"/>
-                                    <StackPanel Grid.Column="1" x:Name="RoofSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Wireframe Preview" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnWireframePreviewClick"/>
+                                        <StackPanel x:Name="RoofSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                         <Button Content="Sync Selected to Expected" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnSyncSelectedRoof"/>
                                         <Button Content="Sync All Mismatches" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Click="OnSyncAllMismatchesRoof"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="RoofPartsGrid" SelectionMode="Extended" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="RoofPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
                                             <Style.Triggers>
@@ -521,6 +616,29 @@
                                         </Style>
                                     </DataGrid.RowStyle>
                                     <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="40" MinWidth="40" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellStyle>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="Padding" Value="4,4"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DataGridTemplateColumn.CellStyle>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource CopyClipButton}" Content="⧉"
+                                                            ToolTip="Copy part number"
+                                                            Click="OnCopyPartNumberClick"
+                                                            Tag="{Binding PartNumber}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Description" Binding="{Binding Description}" IsReadOnly="True" Width="3*" MinWidth="180"/>
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
@@ -543,82 +661,83 @@
             <TabItem Header="Wall Surfaces">
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="230"/>
+                        <ColumnDefinition Width="230" MinWidth="160" MaxWidth="420"/>
+                        <ColumnDefinition Width="5"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Background="{StaticResource BgSurface}" CornerRadius="6,0,0,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,1,0,1">
-                        <ListBox x:Name="WallSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnWallSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox x:Name="WallSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnWallSelectionChanged" PreviewMouseLeftButtonDown="OnSurfaceListPreviewMouseDown" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemTemplate="{StaticResource SurfaceListItemTemplate}">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="ContextMenu" Value="{StaticResource SurfaceContextMenu}"/>
                                 </Style>
                             </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="6" ToolTip="{Binding Segments, StringFormat='Segments: \{0\}'}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding PartNumber}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Segments, StringFormat='Segs: \{0\}'}" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
                         </ListBox>
                     </Border>
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
 
-                    <Border Grid.Column="1" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
+                    <Border Grid.Column="2" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
                         <Grid>
                             <Grid x:Name="WallDetailPanel" Visibility="Collapsed">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="*" MinHeight="100"/>
+                                <RowDefinition Height="5"/>
+                                <RowDefinition Height="2*" MinHeight="140"/>
                             </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="0" Margin="0,0,0,16">
-                                <StackPanel>
-                                    <TextBlock Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}"/>
-                                    <WrapPanel Margin="0,4,0,0">
+                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,0,8">
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Casing Panel Expectations (Editable)" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                    <Button Grid.Column="1" Content="Apply Casing to All Walls" Style="{StaticResource SecondaryButton}" Height="28" Padding="10,0" Click="OnApplyWallToAll"/>
+                                </Grid>
+                                <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Panel Thickness:" Style="{StaticResource FormLabel}"/>
-                                            <TextBox x:Name="WallThicknessText" Style="{StaticResource FormTextBox}" Width="60" TextChanged="OnWallExpectationsChanged" TabIndex="30"/>
+                                            <TextBox x:Name="WallThicknessText" Style="{StaticResource FormTextBox}" Width="52" TextChanged="OnWallExpectationsChanged" TabIndex="30"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Paint Style:" Style="{StaticResource FormLabel}"/>
-                                            <TextBox x:Name="WallPaintText" Style="{StaticResource FormTextBox}" Width="100" TextChanged="OnWallExpectationsChanged" TabIndex="31"/>
+                                            <TextBox x:Name="WallPaintText" Style="{StaticResource FormTextBox}" Width="72" TextChanged="OnWallExpectationsChanged" TabIndex="31"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Ext Skin:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="WallExteriorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="32"/>
-                                            <ComboBox x:Name="WallExteriorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="33"/>
+                                            <ComboBox x:Name="WallExteriorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="32"/>
+                                            <ComboBox x:Name="WallExteriorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="33"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Int Liner:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="WallInteriorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="34"/>
-                                            <ComboBox x:Name="WallInteriorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="35"/>
+                                            <ComboBox x:Name="WallInteriorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="34"/>
+                                            <ComboBox x:Name="WallInteriorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="35"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Channel:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="WallChannelGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="36"/>
-                                            <ComboBox x:Name="WallChannelMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="37"/>
+                                            <ComboBox x:Name="WallChannelGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" Margin="0,0,6,0" TabIndex="36"/>
+                                            <ComboBox x:Name="WallChannelMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnWallExpectationsChanged" TabIndex="37"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Insulation:" Style="{StaticResource FormLabel}"/>
-                                            <TextBox x:Name="WallInsulationText" Style="{StaticResource FormTextBox}" Width="130" TextChanged="OnWallExpectationsChanged" TabIndex="38"/>
+                                            <TextBox x:Name="WallInsulationText" Style="{StaticResource FormTextBox}" Width="110" TextChanged="OnWallExpectationsChanged" TabIndex="38"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="WallThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Width="70" Height="24" SelectionChanged="OnWallThermalComboChanged" TabIndex="39">
+                                            <ComboBox x:Name="WallThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnWallThermalComboChanged" TabIndex="39">
                                                 <ComboBoxItem Content="Yes"/>
                                                 <ComboBoxItem Content="No"/>
                                             </ComboBox>
                                         </StackPanel>
-                                        <Button Content="Apply Casing to All Walls" Style="{StaticResource SecondaryButton}" Height="24" Padding="12,2" Margin="0,4,16,4" Click="OnApplyWallToAll"/>
                                     </WrapPanel>
-                                </StackPanel>
-                            </Grid>
+                            </StackPanel>
+                            </ScrollViewer>
 
-                            <Grid Grid.Row="1">
+                            <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
+
+                            <Grid Grid.Row="2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
@@ -629,12 +748,15 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="Referenced Parts Verification (Scanned Live)" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" Margin="0"/>
-                                    <StackPanel Grid.Column="1" x:Name="WallSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Wireframe Preview" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnWireframePreviewClick"/>
+                                        <StackPanel x:Name="WallSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                         <Button Content="Sync Selected to Expected" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnSyncSelectedWall"/>
                                         <Button Content="Sync All Mismatches" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Click="OnSyncAllMismatchesWall"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="WallPartsGrid" SelectionMode="Extended" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="WallPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
                                             <Style.Triggers>
@@ -648,6 +770,29 @@
                                         </Style>
                                     </DataGrid.RowStyle>
                                     <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="40" MinWidth="40" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellStyle>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="Padding" Value="4,4"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DataGridTemplateColumn.CellStyle>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource CopyClipButton}" Content="⧉"
+                                                            ToolTip="Copy part number"
+                                                            Click="OnCopyPartNumberClick"
+                                                            Tag="{Binding PartNumber}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Description" Binding="{Binding Description}" IsReadOnly="True" Width="3*" MinWidth="180"/>
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
@@ -670,46 +815,39 @@
             <TabItem Header="Base &amp; Floor">
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="230"/>
+                        <ColumnDefinition Width="230" MinWidth="160" MaxWidth="420"/>
+                        <ColumnDefinition Width="5"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Background="{StaticResource BgSurface}" CornerRadius="6,0,0,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,1,0,1">
-                        <ListBox x:Name="BaseSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnBaseSelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox x:Name="BaseSurfaceList" Background="Transparent" BorderThickness="0" SelectionChanged="OnBaseSelectionChanged" PreviewMouseLeftButtonDown="OnSurfaceListPreviewMouseDown" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemTemplate="{StaticResource SurfaceListItemTemplate}">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="ContextMenu" Value="{StaticResource SurfaceContextMenu}"/>
                                 </Style>
                             </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="6" ToolTip="{Binding Segments, StringFormat='Segments: \{0\}'}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding PartNumber}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Segments, StringFormat='Segs: \{0\}'}" Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
                         </ListBox>
                     </Border>
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
 
-                    <Border Grid.Column="1" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
+                    <Border Grid.Column="2" Background="{StaticResource BgCard}" CornerRadius="0,6,6,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="16">
                         <Grid>
                             <Grid x:Name="BaseDetailPanel" Visibility="Collapsed">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="*" MinHeight="100"/>
+                                <RowDefinition Height="5"/>
+                                <RowDefinition Height="2*" MinHeight="140"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Base, Floor, and Sub-Floor Expectations -->
-                            <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Grid Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Base &amp; Floor Specs (Editable)" Style="{StaticResource SectionHeader}"/>
                                     <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Base Height:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="BaseHeightCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Width="80" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="50">
+                                            <ComboBox x:Name="BaseHeightCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="50">
                                                 <ComboBoxItem Content="6&quot;"/>
                                                 <ComboBoxItem Content="8&quot;"/>
                                                 <ComboBoxItem Content="10&quot;"/>
@@ -718,34 +856,34 @@
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Base Structural Mat:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="BaseMatCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Width="130" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="51">
+                                            <ComboBox x:Name="BaseMatCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="51">
                                                 <ComboBoxItem Content="STL C CHNL"/>
                                                 <ComboBoxItem Content="ALM C CHNL"/>
                                             </ComboBox>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Formed Channel:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="FormedChannelGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="52"/>
-                                            <ComboBox x:Name="FormedChannelMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="53"/>
+                                            <ComboBox x:Name="FormedChannelGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="52"/>
+                                            <ComboBox x:Name="FormedChannelMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="53"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Floor:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="FloorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="54"/>
-                                            <ComboBox x:Name="FloorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="55"/>
+                                            <ComboBox x:Name="FloorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="54"/>
+                                            <ComboBox x:Name="FloorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="55"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Sub-Floor:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="SubFloorGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="56"/>
-                                            <ComboBox x:Name="SubFloorMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="57"/>
+                                            <ComboBox x:Name="SubFloorGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="56"/>
+                                            <ComboBox x:Name="SubFloorMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="57"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Perimeter Angle:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="PerimeterAngleGaugeCombo" Style="{StaticResource FormComboBox}" Width="60" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="58"/>
-                                            <ComboBox x:Name="PerimeterAngleMaterialCombo" Style="{StaticResource FormComboBox}" Width="140" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="59"/>
+                                            <ComboBox x:Name="PerimeterAngleGaugeCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" Margin="0,0,6,0" TabIndex="58"/>
+                                            <ComboBox x:Name="PerimeterAngleMaterialCombo" Style="{StaticResource FormComboBox}" IsEditable="False" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="59"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Floor Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="FloorThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Width="70" Height="24" SelectionChanged="OnFloorThermalComboChanged" TabIndex="60">
+                                            <ComboBox x:Name="FloorThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnFloorThermalComboChanged" TabIndex="60">
                                                 <ComboBoxItem Content="Yes"/>
                                                 <ComboBoxItem Content="No"/>
                                             </ComboBox>
@@ -753,8 +891,11 @@
                                     </WrapPanel>
                                 </StackPanel>
                             </Grid>
+                            </ScrollViewer>
 
-                            <Grid Grid.Row="1">
+                            <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
+
+                            <Grid Grid.Row="2">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
@@ -765,12 +906,15 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="Referenced Base/Floor Components Scan" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" Margin="0"/>
-                                    <StackPanel Grid.Column="1" x:Name="BaseSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Content="Wireframe Preview" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnWireframePreviewClick"/>
+                                        <StackPanel x:Name="BaseSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                         <Button Content="Sync Selected to Expected" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Margin="0,0,8,0" Click="OnSyncSelectedBase"/>
                                         <Button Content="Sync All Mismatches" Style="{StaticResource SecondaryButton}" Height="24" Padding="10,2" Click="OnSyncAllMismatchesBase"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="BasePartsGrid" SelectionMode="Extended" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="BasePartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
                                             <Style.Triggers>
@@ -784,6 +928,29 @@
                                         </Style>
                                     </DataGrid.RowStyle>
                                     <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="" Width="40" MinWidth="40" CanUserResize="False">
+                                            <DataGridTemplateColumn.CellStyle>
+                                                <Style TargetType="DataGridCell">
+                                                    <Setter Property="Padding" Value="4,4"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </DataGridTemplateColumn.CellStyle>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource CopyClipButton}" Content="⧉"
+                                                            ToolTip="Copy part number"
+                                                            Click="OnCopyPartNumberClick"
+                                                            Tag="{Binding PartNumber}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Description" Binding="{Binding Description}" IsReadOnly="True" Width="3*" MinWidth="180"/>
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
