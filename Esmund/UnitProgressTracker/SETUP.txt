@@ -1,27 +1,20 @@
-Unit Progress Tracker — source zip (stable base)
-Version 1.0.23 (2026-07-29)
+Unit Progress Tracker — GitHub source
+Version 1.0.40 (2026-07-30)
 
-Archive: releases/UnitSurfaceViewer_Source_v1.0.23_2026-07-29.zip
-OneDrive: C:\Users\esmun\OneDrive\Ce3\7-29\
-See STABLE-BASE.txt and docs/PROGRESS_2026-07-29.md for restore-point notes.
+Folder: Esmund/UnitProgressTracker (this repo)
 
-1. Extract anywhere (e.g. Desktop\UnitSurfaceViewer)
-2. Open PowerShell in that folder:
+Optional patch: UnitProgressTracker_Patch_v1.0.40.zip (CursorRemote DL)
+Apply on v1.0.29+ via patches/v1.0.40/Apply-Patch.bat
+
+1. Open PowerShell in Esmund/UnitProgressTracker
+2. First time only:
    npm install
-   pip install pywin32
+   py -3 -m pip install pywin32
+3. Start:
    npm start
+   — or double-click Start Unit Progress Tracker.vbs
 
-Requires Node.js, Autodesk Inventor, and Python with pywin32 (same COM read as Pigeon).
-Do NOT open index.html in a browser — use npm start (Electron).
+Requires Node.js, Autodesk Inventor, Python 3 + pywin32.
+Do NOT open index.html in a browser — use Electron.
 
-Open a folder of 391Z*.iam files (subfolders scanned). Rescan adds new surfaces.
-Opens blank on launch; use Open Folder or File → Recent.
-
-File menu: Save/Load project (v3 portable save with geometry), Recent, Rescan, Import BOM, Import/Export.
-BOM tab: import BOM xlsx, create Shell folder nest, open export folders in Explorer.
-Resizable side panels · scan progress + cancel · cache-first folder load.
-Options: grid, FPS toggle, mouse maps, fonts/colors, BOM list sort/filter.
-
-npm install may show a deprecated-package warning and audit notices — normal for Electron; safe to ignore for local use.
-
-If extracted from OneDrive/USB zip: unblock folder (Properties → Unblock) if Windows blocks scripts.
+See STABLE-BASE.txt and HOW_TO_USE.md for features and troubleshooting.

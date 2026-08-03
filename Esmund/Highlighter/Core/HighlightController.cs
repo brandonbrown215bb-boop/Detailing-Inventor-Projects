@@ -356,27 +356,17 @@ namespace Highlighter.Core
                             continue;
                         }
 
-                        // During selective focus, never revive excluded geometry.
-                        if (_selectiveApplied)
-                        {
-                            try
-                            {
-                                if (!occ.Visible)
-                                {
-                                    continue;
-                                }
-                            }
-                            catch
-                            {
-                                continue;
-                            }
-                        }
-
                         string occKey;
                         try { occKey = occ.Name ?? string.Empty; } catch { occKey = string.Empty; }
 
-                        ApplyTransparency(occ);
+                        EnsureVisibleChain(occ);
+
+                        int edgeCountBefore = items.Count;
                         HighlightEngine.CollectOutlineItems(occ, occKey, itemSeen, items);
+                        if (items.Count > edgeCountBefore)
+                        {
+                            ApplyGhostForHighlight(occ);
+                        }
                     }
 
                     if (items.Count == 0)
@@ -573,33 +563,124 @@ namespace Highlighter.Core
             return false;
         }
 
-        private bool ApplyTransparency(ComponentOccurrence occ)
+        /// <summary>
+        /// Occurrence + ancestors must be visible for SurfaceBodies/HighlightSet to resolve.
+        /// </summary>
+        private void EnsureVisibleChain(ComponentOccurrence occ)
         {
-            try
+            if (occ == null)
             {
-                bool wasTransparent = false;
-                try { wasTransparent = occ.Transparent; } catch { }
+                return;
+            }
 
-                double wasOpacity = 1.0;
-                try { wasOpacity = occ.OverrideOpacity; } catch { }
+            ComponentOccurrence cur = occ;
+            int guard = 0;
+            while (cur != null && guard++ < 64)
+            {
+                EnsureOccurrenceVisible(cur);
+                try { cur = cur.ParentOccurrence; }
+                catch { break; }
+            }
+        }
 
-                _transparency.Add(new TransparencyRestore
+        private void EnsureOccurrenceVisible(ComponentOccurrence occ)
+        {
+            if (occ == null || IsTrackedOccurrence(occ))
+            {
+                return;
+            }
+
+            bool wasVisible = true;
+            try { wasVisible = occ.Visible; } catch { return; }
+
+            _transparency.Add(new TransparencyRestore
+            {
+                Occurrence = occ,
+                WasVisible = wasVisible,
+                WasTransparent = ReadTransparent(occ),
+                WasOverrideOpacity = ReadOpacity(occ),
+                GhostApplied = false
+            });
+
+            try { occ.Visible = true; } catch { }
+        }
+
+        private static bool ReadTransparent(ComponentOccurrence occ)
+        {
+            try { return occ.Transparent; } catch { return false; }
+        }
+
+        private static double ReadOpacity(ComponentOccurrence occ)
+        {
+            try { return occ.OverrideOpacity; } catch { return 1.0; }
+        }
+
+        private bool IsTrackedOccurrence(ComponentOccurrence occ)
+        {
+            foreach (TransparencyRestore entry in _transparency)
+            {
+                if (ReferenceEquals(entry?.Occurrence, occ))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Ghost the solid so only HighlightSet edges show. Transparent + Opacity 0 hides the
+        /// solid entirely while Visible stays true so edge HighlightSets remain.
+        /// Only called after edge geometry was collected (liners/skins with no edges stay visible).
+        /// </summary>
+        private void ApplyGhostForHighlight(ComponentOccurrence occ)
+        {
+            if (occ == null)
+            {
+                return;
+            }
+
+            TransparencyRestore entry = FindTrackedOccurrence(occ);
+            if (entry == null)
+            {
+                entry = new TransparencyRestore
                 {
                     Occurrence = occ,
-                    WasTransparent = wasTransparent,
-                    WasOverrideOpacity = wasOpacity
-                });
+                    WasVisible = ReadVisible(occ),
+                    WasTransparent = ReadTransparent(occ),
+                    WasOverrideOpacity = ReadOpacity(occ),
+                    GhostApplied = false
+                };
+                _transparency.Add(entry);
+            }
 
-                // Transparent alone is only a ghost; Opacity 0 hides the solid
-                // entirely while Visible stays true so edge HighlightSets remain.
-                occ.Transparent = true;
-                try { occ.OverrideOpacity = 0.0; } catch { }
-                return true;
-            }
-            catch
+            if (entry.GhostApplied)
             {
-                return false;
+                return;
             }
+
+            try { occ.Visible = true; } catch { }
+            try { occ.Transparent = true; } catch { }
+            try { occ.OverrideOpacity = 0.0; } catch { }
+            entry.GhostApplied = true;
+        }
+
+        private static bool ReadVisible(ComponentOccurrence occ)
+        {
+            try { return occ.Visible; } catch { return true; }
+        }
+
+        private TransparencyRestore FindTrackedOccurrence(ComponentOccurrence occ)
+        {
+            foreach (TransparencyRestore entry in _transparency)
+            {
+                if (ReferenceEquals(entry?.Occurrence, occ))
+                {
+                    return entry;
+                }
+            }
+
+            return null;
         }
 
         private void RestoreTransparency()
@@ -611,8 +692,13 @@ namespace Highlighter.Core
                     continue;
                 }
 
-                try { entry.Occurrence.OverrideOpacity = entry.WasOverrideOpacity; } catch { }
-                try { entry.Occurrence.Transparent = entry.WasTransparent; } catch { }
+                if (entry.GhostApplied)
+                {
+                    try { entry.Occurrence.OverrideOpacity = entry.WasOverrideOpacity; } catch { }
+                    try { entry.Occurrence.Transparent = entry.WasTransparent; } catch { }
+                }
+
+                try { entry.Occurrence.Visible = entry.WasVisible; } catch { }
             }
 
             _transparency.Clear();

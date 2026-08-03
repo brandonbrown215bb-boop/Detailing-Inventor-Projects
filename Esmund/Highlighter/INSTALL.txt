@@ -1,13 +1,18 @@
-﻿Highlighter v1.4.5 — source + prebuilt pack
+﻿Highlighter v1.4.8.0 — source + prebuilt pack
 ============================================
 
 CLOSE INVENTOR FIRST.
 
 Quick install:  install.bat   (or  build-and-install.bat  to rebuild)
 
-Tree walk (v1.4.5)
-------------------
+Tree walk (v1.4.5+)
+-------------------
 Skid open (not 391Z): only descend into 391Z surface subassemblies; liners/skins found inside those.
 391Z surface open alone: walk the full surface assembly tree.
 
 Stock Number only: 081/082/083/084/056/080. Corner 073 excluded.
+
+v1.4.8.0: full ghost (opacity 0) restored when edges collected; ghost skipped when no outline geometry.
+v1.4.7+: edge fallbacks and visible-chain for bent skins and hidden liners.
+
+See HOW_TO_USE.md for version history.

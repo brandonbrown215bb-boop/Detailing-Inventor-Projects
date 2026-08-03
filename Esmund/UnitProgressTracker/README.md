@@ -1,5 +1,7 @@
 # Unit Progress Tracker
 
+**Current version: 1.0.40** (2026-07-30)
+
 Electron app for tracking unit build progress: 3D surface review, per-surface checklists and notes, and BOM shell export folder planning.
 
 ## Features
@@ -12,6 +14,8 @@ Electron app for tracking unit build progress: 3D surface review, per-surface ch
 - Configurable status colors in Options (defaults: Current, Corrected, Built, Associated, Paperwork Corrected, Paperwork Uploaded, Done)
 - Persists per-folder data in `.unit-surface-viewer/surface-data.json`
 - Export all surface status/checklist/notes as JSON or Markdown
+- BOM tab: Config.xml import; segment→skid placement; shell folder export
+- Replace / add / retire surfaces without full-folder rescan (v1.0.35+)
 
 ## Supported JSON geometry paths
 
@@ -22,10 +26,13 @@ Electron app for tracking unit build progress: 3D surface review, per-surface ch
 ## Run
 
 ```bash
-cd C:\Users\esmun\Documents\Cursor\UnitSurfaceViewer
+cd Esmund/UnitProgressTracker
 npm install
+py -3 -m pip install pywin32   # first time only
 npm start
 ```
+
+Or double-click `Start Unit Progress Tracker.vbs`.
 
 ## Data files
 
@@ -34,9 +41,17 @@ npm start
 | `{project-folder}/.unit-surface-viewer/surface-data.json` | Per-project surface status, checklist, notes |
 | `%APPDATA%/unit-surface-viewer/options.json` | Global status colors and checklist template |
 
-## Test data
+## Documentation
 
-Sample CONFIG_JSON folders in Ce3:
+- [HOW_TO_USE.md](./HOW_TO_USE.md) — full user guide
+- [STABLE-BASE.txt](./STABLE-BASE.txt) — current build notes
+- [SETUP.txt](./SETUP.txt) — quick install
 
-- `Ce3\ISG\6-26_isg\20116\configs\CONFIG_JSON`
-- `Ce3\xml_data\20078\CurrentSurfaces\CONFIG_JSON`
+## Version history (recent)
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| **1.0.40** | 2026-07-30 | Replace confirm: OK=pick .iam; py -3 launcher |
+| 1.0.39 | 2026-07-30 | Replace scan path + Inventor read fixes |
+| 1.0.34 | 2026-07-30 | BOM Config.xml import |
+| 1.0.23 | 2026-07-29 | Prior stable base (BOM sort/filter) |

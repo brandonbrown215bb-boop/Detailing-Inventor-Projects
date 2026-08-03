@@ -7,8 +7,10 @@ namespace Highlighter.Core
     internal sealed class TransparencyRestore
     {
         public ComponentOccurrence Occurrence { get; set; }
+        public bool WasVisible { get; set; } = true;
         public bool WasTransparent { get; set; }
-        public double WasOverrideOpacity { get; set; }
+        public double WasOverrideOpacity { get; set; } = 1.0;
+        public bool GhostApplied { get; set; }
     }
 
     /// <summary>
@@ -175,13 +177,51 @@ namespace Highlighter.Core
                 return;
             }
 
+            SurfaceBodies bodies = TryGetSurfaceBodies(occ);
+            if (bodies == null)
+            {
+                return;
+            }
+
             try
             {
-                CollectPrimaryFaceOutline(occ.SurfaceBodies, path, seen, items);
+                CollectPrimaryFaceOutline(bodies, path, seen, items);
             }
             catch
             {
             }
+        }
+
+        private static SurfaceBodies TryGetSurfaceBodies(ComponentOccurrence occ)
+        {
+            try
+            {
+                SurfaceBodies bodies = occ.SurfaceBodies;
+                if (bodies != null && bodies.Count > 0)
+                {
+                    return bodies;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (occ.Definition is PartComponentDefinition partDef)
+                {
+                    SurfaceBodies bodies = partDef.SurfaceBodies;
+                    if (bodies != null && bodies.Count > 0)
+                    {
+                        return bodies;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return null;
         }
 
         public static HighlightSet CreateHighlightSet(Document document)
@@ -259,8 +299,10 @@ namespace Highlighter.Core
                 return;
             }
 
-            Face primary = null;
-            double bestArea = 0;
+            Face primaryPlane = null;
+            Face primaryAny = null;
+            double bestPlaneArea = 0;
+            double bestAnyArea = 0;
             try
             {
                 for (int b = 1; b <= bodies.Count; b++)
@@ -271,16 +313,22 @@ namespace Highlighter.Core
                         Face face = faces[f];
                         try
                         {
+                            double area = face.Evaluator.Area;
+                            if (area > bestAnyArea)
+                            {
+                                bestAnyArea = area;
+                                primaryAny = face;
+                            }
+
                             if (face.SurfaceType != SurfaceTypeEnum.kPlaneSurface)
                             {
                                 continue;
                             }
 
-                            double area = face.Evaluator.Area;
-                            if (area > bestArea)
+                            if (area > bestPlaneArea)
                             {
-                                bestArea = area;
-                                primary = face;
+                                bestPlaneArea = area;
+                                primaryPlane = face;
                             }
                         }
                         catch
@@ -294,6 +342,36 @@ namespace Highlighter.Core
                 return;
             }
 
+            Face primary = primaryPlane ?? primaryAny;
+            if (primary != null)
+            {
+                int before = items.Count;
+                CollectFaceLoopEdges(primary, occKey, seen, items);
+                if (items.Count > before)
+                {
+                    return;
+                }
+            }
+
+            // Last resort: outer edges on every body (bent/odd skins that lack one dominant face).
+            try
+            {
+                for (int b = 1; b <= bodies.Count; b++)
+                {
+                    CollectBodyEdges(bodies[b], occKey, seen, items);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void CollectFaceLoopEdges(
+            Face primary,
+            string occKey,
+            HashSet<string> seen,
+            List<object> items)
+        {
             if (primary == null)
             {
                 return;
@@ -308,16 +386,55 @@ namespace Highlighter.Core
                     Edges edges = loop.Edges;
                     for (int e = 1; e <= edges.Count; e++)
                     {
-                        Edge edge = edges[e];
-                        string key = occKey + ":E:" + edge.TransientKey;
-                        if (!seen.Add(key))
-                        {
-                            continue;
-                        }
-
-                        items.Add(edge);
+                        AddEdge(edges[e], occKey, seen, items);
                     }
                 }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void CollectBodyEdges(
+            SurfaceBody body,
+            string occKey,
+            HashSet<string> seen,
+            List<object> items)
+        {
+            if (body == null)
+            {
+                return;
+            }
+
+            try
+            {
+                Edges edges = body.Edges;
+                for (int e = 1; e <= edges.Count; e++)
+                {
+                    AddEdge(edges[e], occKey, seen, items);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void AddEdge(Edge edge, string occKey, HashSet<string> seen, List<object> items)
+        {
+            if (edge == null)
+            {
+                return;
+            }
+
+            try
+            {
+                string key = occKey + ":E:" + edge.TransientKey;
+                if (!seen.Add(key))
+                {
+                    return;
+                }
+
+                items.Add(edge);
             }
             catch
             {

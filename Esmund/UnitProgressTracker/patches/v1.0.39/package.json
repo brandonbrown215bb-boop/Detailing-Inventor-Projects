@@ -1,0 +1,20 @@
+{
+  "name": "unit-surface-viewer",
+  "version": "1.0.39",
+  "description": "Unit progress tracker — 3D surfaces, BOM shell folders, checklists, and notes",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "build:viewer": "esbuild src/viewer3d.js --bundle --format=esm --outfile=src/viewer3d.bundle.js --platform=browser",
+    "prestart": "npm run build:viewer",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "esbuild": "^0.25.0"
+  }
+}

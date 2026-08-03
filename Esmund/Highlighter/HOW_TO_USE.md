@@ -1,5 +1,7 @@
 ﻿# Highlighter — How to use
 
+**Current version: 1.4.8.0** (2026-07-30)
+
 Inventor add-in: toggle colored edge highlights on wall/roof skins and liners and base floors. Matched parts are ghosted (transparent) so only the outline remains visible.
 
 **Requirements:** Windows, [.NET SDK](https://dotnet.microsoft.com/download) (`dotnet` on PATH), Autodesk Inventor 2020+.
@@ -66,6 +68,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -BuildDir .\bi
 ---
 
 ## Version history
+
+### v1.4.8.0 (2026-07-30)
+
+- **Restored full ghost (Opacity 0)** — skins/liners with collected edges are fully invisible again (not semi-transparent)
+- **Ghost only when highlight succeeds** — parts with no edge geometry stay visible (fixes missed liners)
+- Edge fallbacks + visible-chain unchanged from v1.4.7
+
+### v1.4.7.0 (2026-07-30)
+
+- **Ghost only when highlight succeeds** — no longer hides a part unless edge geometry was collected
+- **Transparent ghosting only** — removed OverrideOpacity=0 (was hiding solids without leaving highlight edges)
+- Broader edge fallback for bent/non-planar skins and liners
+
+### v1.4.6.0 (2026-07-30)
+
+- **Liner ghost highlights** — liners often have `Visible=false` in the assembly; force `Visible=true` before opacity-0 ghosting so edge highlights match skins
+- Collect outline edges before ghosting; fall back to part-definition bodies when occurrence bodies are empty
 
 ### v1.4.5.0 (2026-07-30) — keeper release
 
