@@ -4,8 +4,7 @@ Unit Progress Tracker — current build (keeper)
 Version: 1.0.40
 Marked: 2026-07-30
 
-Patch (current): CursorRemote/mobile/UnitProgressTracker_Patch_v1.0.40.zip
-Apply on any v1.0.29+ install via patches/v1.0.40/Apply-Patch.bat
+Source: Esmund/UnitProgressTracker in Detailing-Inventor-Projects (GitHub).
 
 Run
 ---

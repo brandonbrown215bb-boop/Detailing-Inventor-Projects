@@ -3,9 +3,6 @@ Version 1.0.40 (2026-07-30)
 
 Folder: Esmund/UnitProgressTracker (this repo)
 
-Optional patch: UnitProgressTracker_Patch_v1.0.40.zip (CursorRemote DL)
-Apply on v1.0.29+ via patches/v1.0.40/Apply-Patch.bat
-
 1. Open PowerShell in Esmund/UnitProgressTracker
 2. First time only:
    npm install

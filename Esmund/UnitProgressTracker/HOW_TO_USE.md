@@ -97,7 +97,7 @@ If the folder came from a zip or OneDrive, unblock it first (folder **Properties
 |-------|-----|
 | Buttons dead / bridge unavailable | Run with `npm start`, not browser |
 | Scan fails on work laptop | Ensure `py -3` works; sidecar uses Python launcher on Windows |
-| Replace shows no geometry | Confirm `.iam` path; see v1.0.39+ patch notes |
+| Replace shows no geometry | Confirm `.iam` path; ensure Inventor and py -3 sidecar work |
 | Inventor COM errors | Confirm Inventor can open the IAM files; install `pywin32` |
 
 ---
