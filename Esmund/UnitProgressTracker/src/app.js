@@ -15,8 +15,9 @@ import {
   retireSurfaceFully,
   filterExcludedGeometry,
   listRemovedSurfaces,
+  removeHistoryNumber,
 } from './project-data.js';
-import { buildProjectSavePayload, parseSavedProjectFile } from './project-save.js';
+import { buildProjectSavePayload, parseSavedProjectFile, parseProjectOptions, extractProjectOptions } from './project-save.js';
 import {
   FILL_SOLID,
   FILL_TYPE_OPTIONS,
@@ -199,6 +200,7 @@ const state = {
   selectedBomEntryKey: null,
   projectFilePath: null,
   viewingRemovedKey: null,
+  folderPathUsable: false,
 };
 
 function defaultOptions() {
@@ -462,18 +464,58 @@ function buildCurrentProjectPayload() {
     state.folderPath,
     state.surfaces,
     state.projectData,
-    state.scanSource
+    state.scanSource,
+    state.options
   );
 }
 
 async function writeFolderProjectCache() {
   if (!state.folderPath) return null;
-  return api.saveProjectData(state.folderPath, state.projectData);
+  const payload = {
+    ...state.projectData,
+    projectOptions: extractProjectOptions(state.options),
+  };
+  return api.saveProjectData(state.folderPath, payload);
 }
 
 async function writeProjectFile() {
   if (!state.projectFilePath) return null;
   return api.saveProjectFile(state.projectFilePath, buildCurrentProjectPayload());
+}
+
+async function refreshFolderPathUsable() {
+  if (!state.folderPath || !api?.pathExists) return false;
+  try {
+    return await api.pathExists(state.folderPath);
+  } catch {
+    return false;
+  }
+}
+
+async function persistProjectChanges() {
+  const errors = [];
+  let savedPath = null;
+
+  if (state.folderPath && state.folderPathUsable && api) {
+    try {
+      const result = await writeFolderProjectCache();
+      savedPath = result?.path || savedPath;
+    } catch (err) {
+      errors.push(err);
+      state.folderPathUsable = false;
+    }
+  }
+
+  if (state.projectFilePath && api) {
+    try {
+      const result = await writeProjectFile();
+      savedPath = result?.path || savedPath;
+    } catch (err) {
+      errors.push(err);
+    }
+  }
+
+  return { saved: Boolean(savedPath), savedPath, errors };
 }
 
 async function saveProjectNow() {
@@ -484,10 +526,13 @@ async function saveProjectNow() {
   }
   clearTimeout(state.saveTimer);
   try {
-    const folderResult = await writeFolderProjectCache();
-    const fileResult = await writeProjectFile();
+    const { saved, savedPath, errors } = await persistProjectChanges();
+    if (!saved) {
+      const msg = errors[0]?.message || errors[0] || 'No save location available';
+      setAppStatus(`Save failed: ${msg}`, true);
+      return;
+    }
     markProjectClean();
-    const savedPath = fileResult?.path || folderResult?.path;
     setAppStatus(`Saved to ${savedPath}`);
     setTimeout(() => setAppStatus(''), 4000);
   } catch (err) {
@@ -547,11 +592,14 @@ async function applySavedProject(parsed, { filePath = '', quiet = false } = {}) 
 
   state.folderPath = parsed.sourceFolder || null;
   state.projectFilePath = filePath || null;
+  state.folderPathUsable = await refreshFolderPathUsable();
   projectData = migrateProjectData(projectData, parsed.sourceFolder);
   state.surfaces = filterExcludedGeometry(surfaces, projectData);
   state.loadErrors = [];
   state.scanSource = state.surfaces.length ? parsed.scanSource || 'saved' : 'none';
   state.projectData = mergeScanWithProject(state.surfaces, projectData);
+
+  loadProjectOptionsFromSave(parsed, state.projectData);
 
   for (const surface of state.surfaces) {
     const fp = geometryFingerprint(surface);
@@ -831,6 +879,82 @@ function defaultSurfaceRecord() {
   return normalizeSurfaceRecord({ stateId: defaultStateId });
 }
 
+function formatMissingOptionLabel(id) {
+  const s = String(id || '');
+  if (s.startsWith('item-')) return `Checklist item (${s.slice(-6)})`;
+  if (s.startsWith('new-state')) {
+    return s
+      .replace(/^new-state-?/, 'Status ')
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+  }
+  return s;
+}
+
+function applyProjectOptions(projectOptions) {
+  const parsed = parseProjectOptions(projectOptions);
+  if (!parsed.states.length && !parsed.checklistItems.length) return false;
+  if (!state.options) state.options = defaultOptions();
+  if (parsed.states.length) state.options.states = parsed.states;
+  if (parsed.checklistItems.length) state.options.checklistItems = parsed.checklistItems;
+  applyOptionsToUi(state.options);
+  renderLegend();
+  syncOpacityControls();
+  return true;
+}
+
+/** Add placeholder status/checklist rows for IDs referenced in surface data but missing from options. */
+function ensureOptionsCoverProjectData(projectData) {
+  if (!state.options) state.options = defaultOptions();
+  const stateIds = new Set();
+  const checklistIds = new Set();
+
+  const collect = (record) => {
+    if (!record) return;
+    if (record.stateId) stateIds.add(record.stateId);
+    for (const id of Object.keys(record.checklist || {})) checklistIds.add(id);
+  };
+
+  for (const record of Object.values(projectData?.surfaces || {})) collect(record);
+  for (const entry of Object.values(projectData?.retired || {})) collect(entry.snapshot);
+
+  const knownStateIds = new Set(state.options.states.map((s) => s.id));
+  const knownChecklistIds = new Set(state.options.checklistItems.map((c) => c.id));
+  let changed = false;
+
+  for (const id of stateIds) {
+    if (knownStateIds.has(id)) continue;
+    state.options.states.push({
+      id,
+      name: formatMissingOptionLabel(id),
+      color: '#64748b',
+      fillType: FILL_SOLID,
+    });
+    changed = true;
+  }
+  for (const id of checklistIds) {
+    if (knownChecklistIds.has(id)) continue;
+    state.options.checklistItems.push({
+      id,
+      label: formatMissingOptionLabel(id),
+    });
+    changed = true;
+  }
+
+  if (changed) {
+    applyOptionsToUi(state.options);
+    renderLegend();
+  }
+  return changed;
+}
+
+function loadProjectOptionsFromSave(parsed, projectData) {
+  const fromFile = parsed?.projectOptions || projectData?.projectOptions || null;
+  if (fromFile && applyProjectOptions(fromFile)) return;
+  ensureOptionsCoverProjectData(projectData);
+}
+
 function getSurfaceRecord(surfaceNumber) {
   if (!state.projectData.surfaces[surfaceNumber]) {
     state.projectData.surfaces[surfaceNumber] = defaultSurfaceRecord();
@@ -867,12 +991,25 @@ function applySwatchStyle(el, appearanceOrState) {
 }
 
 function scheduleSave() {
-  if (!state.folderPath || !api) return;
+  if (!api) return;
+  if (!state.folderPath && !state.projectFilePath) return;
   markProjectDirty();
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(async () => {
-    await api.saveProjectData(state.folderPath, state.projectData);
-    markProjectClean();
+    try {
+      const { saved, errors } = await persistProjectChanges();
+      markProjectClean();
+      if (!saved && errors.length) {
+        console.warn('Autosave failed', errors);
+        setAppStatus(`Autosave failed: ${errors[0].message || errors[0]}`, true);
+        setTimeout(() => setAppStatus(''), 5000);
+      }
+    } catch (err) {
+      console.warn('Autosave failed', err);
+      markProjectClean();
+      setAppStatus(`Autosave failed: ${err.message || err}`, true);
+      setTimeout(() => setAppStatus(''), 5000);
+    }
   }, 400);
 }
 
@@ -1201,8 +1338,8 @@ async function ensureShellRootAvailable() {
     await pickShellRoot();
     return getBomState().shellRoot;
   }
-  const check = await api.pathExists(bom.shellRoot);
-  if (check.exists) return bom.shellRoot;
+  const exists = await api.pathExists(bom.shellRoot);
+  if (exists) return bom.shellRoot;
   const retry = confirm(
     `The Inventor root folder was not found:\n${bom.shellRoot}\n\nChoose a new location?`
   );
@@ -1526,11 +1663,14 @@ async function tryLoadFolderFromCache(folderPath) {
 async function applyFolderLoadResult(folderPath, result, { quiet = false, rescan = false, fromCache = false } = {}) {
   state.folderPath = result.folderPath;
   state.projectFilePath = null;
+  state.folderPathUsable = true;
   state.loadErrors = result.errors || [];
   state.scanSource = result.scanSource || 'none';
   state.projectData = migrateProjectData(result.projectData, result.folderPath);
   state.surfaces = filterExcludedGeometry(result.surfaces, state.projectData);
   state.projectData = mergeScanWithProject(state.surfaces, state.projectData);
+
+  loadProjectOptionsFromSave(null, state.projectData);
 
   for (const surface of state.surfaces) {
     const fp = geometryFingerprint(surface);
@@ -1963,6 +2103,13 @@ function renderHistorySection(surfaceNumber) {
       const retired = state.projectData.retired?.[prev];
       const type = retired?.transferType || 'linked';
       li.innerHTML = `<span class="history-num">${escapeHtml(prev)}</span><span class="history-type">${escapeHtml(type)}</span>`;
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn small history-remove';
+      removeBtn.title = 'Remove from history';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => void removeHistoryEntry(surfaceNumber, prev));
+      li.appendChild(removeBtn);
       els.historyList.appendChild(li);
     }
   }
@@ -1977,6 +2124,19 @@ function renderHistorySection(surfaceNumber) {
   const hasRetired = getRetiredNumbers().some((num) => !(record.previousNumbers || []).includes(num));
   els.linkRenumberBtn.disabled = !hasRetired;
   els.linkReplaceBtn.disabled = !hasRetired;
+}
+
+function removeHistoryEntry(fileKey, historyNumber) {
+  if (!confirm(`Remove "${historyNumber}" from this surface's history?`)) return;
+  try {
+    state.projectData = removeHistoryNumber(state.projectData, fileKey, historyNumber);
+  } catch (err) {
+    alert(err.message || String(err));
+    return;
+  }
+  scheduleSave();
+  renderHistorySection(fileKey);
+  renderSurfaceList();
 }
 
 function openDetailPanel(surfaceNumber) {

@@ -162,6 +162,15 @@ function createSurfaceMeshMaterial(appearance, surfaceOpacity) {
     return { mat, isHazard: false };
   }
   const mat = createHazardMaterial(fillType, THREE, surfaceOpacity);
+  if (!mat) {
+    const fallback = new THREE.MeshStandardMaterial({
+      metalness: 0.12,
+      roughness: 0.52,
+    });
+    applySolidMaterial(fallback, appearance);
+    applyMeshOpacity(fallback, surfaceOpacity);
+    return { mat: fallback, isHazard: false };
+  }
   return { mat, isHazard: true };
 }
 
@@ -592,21 +601,17 @@ export class UnitViewer3d {
         edges.renderOrder = 2;
         edges.userData.surfaceNumber = surface.surfaceNumber;
 
-        if (mat.isHazard) {
-          group.add(mesh);
-        } else {
-          const depthMat = new THREE.MeshBasicMaterial({
-            colorWrite: false,
-            depthWrite: true,
-          });
-          const depthMesh = new THREE.Mesh(geom, depthMat);
-          depthMesh.position.set(cx, cy, cz);
-          depthMesh.renderOrder = 0;
-          depthMesh.userData.isDepthOccluder = true;
-          depthMesh.userData.surfaceNumber = surface.surfaceNumber;
-          group.add(depthMesh);
-          group.add(mesh);
-        }
+        const depthMat = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true,
+        });
+        const depthMesh = new THREE.Mesh(geom, depthMat);
+        depthMesh.position.set(cx, cy, cz);
+        depthMesh.renderOrder = 0;
+        depthMesh.userData.isDepthOccluder = true;
+        depthMesh.userData.surfaceNumber = surface.surfaceNumber;
+        group.add(depthMesh);
+        group.add(mesh);
         group.add(edges);
       }
 

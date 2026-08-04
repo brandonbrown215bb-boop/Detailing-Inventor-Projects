@@ -17,15 +17,62 @@ export function surfaceGeometryForSave(surface) {
   };
 }
 
-export function buildProjectSavePayload(folderPath, geometrySurfaces, projectData, scanSource) {
+/** Status + checklist templates stored per project (not global APPDATA). */
+export function extractProjectOptions(options) {
+  if (!options || typeof options !== 'object') return null;
+  const states = Array.isArray(options.states)
+    ? options.states.map((s) => ({
+        id: s.id,
+        name: s.name,
+        color: s.color,
+        fillType: s.fillType || 'solid',
+      }))
+    : [];
+  const checklistItems = Array.isArray(options.checklistItems)
+    ? options.checklistItems.map((c) => ({
+        id: c.id,
+        label: c.label,
+      }))
+    : [];
+  if (!states.length && !checklistItems.length) return null;
+  return { states, checklistItems };
+}
+
+export function parseProjectOptions(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { states: [], checklistItems: [] };
+  }
+  const states = Array.isArray(raw.states)
+    ? raw.states
+        .filter((s) => s && s.id)
+        .map((s) => ({
+          id: String(s.id),
+          name: String(s.name || s.id),
+          color: s.color || '#64748b',
+          fillType: s.fillType || 'solid',
+        }))
+    : [];
+  const checklistItems = Array.isArray(raw.checklistItems)
+    ? raw.checklistItems
+        .filter((c) => c && c.id)
+        .map((c) => ({
+          id: String(c.id),
+          label: String(c.label || c.id),
+        }))
+    : [];
+  return { states, checklistItems };
+}
+
+export function buildProjectSavePayload(folderPath, geometrySurfaces, projectData, scanSource, options) {
   const surfaces = projectData?.surfaces && typeof projectData.surfaces === 'object' ? projectData.surfaces : {};
   const retired = projectData?.retired && typeof projectData.retired === 'object' ? projectData.retired : {};
   const bom = projectData?.bom && typeof projectData.bom === 'object' ? projectData.bom : null;
   const geometry = (geometrySurfaces || [])
     .map(surfaceGeometryForSave)
     .filter((s) => s && s.boxes.length > 0);
+  const projectOptions = extractProjectOptions(options);
 
-  return {
+  const payload = {
     version: 3,
     savedAt: new Date().toISOString(),
     sourceFolder: folderPath || null,
@@ -37,6 +84,8 @@ export function buildProjectSavePayload(folderPath, geometrySurfaces, projectDat
     bom,
     updatedAt: projectData?.updatedAt || new Date().toISOString(),
   };
+  if (projectOptions) payload.projectOptions = projectOptions;
+  return payload;
 }
 
 export function parseSavedProjectFile(data) {
@@ -65,6 +114,7 @@ export function parseSavedProjectFile(data) {
     sourceFolder,
     geometrySurfaces,
     scanSource: data.scanSource || (geometrySurfaces.length ? 'saved' : 'unknown'),
+    projectOptions: data.projectOptions || null,
     projectPayload: {
       version: 2,
       sourceFolder,

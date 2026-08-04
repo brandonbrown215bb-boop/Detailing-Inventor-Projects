@@ -740,6 +740,12 @@ textarea {
   text-transform: capitalize;
 }
 
+.history-remove {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
 .renumber-row {
   display: grid;
   grid-template-columns: 1fr auto;

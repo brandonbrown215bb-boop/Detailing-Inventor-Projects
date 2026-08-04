@@ -10,6 +10,7 @@ function readAppVersion() {
 contextBridge.exposeInMainWorld('unitSurfaceViewer', {
   appVersion: readAppVersion(),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  pathExists: (targetPath) => ipcRenderer.invoke('path-exists', { targetPath }),
   allowFolderScans: () => ipcRenderer.invoke('allow-folder-scans'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   pickFolders: () => ipcRenderer.invoke('pick-folders'),
@@ -72,7 +73,6 @@ contextBridge.exposeInMainWorld('unitSurfaceViewer', {
         ? foldersOrPaths
         : undefined,
     }),
-  pathExists: (targetPath) => ipcRenderer.invoke('path-exists', { targetPath }),
   openShellFolder: (rootPath, relativePath) =>
     ipcRenderer.invoke('open-shell-folder', { rootPath, relativePath }),
 });

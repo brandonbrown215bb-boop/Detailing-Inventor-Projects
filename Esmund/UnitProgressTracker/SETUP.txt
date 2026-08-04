@@ -1,5 +1,5 @@
 Unit Progress Tracker — GitHub source
-Version 1.0.40 (2026-07-30)
+Version 1.0.43 (2026-08-04)
 
 Folder: Esmund/UnitProgressTracker (this repo)
 

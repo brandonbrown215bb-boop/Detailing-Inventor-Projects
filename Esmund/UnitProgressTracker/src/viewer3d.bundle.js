@@ -31410,40 +31410,39 @@ var STRIPE_PERIOD = 5;
 var HAZARD_VERT = (
   /* glsl */
   `
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vWorldPos;
-varying vec3 vNormal;
 
 void main() {
   vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  vNormal = normalize(normalMatrix * normal);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  #include <logdepthbuf_vertex>
 }
 `
 );
 var HAZARD_FRAG = (
   /* glsl */
   `
-varying vec3 vWorldPos;
-varying vec3 vNormal;
+#include <logdepthbuf_pars_fragment>
 
-uniform float uStripePeriod;
+varying vec3 vWorldPos;
+
 uniform vec3 uColorA;
 uniform vec3 uColorB;
+uniform float uStripePeriod;
 uniform float uOpacity;
 uniform vec3 uEmissive;
 uniform float uEmissiveIntensity;
 
 void main() {
+  // 45\xB0 hazard bands in plan view; shared world coords keep stripes aligned everywhere.
   float diag = vWorldPos.x + vWorldPos.y;
   float stripe = mod(floor(diag / uStripePeriod), 2.0);
-  vec3 base = mix(uColorA, uColorB, stripe);
-
-  vec3 lightDir = normalize(vec3(0.45, 1.0, 0.65));
-  float ndl = abs(dot(normalize(vNormal), lightDir));
-  vec3 lit = base * (0.48 + 0.52 * ndl);
-
-  vec3 finalColor = lit + uEmissive * uEmissiveIntensity;
-  gl_FragColor = vec4(finalColor, uOpacity);
+  vec3 color = mix(uColorA, uColorB, stripe);
+  color += uEmissive * uEmissiveIntensity;
+  gl_FragColor = vec4(color, uOpacity);
+  #include <logdepthbuf_fragment>
 }
 `
 );
@@ -31463,7 +31462,7 @@ function createHazardMaterial(fillType, THREE, opacity = 0.9) {
   if (!colors) return null;
   const value = Math.min(1, Math.max(0.25, opacity));
   const opaque = value >= 0.999;
-  return new THREE.ShaderMaterial({
+  const mat = new THREE.ShaderMaterial({
     uniforms: {
       uStripePeriod: { value: STRIPE_PERIOD },
       uColorA: { value: new THREE.Color(colors[0]) },
@@ -31475,11 +31474,13 @@ function createHazardMaterial(fillType, THREE, opacity = 0.9) {
     vertexShader: HAZARD_VERT,
     fragmentShader: HAZARD_FRAG,
     side: THREE.DoubleSide,
-    forceSinglePass: true,
     transparent: !opaque,
     depthWrite: opaque,
-    depthTest: true
+    depthTest: true,
+    toneMapped: false
   });
+  mat.userData.hazardFillType = fillType;
+  return mat;
 }
 function updateHazardMaterialOpacity(material, opacity) {
   if (!material?.uniforms?.uOpacity) return;
@@ -31680,6 +31681,15 @@ function createSurfaceMeshMaterial(appearance, surfaceOpacity) {
     return { mat: mat2, isHazard: false };
   }
   const mat = createHazardMaterial(fillType, three_module_exports, surfaceOpacity);
+  if (!mat) {
+    const fallback = new MeshStandardMaterial({
+      metalness: 0.12,
+      roughness: 0.52
+    });
+    applySolidMaterial(fallback, appearance);
+    applyMeshOpacity(fallback, surfaceOpacity);
+    return { mat: fallback, isHazard: false };
+  }
   return { mat, isHazard: true };
 }
 function syncMeshMaterial(mesh, appearance, surfaceOpacity) {
@@ -32060,21 +32070,17 @@ var UnitViewer3d = class {
         edges.position.copy(mesh.position);
         edges.renderOrder = 2;
         edges.userData.surfaceNumber = surface.surfaceNumber;
-        if (mat.isHazard) {
-          group.add(mesh);
-        } else {
-          const depthMat = new MeshBasicMaterial({
-            colorWrite: false,
-            depthWrite: true
-          });
-          const depthMesh = new Mesh(geom, depthMat);
-          depthMesh.position.set(cx, cy, cz);
-          depthMesh.renderOrder = 0;
-          depthMesh.userData.isDepthOccluder = true;
-          depthMesh.userData.surfaceNumber = surface.surfaceNumber;
-          group.add(depthMesh);
-          group.add(mesh);
-        }
+        const depthMat = new MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true
+        });
+        const depthMesh = new Mesh(geom, depthMat);
+        depthMesh.position.set(cx, cy, cz);
+        depthMesh.renderOrder = 0;
+        depthMesh.userData.isDepthOccluder = true;
+        depthMesh.userData.surfaceNumber = surface.surfaceNumber;
+        group.add(depthMesh);
+        group.add(mesh);
         group.add(edges);
       }
       const bounds = computeBounds(group);

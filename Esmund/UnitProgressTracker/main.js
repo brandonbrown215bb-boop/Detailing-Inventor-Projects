@@ -615,6 +615,15 @@ ipcMain.handle('save-options', async (_event, options) => {
 
 ipcMain.handle('get-app-version', async () => ({ version: APP_VERSION }));
 
+ipcMain.handle('path-exists', async (_event, { targetPath }) => {
+  if (!targetPath || typeof targetPath !== 'string') return false;
+  try {
+    return fs.existsSync(targetPath);
+  } catch {
+    return false;
+  }
+});
+
 ipcMain.handle('allow-folder-scans', async () => {
   folderScansAllowed = true;
   return { ok: true };
@@ -703,6 +712,8 @@ function normalizeProjectData(raw, folderPath) {
     };
   }
   const bom = base.bom && typeof base.bom === 'object' ? { ...base.bom } : null;
+  const projectOptions =
+    base.projectOptions && typeof base.projectOptions === 'object' ? base.projectOptions : null;
   return {
     version: 2,
     sourceFolder: folderPath || base.sourceFolder || null,
@@ -710,6 +721,7 @@ function normalizeProjectData(raw, folderPath) {
     surfaces,
     retired,
     bom,
+    projectOptions,
   };
 }
 
@@ -933,11 +945,6 @@ ipcMain.handle('create-shell-folders', async (_event, { rootPath, relativePaths,
     created.push(full);
   }
   return { ok: true, count: created.length };
-});
-
-ipcMain.handle('path-exists', async (_event, { targetPath }) => {
-  if (!targetPath) return { exists: false };
-  return { exists: fs.existsSync(targetPath) };
 });
 
 ipcMain.handle('open-shell-folder', async (_event, { rootPath, relativePath }) => {

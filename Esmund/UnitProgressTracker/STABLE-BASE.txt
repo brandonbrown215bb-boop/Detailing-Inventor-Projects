@@ -1,8 +1,8 @@
 Unit Progress Tracker — current build (keeper)
 ==============================================
 
-Version: 1.0.40
-Marked: 2026-07-30
+Version: 1.0.43
+Marked: 2026-08-04
 
 Source: Esmund/UnitProgressTracker in Detailing-Inventor-Projects (GitHub).
 
@@ -14,15 +14,15 @@ Run
   npm start
   — or double-click Start Unit Progress Tracker.vbs
 
-Current build highlights (v1.0.34 → v1.0.40)
+Current build highlights (v1.0.41 → v1.0.43)
 --------------------------------------------
-- BOM tab: Config.xml import; segment→skid placement from Config (not BOM brackets)
-- Replace surface: pick 391Z .iam via Inventor (no full 59-surface rescan)
-- Add surface(s) from folder; Remove surface + Removed list
-- Inventor read: MOM_DATA → DOCUMENT_CONFIG_JSON; py -3 launcher on Windows
-- Replace confirm: OK = pick .iam, Cancel = cancel
+- Per-project Status and Checklist templates saved in project JSON (projectOptions)
+- Renamed surfaces stay visible after Save / Load Project
+- Remove mistaken numbers from Surface history (Renumber & history panel)
+- Autosave to project file when IAM sourceFolder is missing or on another PC
+- Failed autosave no longer leaves the app stuck unable to close
 
 Requires Node.js, Autodesk Inventor, Python 3 + pywin32.
 Do NOT open index.html in a browser — use Electron (npm start or .vbs launcher).
 
-Prior stable base: v1.0.23 (releases/UnitSurfaceViewer_Source_v1.0.23_2026-07-29.zip)
+Prior stable base: v1.0.23

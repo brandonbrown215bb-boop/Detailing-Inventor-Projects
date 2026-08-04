@@ -8,6 +8,8 @@ export function migrateProjectData(raw, folderPath) {
   }
 
   const bom = base.bom && typeof base.bom === 'object' ? { ...base.bom } : null;
+  const projectOptions =
+    base.projectOptions && typeof base.projectOptions === 'object' ? { ...base.projectOptions } : null;
 
   return {
     version: 2,
@@ -16,6 +18,7 @@ export function migrateProjectData(raw, folderPath) {
     surfaces,
     retired,
     bom,
+    projectOptions,
   };
 }
 
@@ -204,14 +207,59 @@ export function renumberSurfaceInPlace(projectData, fileKey, newNumber) {
   return { ...projectData, surfaces, retired };
 }
 
-/** File keys whose geometry should not load from cache (removed or superseded). */
+/** File keys whose geometry should not load from cache (removed or replaced IAM only). */
 export function getExcludedGeometryKeys(projectData) {
   const excluded = new Set();
   for (const entry of Object.values(projectData?.retired || {})) {
-    if (entry.fileKey) excluded.add(entry.fileKey);
-    if (entry.transferType === 'removed' && entry.fileKey) excluded.add(entry.fileKey);
+    const key = entry.fileKey;
+    if (!key) continue;
+    const type = entry.transferType;
+    // Renumber keeps the same IAM file — geometry must stay visible after reload.
+    if (type === 'removed' || type === 'replaced') {
+      excluded.add(key);
+    }
   }
   return excluded;
+}
+
+/** Remove a mistaken previous surface number from history (IAM geometry unchanged). */
+export function removeHistoryNumber(projectData, fileKey, historyNumber) {
+  const trimmed = String(historyNumber || '').trim();
+  if (!trimmed) throw new Error('No history number specified');
+
+  const surfaces = { ...(projectData.surfaces || {}) };
+  const retired = { ...(projectData.retired || {}) };
+  const record = surfaces[fileKey];
+  if (!record) throw new Error('Surface not found');
+
+  const prev = record.previousNumbers || [];
+  if (!prev.includes(trimmed)) {
+    throw new Error(`"${trimmed}" is not in this surface's history`);
+  }
+
+  const currentDisplay = getDisplayNumber(fileKey, record);
+  const previousNumbers = prev.filter((n) => n !== trimmed);
+
+  surfaces[fileKey] = {
+    ...record,
+    previousNumbers,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (retired[trimmed]) {
+    delete retired[trimmed];
+  }
+
+  for (const [key, entry] of Object.entries(retired)) {
+    if (entry.supersededBy === trimmed) {
+      retired[key] = {
+        ...entry,
+        supersededBy: currentDisplay,
+      };
+    }
+  }
+
+  return { ...projectData, surfaces, retired };
 }
 
 export function filterExcludedGeometry(surfaces, projectData) {

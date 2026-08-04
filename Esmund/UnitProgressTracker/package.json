@@ -1,6 +1,6 @@
 {
   "name": "unit-surface-viewer",
-  "version": "1.0.40",
+  "version": "1.0.43",
   "description": "Unit progress tracker — 3D surfaces, BOM shell folders, checklists, and notes",
   "private": true,
   "main": "main.js",
