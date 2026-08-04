@@ -1,64 +1,150 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using UnitProgressTracker.Core.Models;
 
 namespace UnitProgressTracker.Core.Services;
 
 public class GeometryScanner
 {
-    public static List<SurfaceModel> ScanJsonFolder(string folderPath)
+    /// <summary>
+    /// Asynchronously scans a folder for .iam assembly files via active Inventor COM,
+    /// falling back to .json geometry sidecar files when Inventor is not running.
+    /// Progress reports and cancellation tokens are fully supported.
+    /// </summary>
+    public static async Task<List<SurfaceModel>> ScanIamFolderAsync(
+        string folderPath,
+        IProgress<ProgressReport>? progress = null,
+        CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+            return new List<SurfaceModel>();
+
+        bool inventorRunning = InventorComReader.IsInventorRunning();
+        string[] files = inventorRunning
+            ? Directory.GetFiles(folderPath, "*.iam", SearchOption.AllDirectories)
+            : Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories)
+                       .Where(f => !f.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase))
+                       .ToArray();
+
         var result = new List<SurfaceModel>();
-        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath)) return result;
-
-        var files = Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories);
         var seenNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int total = files.Length;
 
-        foreach (var file in files)
+        for (int i = 0; i < files.Length; i++)
         {
-            if (file.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase)) continue;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            string surfaceNumber = Path.GetFileNameWithoutExtension(file);
-            if (seenNumbers.Contains(surfaceNumber)) continue;
+            string file = files[i];
+            string fileName = Path.GetFileName(file);
 
-            try
+            progress?.Report(new ProgressReport(
+                Scanned: i,
+                Total: total,
+                CurrentFile: fileName,
+                StatusMessage: $"Scanning {i + 1} of {total}: {fileName}"
+            ));
+
+            SurfaceModel? model = inventorRunning
+                ? await ScanIamFileAsync(file, folderPath, cancellationToken)
+                : await Task.Run(() => ScanJsonFile(file, folderPath), cancellationToken);
+
+            if (model != null && seenNumbers.Add(model.SurfaceNumber))
             {
-                string jsonText = File.ReadAllText(file);
-                using var doc = JsonDocument.Parse(jsonText);
-
-                if (!doc.RootElement.TryGetProperty("configuration", out var conf)) continue;
-
-                var boxes = ExtractBoxesFromConfig(conf);
-                if (boxes.Count == 0) continue;
-
-                seenNumbers.Add(surfaceNumber);
-
-                string partNumber = conf.TryGetProperty("partNumber", out var pn) ? pn.GetString() ?? surfaceNumber : surfaceNumber;
-                string surfaceType = conf.TryGetProperty("surfaceType", out var st) ? st.GetString() ?? "" : "";
-                string side = conf.TryGetProperty("surfaceUnitSide", out var sus) ? sus.GetString() ?? "" : "";
-
-                result.Add(new SurfaceModel
-                {
-                    SurfaceNumber = surfaceNumber,
-                    FilePath = file,
-                    RelativePath = Path.GetRelativePath(folderPath, file),
-                    SourceType = "json",
-                    PartNumber = partNumber,
-                    SurfaceType = surfaceType,
-                    SurfaceUnitSide = side,
-                    Boxes = boxes
-                });
-            }
-            catch
-            {
-                // Skip invalid JSON files
+                result.Add(model);
             }
         }
 
+        progress?.Report(new ProgressReport(
+            Scanned: total,
+            Total: total,
+            CurrentFile: string.Empty,
+            StatusMessage: "Scan complete."
+        ));
+
         result.Sort((a, b) => string.Compare(a.SurfaceNumber, b.SurfaceNumber, StringComparison.OrdinalIgnoreCase));
         return result;
+    }
+
+    public static Task<SurfaceModel?> ScanIamFileAsync(
+        string iamPath,
+        string rootFolder = "",
+        CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string? json = InventorComReader.TryReadConfigJsonAttribute(iamPath);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                return ParseConfigJson(json, iamPath, rootFolder, "iam");
+            }
+
+            // Per-file fallback to adjacent .json sidecar
+            string jsonPath = Path.ChangeExtension(iamPath, ".json");
+            if (File.Exists(jsonPath))
+            {
+                return ScanJsonFile(jsonPath, rootFolder);
+            }
+
+            return null;
+        }, cancellationToken);
+    }
+
+    public static List<SurfaceModel> ScanJsonFolder(string folderPath)
+    {
+        return ScanIamFolderAsync(folderPath).GetAwaiter().GetResult();
+    }
+
+    private static SurfaceModel? ScanJsonFile(string jsonPath, string rootFolder)
+    {
+        try
+        {
+            if (!File.Exists(jsonPath)) return null;
+            string text = File.ReadAllText(jsonPath);
+            return ParseConfigJson(text, jsonPath, rootFolder, "json");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public static SurfaceModel? ParseConfigJson(string jsonText, string filePath, string rootFolder, string sourceType)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            if (!doc.RootElement.TryGetProperty("configuration", out var conf)) return null;
+
+            var boxes = ExtractBoxesFromConfig(conf);
+            if (boxes.Count == 0) return null;
+
+            string surfaceNumber = Path.GetFileNameWithoutExtension(filePath);
+            string partNumber = conf.TryGetProperty("partNumber", out var pn) ? pn.GetString() ?? surfaceNumber : surfaceNumber;
+            string surfaceType = conf.TryGetProperty("surfaceType", out var st) ? st.GetString() ?? "" : "";
+            string side = conf.TryGetProperty("surfaceUnitSide", out var sus) ? sus.GetString() ?? "" : "";
+
+            return new SurfaceModel
+            {
+                SurfaceNumber = surfaceNumber,
+                FilePath = filePath,
+                RelativePath = !string.IsNullOrEmpty(rootFolder) ? Path.GetRelativePath(rootFolder, filePath) : filePath,
+                SourceType = sourceType,
+                PartNumber = partNumber,
+                SurfaceType = surfaceType,
+                SurfaceUnitSide = side,
+                Boxes = boxes
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static List<GeometryBox> ExtractBoxesFromConfig(JsonElement conf)

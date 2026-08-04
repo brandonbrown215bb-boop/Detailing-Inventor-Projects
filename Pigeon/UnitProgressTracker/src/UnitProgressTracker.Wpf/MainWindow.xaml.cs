@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
 using UnitProgressTracker.Core.Models;
 using UnitProgressTracker.Wpf.ViewModels;
@@ -26,6 +28,14 @@ public partial class MainWindow : Window
         ViewModel.RequestSetSurfaceVisibility = (hidden, sn) => Viewport3D.SetSurfaceVisibility(hidden, sn);
 
         Viewport3D.SurfacePicked += OnSurfacePickedIn3D;
+    }
+
+    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (!ViewModel.ConfirmUnsavedChanges())
+        {
+            e.Cancel = true;
+        }
     }
 
     private void OnSurfacePickedIn3D(string surfaceNumber)
@@ -134,6 +144,7 @@ public partial class MainWindow : Window
 
         ViewModel.LoadBomRows(demoBom);
         ViewModel.StatusMessage = "Loaded demo 3D surfaces and BOM shell data.";
+        ViewModel.MarkDirty();
         Refresh3DViewport();
     }
 
@@ -147,6 +158,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             ViewModel.ShellRootPath = dialog.FolderName;
+            ViewModel.MarkDirty();
             if (ViewModel.CurrentBomPlan != null)
             {
                 ViewModel.LoadBomRows(ViewModel.CurrentBomPlan.Entries.ConvertAll(e => new BomRow
@@ -179,7 +191,6 @@ public partial class MainWindow : Window
 
     private void OnOpacitySliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        // Binding handles it; this fires a direct viewport update to avoid binding lag on drag
         Viewport3D.SetGlobalOpacity(e.NewValue);
     }
 
@@ -188,8 +199,16 @@ public partial class MainWindow : Window
         string label = NewChecklistItemBox.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(label) || ViewModel.SelectedSurface == null) return;
 
-        ViewModel.SelectedSurface.Checklist[label] = false;
-        ViewModel.OnPropertyChangedPublic(nameof(ViewModel.ChecklistItems));
+        ViewModel.AddChecklistItemCommand.Execute(label);
         NewChecklistItemBox.Clear();
+    }
+
+    private void OnNewChecklistItemKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            OnAddChecklistItemClick(sender, e);
+            e.Handled = true;
+        }
     }
 }

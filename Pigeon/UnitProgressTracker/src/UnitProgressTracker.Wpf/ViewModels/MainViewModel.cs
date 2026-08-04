@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using UnitProgressTracker.Core.Models;
 using UnitProgressTracker.Core.Services;
@@ -70,12 +71,14 @@ public class AsyncRelayCommand : ICommand
 public class MainViewModel : INotifyPropertyChanged
 {
     private string? _currentFolderPath;
+    private string? _currentProjectPath;
+    private bool _isDirty;
     private SurfaceModel? _selectedSurface;
     private ShellFolderEntry? _selectedBomEntry;
     private string _searchText = string.Empty;
     private string _shellRootPath = string.Empty;
     private int _selectedTabIndex = 0;
-    private string _statusMessage = "Ready. Open a unit folder to begin.";
+    private string _statusMessage = "Ready. Open a unit folder or project to begin.";
     private string _selectedSkidFilter = "All Skids";
     private string _selectedSegmentFilter = "All Segments";
     private bool _isCustomSqOnly;
@@ -86,7 +89,9 @@ public class MainViewModel : INotifyPropertyChanged
     private double _scanProgress;
     private string _scanProgressLabel = string.Empty;
     private CancellationTokenSource? _scanCts;
+    private readonly DispatcherTimer _autoSaveTimer;
 
+    public ProjectStateModel ProjectState { get; private set; } = new();
     public ObservableCollection<SurfaceModel> Surfaces { get; } = new();
     public ObservableCollection<StatusState> StatusStates { get; } = new();
     public ObservableCollection<ShellFolderEntry> BomEntries { get; } = new();
@@ -94,6 +99,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<BomRow> MisplacedRows { get; } = new();
     public ObservableCollection<string> AvailableSkids { get; } = new();
     public ObservableCollection<string> AvailableSegments { get; } = new();
+    public ObservableCollection<RecentProjectItemViewModel> RecentProjects { get; } = new();
     public ShellFolderPlan? CurrentBomPlan { get; private set; }
 
     // Callbacks wired by MainWindow
@@ -110,10 +116,52 @@ public class MainViewModel : INotifyPropertyChanged
     public string? CurrentFolderPath
     {
         get => _currentFolderPath;
-        set { _currentFolderPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasFolder)); }
+        set { _currentFolderPath = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasFolder)); OnPropertyChanged(nameof(WindowTitle)); }
     }
 
     public bool HasFolder => !string.IsNullOrWhiteSpace(CurrentFolderPath);
+
+    public string? CurrentProjectPath
+    {
+        get => _currentProjectPath;
+        set
+        {
+            _currentProjectPath = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasProjectPath));
+            OnPropertyChanged(nameof(WindowTitle));
+        }
+    }
+
+    public bool HasProjectPath => !string.IsNullOrWhiteSpace(CurrentProjectPath);
+
+    public bool IsDirty
+    {
+        get => _isDirty;
+        set
+        {
+            if (_isDirty != value)
+            {
+                _isDirty = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        }
+    }
+
+    public string WindowTitle
+    {
+        get
+        {
+            string name = string.IsNullOrEmpty(CurrentProjectPath)
+                ? (HasFolder ? Path.GetFileName(CurrentFolderPath)! : "Untitled Project")
+                : Path.GetFileName(CurrentProjectPath);
+            string marker = IsDirty ? "*" : "";
+            return $"Unit Progress Tracker — {name}{marker}";
+        }
+    }
+
+    public bool HasRecentProjects => RecentProjects.Count > 0;
 
     public SurfaceModel? SelectedSurface
     {
@@ -123,13 +171,28 @@ public class MainViewModel : INotifyPropertyChanged
             _selectedSurface = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelectedSurface));
-            OnPropertyChanged(nameof(ChecklistItems));
+            OnPropertyChanged(nameof(SelectedSurfaceNotes));
+            NotifyChecklistChanged();
             if (value != null)
                 RequestHighlightSurface?.Invoke(value.SurfaceNumber);
         }
     }
 
     public bool HasSelectedSurface => SelectedSurface != null;
+
+    public string SelectedSurfaceNotes
+    {
+        get => SelectedSurface?.Notes ?? string.Empty;
+        set
+        {
+            if (SelectedSurface != null && SelectedSurface.Notes != value)
+            {
+                SelectedSurface.Notes = value;
+                OnPropertyChanged();
+                MarkDirty();
+            }
+        }
+    }
 
     // Expose checklist as a bindable list for the right-panel ItemsControl
     public IEnumerable<ChecklistItemViewModel> ChecklistItems
@@ -139,6 +202,22 @@ public class MainViewModel : INotifyPropertyChanged
             if (SelectedSurface == null) return Enumerable.Empty<ChecklistItemViewModel>();
             return SelectedSurface.Checklist.Select(kv => new ChecklistItemViewModel(kv.Key, kv.Value, this));
         }
+    }
+
+    public int ChecklistCompletedCount => SelectedSurface?.Checklist.Values.Count(v => v) ?? 0;
+    public int ChecklistTotalCount => SelectedSurface?.Checklist.Count ?? 0;
+    public double ChecklistProgressPercent => ChecklistTotalCount > 0 ? (double)ChecklistCompletedCount / ChecklistTotalCount * 100.0 : 0.0;
+    public string ChecklistProgressText => ChecklistTotalCount > 0 
+        ? $"{ChecklistCompletedCount} / {ChecklistTotalCount} completed ({ChecklistProgressPercent:F0}%)"
+        : "No checklist items";
+
+    public void NotifyChecklistChanged()
+    {
+        OnPropertyChanged(nameof(ChecklistItems));
+        OnPropertyChanged(nameof(ChecklistCompletedCount));
+        OnPropertyChanged(nameof(ChecklistTotalCount));
+        OnPropertyChanged(nameof(ChecklistProgressPercent));
+        OnPropertyChanged(nameof(ChecklistProgressText));
     }
 
     public ShellFolderEntry? SelectedBomEntry
@@ -250,6 +329,13 @@ public class MainViewModel : INotifyPropertyChanged
     // Commands
     // -----------------------------------------------------------------------
 
+    public ICommand NewProjectCommand { get; }
+    public ICommand OpenProjectCommand { get; }
+    public ICommand SaveProjectCommand { get; }
+    public ICommand SaveProjectAsCommand { get; }
+    public ICommand OpenRecentProjectCommand { get; }
+    public ICommand ClearRecentProjectsCommand { get; }
+    public ICommand ExitCommand { get; }
     public ICommand ImportExcelBomCommand { get; }
     public ICommand SetShellRootFolderCommand { get; }
     public ICommand CreateShellFoldersCommand { get; }
@@ -263,14 +349,28 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand CancelScanCommand { get; }
     public ICommand AsyncScanFolderCommand { get; }
 
+    // M3 Commands
+    public ICommand ManageStatusStatesCommand { get; private set; } = null!;
+    public ICommand AddChecklistItemCommand { get; private set; } = null!;
+    public ICommand DeleteChecklistItemCommand { get; private set; } = null!;
+    public ICommand ClearNotesCommand { get; private set; } = null!;
+    public ICommand ToggleSelectedSurfaceVisibilityCommand { get; private set; } = null!;
+
     public MainViewModel()
     {
-        foreach (var state in StatusState.DefaultStates)
+        foreach (var state in StatusStateService.GetDefaultStates())
             StatusStates.Add(state);
 
         AvailableSkids.Add("All Skids");
         AvailableSegments.Add("All Segments");
 
+        NewProjectCommand = new RelayCommand(_ => ExecuteNewProject());
+        OpenProjectCommand = new RelayCommand(_ => ExecuteOpenProject());
+        SaveProjectCommand = new RelayCommand(_ => ExecuteSaveProject());
+        SaveProjectAsCommand = new RelayCommand(_ => ExecuteSaveProjectAs());
+        OpenRecentProjectCommand = new RelayCommand(p => ExecuteOpenRecentProject(p as string));
+        ClearRecentProjectsCommand = new RelayCommand(_ => ExecuteClearRecentProjects(), _ => HasRecentProjects);
+        ExitCommand = new RelayCommand(_ => ExecuteExit());
         ImportExcelBomCommand = new RelayCommand(_ => ExecuteImportExcelBom());
         SetShellRootFolderCommand = new RelayCommand(_ => ExecuteSetShellRootFolder());
         CreateShellFoldersCommand = new RelayCommand(_ => CreateShellFolders(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && BomEntries.Count > 0);
@@ -283,10 +383,256 @@ public class MainViewModel : INotifyPropertyChanged
         ToggleSurfaceVisibilityCommand = new RelayCommand(p => ExecuteToggleSurfaceVisibility(p as SurfaceModel));
         CancelScanCommand = new RelayCommand(_ => _scanCts?.Cancel(), _ => IsScanning);
         AsyncScanFolderCommand = new AsyncRelayCommand(_ => ExecuteAsyncScanAsync());
+
+        // M3 Command Initializations
+        ManageStatusStatesCommand = new RelayCommand(_ => ExecuteManageStatusStates());
+        AddChecklistItemCommand = new RelayCommand(p => ExecuteAddChecklistItem(p as string), _ => HasSelectedSurface);
+        DeleteChecklistItemCommand = new RelayCommand(p => ExecuteDeleteChecklistItem(p as string), _ => HasSelectedSurface);
+        ClearNotesCommand = new RelayCommand(_ => SelectedSurfaceNotes = string.Empty, _ => HasSelectedSurface && !string.IsNullOrEmpty(SelectedSurfaceNotes));
+        ToggleSelectedSurfaceVisibilityCommand = new RelayCommand(_ => ExecuteToggleSurfaceVisibility(SelectedSurface), _ => HasSelectedSurface);
+
+        // Setup 5-minute auto-save background timer
+        _autoSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(5.0)
+        };
+        _autoSaveTimer.Tick += OnAutoSaveTimerTick;
+        _autoSaveTimer.Start();
+
+        RefreshRecentProjects();
+    }
+
+    public void MarkDirty() => IsDirty = true;
+    public void ClearDirty() => IsDirty = false;
+
+    public void RefreshRecentProjects()
+    {
+        var settings = AppSettingsService.LoadSettings();
+        RecentProjects.Clear();
+        foreach (var path in settings.RecentProjects)
+        {
+            RecentProjects.Add(new RecentProjectItemViewModel(path));
+        }
+        OnPropertyChanged(nameof(HasRecentProjects));
+    }
+
+    private void OnAutoSaveTimerTick(object? sender, EventArgs e)
+    {
+        if (IsDirty && !string.IsNullOrWhiteSpace(CurrentProjectPath) && !IsScanning)
+        {
+            SaveProjectInternal(CurrentProjectPath);
+            StatusMessage = $"[Auto-Save] Project auto-saved to {Path.GetFileName(CurrentProjectPath)} at {DateTime.Now:HH:mm:ss}.";
+        }
+    }
+
+    public bool SaveProjectInternal(string filePath)
+    {
+        try
+        {
+            ProjectState.Version = 2;
+            ProjectState.SourceFolder = CurrentFolderPath;
+            ProjectState.UpdatedAt = DateTime.UtcNow;
+
+            foreach (var surf in Surfaces)
+            {
+                string key = surf.SurfaceNumber;
+                if (string.IsNullOrWhiteSpace(key)) continue;
+
+                if (!ProjectState.Surfaces.TryGetValue(key, out var record))
+                {
+                    record = new SurfaceRecordModel();
+                    ProjectState.Surfaces[key] = record;
+                }
+
+                record.StateId = surf.StateId;
+                record.Checklist = new Dictionary<string, bool>(surf.Checklist, StringComparer.OrdinalIgnoreCase);
+                record.Notes = surf.Notes;
+                record.UpdatedAt = DateTime.UtcNow;
+                record.Hidden = surf.IsHidden;
+                record.DisplayNumber = surf.DisplayNumber ?? key;
+                record.PreviousNumbers = surf.PreviousNumbers ?? new List<string>();
+                record.GeometryFingerprint = surf.GeometryFingerprint ?? GeometryFingerprinter.CalculateFingerprint(surf);
+            }
+
+            ProjectSerializer.SaveAtomic(filePath, ProjectState);
+            AppSettingsService.AddRecentProject(filePath);
+            RefreshRecentProjects();
+            CurrentProjectPath = filePath;
+            ClearDirty();
+            StatusMessage = $"Project saved to {Path.GetFileName(filePath)}.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error saving project: {ex.Message}";
+            return false;
+        }
+    }
+
+    public void LoadProjectFromFile(string filePath)
+    {
+        try
+        {
+            var project = ProjectSerializer.Load<ProjectStateModel>(filePath);
+            if (project != null)
+            {
+                ProjectState = project;
+                CurrentProjectPath = filePath;
+                if (!string.IsNullOrEmpty(project.SourceFolder))
+                    CurrentFolderPath = project.SourceFolder;
+
+                Surfaces.Clear();
+                foreach (var (key, rec) in project.Surfaces)
+                {
+                    var surf = new SurfaceModel
+                    {
+                        SurfaceNumber = key,
+                        DisplayNumber = rec.DisplayNumber ?? key,
+                        StateId = rec.StateId ?? "current",
+                        Notes = rec.Notes ?? string.Empty,
+                        IsHidden = rec.Hidden,
+                        Checklist = rec.Checklist != null ? new Dictionary<string, bool>(rec.Checklist, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, bool>(),
+                        PreviousNumbers = rec.PreviousNumbers != null ? new List<string>(rec.PreviousNumbers) : new List<string>(),
+                        GeometryFingerprint = rec.GeometryFingerprint
+                    };
+                    Surfaces.Add(surf);
+                }
+
+                if (project.Bom != null && project.Bom.KeptRows != null && project.Bom.KeptRows.Count > 0)
+                {
+                    LoadBomRows(project.Bom.KeptRows);
+                }
+
+                AppSettingsService.AddRecentProject(filePath);
+                RefreshRecentProjects();
+                ClearDirty();
+                StatusMessage = $"Loaded project from {Path.GetFileName(filePath)} ({Surfaces.Count} surfaces).";
+                RequestViewportRefresh?.Invoke();
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error loading project: {ex.Message}";
+        }
+    }
+
+    public bool ConfirmUnsavedChanges()
+    {
+        if (!IsDirty) return true;
+
+        var result = System.Windows.MessageBox.Show(
+            "You have unsaved changes in the current project.\nDo you want to save before proceeding?",
+            "Unsaved Changes",
+            System.Windows.MessageBoxButton.YesNoCancel,
+            System.Windows.MessageBoxImage.Warning);
+
+        if (result == System.Windows.MessageBoxResult.Yes)
+        {
+            if (string.IsNullOrWhiteSpace(CurrentProjectPath))
+            {
+                return ExecuteSaveProjectAs();
+            }
+            return SaveProjectInternal(CurrentProjectPath);
+        }
+        if (result == System.Windows.MessageBoxResult.No)
+        {
+            return true;
+        }
+        return false; // Cancel
+    }
+
+    private void ExecuteNewProject()
+    {
+        if (!ConfirmUnsavedChanges()) return;
+
+        Surfaces.Clear();
+        BomEntries.Clear();
+        FilteredBomEntries.Clear();
+        MisplacedRows.Clear();
+        ProjectState = new ProjectStateModel();
+        CurrentFolderPath = null;
+        CurrentProjectPath = null;
+        ClearDirty();
+        StatusMessage = "Created new empty project.";
+    }
+
+    private void ExecuteOpenProject()
+    {
+        if (!ConfirmUnsavedChanges()) return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Open Unit Progress Tracker Project",
+            Filter = "Unit Progress Tracker Project (*.uptproj)|*.uptproj|JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            LoadProjectFromFile(dialog.FileName);
+        }
+    }
+
+    private void ExecuteOpenRecentProject(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return;
+
+        if (!File.Exists(filePath))
+        {
+            System.Windows.MessageBox.Show($"The selected project file does not exist:\n{filePath}", "File Not Found", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            return;
+        }
+
+        if (!ConfirmUnsavedChanges()) return;
+
+        LoadProjectFromFile(filePath);
+    }
+
+    private void ExecuteSaveProject()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentProjectPath))
+        {
+            ExecuteSaveProjectAs();
+        }
+        else
+        {
+            SaveProjectInternal(CurrentProjectPath);
+        }
+    }
+
+    private bool ExecuteSaveProjectAs()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Save Project As",
+            Filter = "Unit Progress Tracker Project (*.uptproj)|*.uptproj|All Files (*.*)|*.*",
+            DefaultExt = "uptproj",
+            FileName = !string.IsNullOrEmpty(CurrentProjectPath) ? Path.GetFileName(CurrentProjectPath) : "unit-project.uptproj"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            return SaveProjectInternal(dialog.FileName);
+        }
+        return false;
+    }
+
+    private void ExecuteClearRecentProjects()
+    {
+        AppSettingsService.ClearRecentProjects();
+        RefreshRecentProjects();
+        StatusMessage = "Cleared recent projects history.";
+    }
+
+    private void ExecuteExit()
+    {
+        if (ConfirmUnsavedChanges())
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
     }
 
     // -----------------------------------------------------------------------
-    // Surface loading
+    // Surface loading & M3 dynamic features
     // -----------------------------------------------------------------------
 
     public void LoadFolder(string folderPath)
@@ -299,6 +645,7 @@ public class MainViewModel : INotifyPropertyChanged
         foreach (var surf in scanned) Surfaces.Add(surf);
 
         StatusMessage = $"Loaded {Surfaces.Count} surfaces.";
+        MarkDirty();
         RequestViewportRefresh?.Invoke();
     }
 
@@ -314,26 +661,27 @@ public class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            var progress = new Progress<IamScanProgress>(p =>
+            var progress = new Progress<ProgressReport>(p =>
             {
                 ScanProgress = p.Percent;
                 ScanProgressLabel = p.Total > 0
                     ? $"Scanning {p.Scanned}/{p.Total} — {p.CurrentFile}"
-                    : "Done.";
+                    : (string.IsNullOrEmpty(p.StatusMessage) ? "Done." : p.StatusMessage);
             });
 
-            var results = await AsyncGeometryScanner.ScanFolderAsync(
+            var results = await GeometryScanner.ScanIamFolderAsync(
                 CurrentFolderPath,
                 progress,
                 _scanCts.Token);
 
             foreach (var surf in results) Surfaces.Add(surf);
             StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded.";
+            MarkDirty();
             RequestViewportRefresh?.Invoke();
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "Scan cancelled.";
+            StatusMessage = "IAM scan cancelled by user.";
         }
         catch (Exception ex)
         {
@@ -356,7 +704,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     public string GetStatusColor(string stateId)
     {
-        var match = StatusStates.FirstOrDefault(s => s.Id == stateId);
+        var match = StatusStates.FirstOrDefault(s => string.Equals(s.Id, stateId, StringComparison.OrdinalIgnoreCase));
         return match?.ColorHex ?? "#94a3b8";
     }
 
@@ -365,6 +713,7 @@ public class MainViewModel : INotifyPropertyChanged
         if (SelectedSurface != null)
         {
             SelectedSurface.StateId = stateId;
+            MarkDirty();
             RequestViewportRefresh?.Invoke();
             OnPropertyChanged(nameof(SelectedSurface));
         }
@@ -375,7 +724,52 @@ public class MainViewModel : INotifyPropertyChanged
         if (SelectedSurface != null)
         {
             SelectedSurface.Checklist[key] = value;
-            OnPropertyChanged(nameof(ChecklistItems));
+            MarkDirty();
+            NotifyChecklistChanged();
+        }
+    }
+
+    private void ExecuteManageStatusStates()
+    {
+        var dialogVm = new StatusStateEditorViewModel(StatusStates);
+        var dialog = new StatusStateEditorDialog(dialogVm)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            var newStates = dialogVm.GetResultStates();
+            StatusStates.Clear();
+            foreach (var st in newStates) StatusStates.Add(st);
+            
+            MarkDirty();
+            RequestViewportRefresh?.Invoke();
+            StatusMessage = $"Updated status states configuration ({StatusStates.Count} states defined).";
+        }
+    }
+
+    private void ExecuteAddChecklistItem(string? key)
+    {
+        if (SelectedSurface == null || string.IsNullOrWhiteSpace(key)) return;
+
+        string cleanKey = key.Trim();
+        if (!SelectedSurface.Checklist.ContainsKey(cleanKey))
+        {
+            SelectedSurface.Checklist[cleanKey] = false;
+            MarkDirty();
+            NotifyChecklistChanged();
+        }
+    }
+
+    private void ExecuteDeleteChecklistItem(string? key)
+    {
+        if (SelectedSurface == null || string.IsNullOrWhiteSpace(key)) return;
+
+        if (SelectedSurface.Checklist.Remove(key))
+        {
+            MarkDirty();
+            NotifyChecklistChanged();
         }
     }
 
@@ -383,6 +777,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (surface == null) return;
         surface.IsHidden = !surface.IsHidden;
+        MarkDirty();
         RequestSetSurfaceVisibility?.Invoke(surface.IsHidden, surface.SurfaceNumber);
         OnPropertyChanged(nameof(SelectedSurface));
     }
@@ -405,7 +800,7 @@ public class MainViewModel : INotifyPropertyChanged
         {
             try
             {
-                MarkdownExporter.SaveAuditReport(dialog.FileName, Surfaces, StatusStates);
+                MarkdownExporter.SaveAuditReport(dialog.FileName, ProjectState, Surfaces, StatusStates);
                 StatusMessage = $"Audit report exported to {Path.GetFileName(dialog.FileName)}.";
             }
             catch (Exception ex)
@@ -433,7 +828,9 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 var importer = new ExcelBomImporter();
                 var result = importer.ImportBom(dialog.FileName);
+                ProjectState.Bom = result;
                 LoadBomRows(result.KeptRows);
+                MarkDirty();
                 StatusMessage = $"Imported {result.KeptCount} kept BOM rows from {Path.GetFileName(dialog.FileName)} ({result.DroppedCount} hardware/factor rows dropped).";
             }
             catch (Exception ex)
@@ -449,6 +846,7 @@ public class MainViewModel : INotifyPropertyChanged
         if (dialog.ShowDialog() == true)
         {
             ShellRootPath = dialog.FolderName;
+            MarkDirty();
             StatusMessage = $"Shell root path set to: {ShellRootPath}";
         }
     }
@@ -476,6 +874,7 @@ public class MainViewModel : INotifyPropertyChanged
         List<BomRow> currentRows = GetCurrentBomRows();
         currentRows.Add(newRow);
         LoadBomRows(currentRows);
+        MarkDirty();
 
         var addedEntry = BomEntries.FirstOrDefault(e => e.PartNumber == "391-NEW");
         if (addedEntry != null) SelectedBomEntry = addedEntry;
@@ -489,6 +888,7 @@ public class MainViewModel : INotifyPropertyChanged
         List<BomRow> currentRows = GetCurrentBomRows();
         currentRows.RemoveAll(r => BomShellEngine.BuildEntryKey(r.PartNumber, r.Skid, r.Segment, r.Description, r.ExtDescription) == targetKey);
         LoadBomRows(currentRows);
+        MarkDirty();
     }
 
     private List<BomRow> GetCurrentBomRows()

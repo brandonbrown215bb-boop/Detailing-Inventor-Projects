@@ -29,41 +29,93 @@ public class InventorComReader
 
     public static bool IsInventorRunning()
     {
-        return GetActiveComObject("Inventor.Application") != null;
+        object? invObj = GetActiveComObject("Inventor.Application");
+        if (invObj != null)
+        {
+            SafeReleaseComObject(invObj);
+            return true;
+        }
+        return false;
     }
 
     public static string? TryReadConfigJsonAttribute(string iamPath)
     {
-        object? invObj = GetActiveComObject("Inventor.Application");
-        if (invObj == null) return null;
+        object? invObj = null;
+        object? docsObj = null;
+        object? docObj = null;
+        object? attrSetsObj = null;
+        object? attrSetObj = null;
+        object? attrObj = null;
 
         try
         {
-            dynamic invApp = invObj;
-            dynamic doc = invApp.Documents.Open(iamPath, false);
+            invObj = GetActiveComObject("Inventor.Application");
+            if (invObj == null) return null;
 
-            try
+            dynamic invApp = invObj;
+            docsObj = invApp.Documents;
+            dynamic docs = docsObj;
+
+            docObj = docs.Open(iamPath, true);
+            if (docObj == null) return null;
+
+            dynamic doc = docObj;
+            attrSetsObj = doc.AttributeSets;
+            dynamic attributeSets = attrSetsObj;
+
+            if (attributeSets.NameExists["DOCUMENT_CONFIG_JSON"])
             {
-                dynamic attributeSets = doc.AttributeSets;
-                if (attributeSets.NameExists["DOCUMENT_CONFIG_JSON"])
+                attrSetObj = attributeSets["DOCUMENT_CONFIG_JSON"];
+                dynamic set = attrSetObj;
+                if (set.NameExists["DOCUMENT_CONFIG_JSON"])
                 {
-                    dynamic set = attributeSets["DOCUMENT_CONFIG_JSON"];
-                    if (set.NameExists["DOCUMENT_CONFIG_JSON"])
-                    {
-                        return set["DOCUMENT_CONFIG_JSON"].Value as string;
-                    }
+                    attrObj = set["DOCUMENT_CONFIG_JSON"];
+                    dynamic attr = attrObj;
+                    return attr.Value as string;
                 }
-            }
-            finally
-            {
-                doc.Close(true);
             }
         }
         catch
         {
             // Inventor COM read failure
         }
+        finally
+        {
+            SafeReleaseComObject(attrObj);
+            SafeReleaseComObject(attrSetObj);
+            SafeReleaseComObject(attrSetsObj);
+            if (docObj != null)
+            {
+                try
+                {
+                    dynamic doc = docObj;
+                    doc.Close(true);
+                }
+                catch { }
+                SafeReleaseComObject(docObj);
+            }
+            SafeReleaseComObject(docsObj);
+            SafeReleaseComObject(invObj);
+        }
 
         return null;
     }
+
+    private static void SafeReleaseComObject(object? comObj)
+    {
+        if (comObj != null && Marshal.IsComObject(comObj))
+        {
+            try
+            {
+#pragma warning disable CA1416
+                Marshal.ReleaseComObject(comObj);
+#pragma warning restore CA1416
+            }
+            catch
+            {
+                // Ignore release errors during teardown
+            }
+        }
+    }
 }
+

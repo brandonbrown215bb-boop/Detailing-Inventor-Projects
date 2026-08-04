@@ -29,10 +29,10 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Excel BOM Import & Shell Engine | Native Excel reader, BOM filtering, skid sequence, WPF BOM DataGrid & Shell Engine | none | IN_PROGRESS |
-| M2 | Atomic Project File (.uptproj) & History | ProjectStateModel, atomic save, IsDirty/auto-save, MRU, surface renumbering history | M1 | PLANNED |
-| M3 | Audit Checklist, Status & Markdown Export | Dynamic status state editor, interactive checklist bindings, visibility toggle, MarkdownExporter | M2 | PLANNED |
-| M4 | Async Inventor IAM File Scanner | Async scanning engine, WPF progress bar overlay, CancellationToken support | M2 | PLANNED |
+| M1 | Excel BOM Import & Shell Engine | Native Excel reader, BOM filtering, skid sequence, WPF BOM DataGrid & Shell Engine | none | DONE |
+| M2 | Atomic Project File (.uptproj) & History | ProjectStateModel, atomic save, IsDirty/auto-save, MRU, surface renumbering history | M1 | DONE |
+| M3 | Audit Checklist, Status & Markdown Export | Dynamic status state editor, interactive checklist bindings, visibility toggle, MarkdownExporter | M2 | IN_PROGRESS |
+| M4 | Async Inventor IAM File Scanner | Async scanning engine, WPF progress bar overlay, CancellationToken support | M2 | IN_PROGRESS |
 | M5 | Interactive WPF 3D Viewport Enhancements | Selection highlight sync, 3D billboard stickers, opacity slider, wireframe toggle, camera reset | M3 | PLANNED |
 
 ## Interface Contracts
