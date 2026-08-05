@@ -170,5 +170,12 @@ namespace UnitConstructionVerifier.Tests
             // Roof seal-off angle still routes to Misc Trim via the existing legacy fallback.
             Assert.AreEqual("Misc Trim",      MaterialsConfig.GetPartClassification("",        "Roof Seal-Off Angle"));
         }
+
+        [Test]
+        public void TestEditedAppearance_LoadedFromConfig()
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(MaterialsConfig.EditedAppearance));
+            Assert.AreEqual("Yellow", MaterialsConfig.EditedAppearance);
+        }
     }
 }

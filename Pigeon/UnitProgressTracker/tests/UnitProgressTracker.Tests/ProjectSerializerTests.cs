@@ -177,7 +177,7 @@ public class ProjectSerializerTests : IDisposable
     [Fact]
     public void SaveAtomic_InvalidPath_ThrowsException()
     {
-        string invalidPath = @"Z:\NonExistentDriveDirectory12345\file.uptproj";
+        string invalidPath = @"Q:\NonExistentDriveDirectory12345\file.uptproj";
         Assert.Throws<DirectoryNotFoundException>(() => ProjectSerializer.SaveAtomic(invalidPath, "test payload"));
     }
 

@@ -91,7 +91,7 @@ public class Tier3CrossFeatureTests
             surf.Checklist["Paint Gauge Check"] = true;
 
             // 4. Export Markdown Audit Report
-            string md = MarkdownAuditExporter.GenerateAuditReport(surfaces, StatusState.DefaultStates);
+            string md = MarkdownExporter.GenerateAuditReport(surfaces, StatusState.DefaultStates);
 
             // 5. Verify Markdown contains scanned data + checklist audit state
             Assert.Contains("SURF-6001", md);

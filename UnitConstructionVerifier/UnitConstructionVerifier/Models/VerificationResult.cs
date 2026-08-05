@@ -19,6 +19,8 @@ namespace UnitConstructionVerifier.Models
         public string ModelNumber       { get; set; } = string.Empty;  // "091-30117-073"
         public string MtlGauge          { get; set; } = string.Empty;  // INPUT_PARAMETER_Mtl_Gauge
         public string MaterialStyle     { get; set; } = string.Empty;  // INPUT_PARAMETER_MaterialStyle
+        public string PartSource        { get; set; } = string.Empty;  // MOM_DATA PART_SOURCE
+        public bool IsHardEdited        { get; set; }                  // IS_HARD_EDITED User Defined property flag
 
         // Design Tracking Properties
         public string Description       { get; set; } = string.Empty;  // part description / title

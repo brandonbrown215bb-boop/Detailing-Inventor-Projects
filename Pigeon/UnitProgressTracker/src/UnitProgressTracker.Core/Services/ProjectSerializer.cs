@@ -24,14 +24,14 @@ public static class ProjectSerializer
             ?? throw new InvalidOperationException($"Invalid directory for path: {filePath}");
         Directory.CreateDirectory(dir);
 
-        string tempPath = $"{filePath}.tmp.{Environment.ProcessId}.{DateTime.UtcNow.Ticks}";
+        string tempPath = $"{filePath}.tmp.{Environment.ProcessId}.{Guid.NewGuid():N}";
 
         try
         {
             string json = JsonSerializer.Serialize(data, JsonOptions);
             File.WriteAllText(tempPath, json);
 
-            int retries = 5;
+            int retries = 20;
             while (retries > 0)
             {
                 try
@@ -42,7 +42,7 @@ public static class ProjectSerializer
                 catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && retries > 1)
                 {
                     retries--;
-                    Thread.Sleep(50);
+                    Thread.Sleep(Random.Shared.Next(10, 50));
                 }
             }
         }

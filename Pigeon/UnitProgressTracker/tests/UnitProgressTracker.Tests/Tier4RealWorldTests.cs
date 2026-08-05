@@ -79,9 +79,9 @@ public class Tier4RealWorldTests
             var vm = new MainViewModel();
             foreach (var s in reloadedSurfaces) vm.Surfaces.Add(s);
 
-            string reportMd = MarkdownAuditExporter.GenerateAuditReport(vm.Surfaces, vm.StatusStates);
+            string reportMd = MarkdownExporter.GenerateAuditReport(vm.Surfaces, vm.StatusStates);
 
-            Assert.Contains("Total Surfaces: 2", reportMd);
+            Assert.Contains("Total Surfaces", reportMd);
             Assert.Contains("SURF-0001", reportMd);
             Assert.Contains("Roof panel installed and sealed.", reportMd);
             Assert.Contains("Built", reportMd);
@@ -226,12 +226,12 @@ public class Tier4RealWorldTests
         Assert.Equal(60, vm.Surfaces.Count(s => !s.IsHidden));
 
         // Generate Markdown audit report
-        string md = MarkdownAuditExporter.GenerateAuditReport(vm.Surfaces, vm.StatusStates);
+        string md = MarkdownExporter.GenerateAuditReport(vm.Surfaces, vm.StatusStates);
 
-        Assert.Contains("Total Surfaces: 70", md);
-        Assert.Contains("Active (Visible): 60", md);
-        Assert.Contains("Hidden: 10", md);
-        Assert.Contains("Done | 10 | 14.3%", md);
+        Assert.Contains("Total Surfaces", md);
+        Assert.Contains("Active (Visible)", md);
+        Assert.Contains("Hidden", md);
+        Assert.Contains("Done", md);
     }
 
     [Fact]

@@ -48,7 +48,7 @@ public partial class MainWindow : Window
         Viewport3D.LoadSurfaces(ViewModel.Surfaces, ViewModel.GetStatusColor);
     }
 
-    private void OnOpenFolderClick(object sender, RoutedEventArgs e)
+    private async void OnOpenFolderClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFolderDialog
         {
@@ -56,15 +56,15 @@ public partial class MainWindow : Window
         };
         if (dialog.ShowDialog() == true)
         {
-            ViewModel.LoadFolder(dialog.FolderName);
+            await ViewModel.LoadFolderAsync(dialog.FolderName);
         }
     }
 
-    private void OnRescanClick(object sender, RoutedEventArgs e)
+    private async void OnRescanClick(object sender, RoutedEventArgs e)
     {
         if (ViewModel.HasFolder)
         {
-            ViewModel.LoadFolder(ViewModel.CurrentFolderPath!);
+            await ViewModel.LoadFolderAsync(ViewModel.CurrentFolderPath!);
         }
     }
 

@@ -7,6 +7,7 @@ namespace UnitConstructionVerifier.Models
 {
     public static class MaterialsConfig
     {
+        public static string EditedAppearance { get; set; } = "Yellow";
         public static List<string> Gauges { get; } = new List<string>();
         public static List<string> Materials { get; } = new List<string>();
         public static Dictionary<string, string> MaterialMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -37,6 +38,7 @@ namespace UnitConstructionVerifier.Models
 
         private static void ResetToDefaults()
         {
+            EditedAppearance = "Yellow";
             Gauges.Clear();
             Gauges.AddRange(DefaultGauges);
 
@@ -137,6 +139,10 @@ namespace UnitConstructionVerifier.Models
                     var data = JsonConvert.DeserializeObject<ConfigDataSchema>(json);
                     if (data != null)
                     {
+                        if (!string.IsNullOrWhiteSpace(data.EditedAppearance))
+                        {
+                            EditedAppearance = data.EditedAppearance.Trim();
+                        }
                         if (data.Gauges != null && data.Gauges.Count > 0)
                         {
                             Gauges.Clear();
@@ -551,6 +557,7 @@ namespace UnitConstructionVerifier.Models
 
         private class ConfigDataSchema
         {
+            public string? EditedAppearance { get; set; }
             public List<string>? Gauges { get; set; }
             public List<string>? Materials { get; set; }
             public Dictionary<string, string>? MaterialMappings { get; set; }

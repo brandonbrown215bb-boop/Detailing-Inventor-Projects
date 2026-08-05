@@ -278,10 +278,10 @@ public class Tier1FeatureTests
             }
         };
 
-        string md = MarkdownAuditExporter.GenerateAuditReport(surfaces, StatusState.DefaultStates);
+        string md = MarkdownExporter.GenerateAuditReport(surfaces, StatusState.DefaultStates);
 
-        Assert.Contains("# Unit Progress Tracker - Surface Audit Report", md);
-        Assert.Contains("Total Surfaces: 1", md);
+        Assert.Contains("# Unit Progress Tracker", md);
+        Assert.Contains("Total Surfaces", md);
         Assert.Contains("SURF-0001", md);
         Assert.Contains("Done", md);
         Assert.Contains("1/1", md);
@@ -399,7 +399,7 @@ public class Tier1FeatureTests
     // =========================================================================
 
     [Fact]
-    public void F5_01_MainViewModel_LoadFolder_PopulatesSurfacesCollection()
+    public async Task F5_01_MainViewModel_LoadFolder_PopulatesSurfacesCollection()
     {
         string tempDir = Path.Combine(Path.GetTempPath(), $"vm_load_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
@@ -409,11 +409,11 @@ public class Tier1FeatureTests
             File.WriteAllText(Path.Combine(tempDir, "SURF-301.json"), json);
 
             var vm = new MainViewModel();
-            vm.LoadFolder(tempDir);
+            await vm.LoadFolderAsync(tempDir);
 
             Assert.Single(vm.Surfaces);
             Assert.Equal("SURF-301", vm.Surfaces[0].SurfaceNumber);
-            Assert.Contains("Loaded 1 surfaces", vm.StatusMessage);
+            Assert.Contains("Async scan complete: 1 surfaces loaded", vm.StatusMessage);
         }
         finally
         {

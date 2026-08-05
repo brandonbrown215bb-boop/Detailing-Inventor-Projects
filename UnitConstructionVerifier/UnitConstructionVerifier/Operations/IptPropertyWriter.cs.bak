@@ -113,19 +113,6 @@ namespace UnitConstructionVerifier.Operations
                         edits.Thickness = mappedThick;
                     }
                 }
-                else if (edits.YCMATL != null && edits.Thickness == null)
-                {
-                    // Material changed without explicit thickness edit: Re-calculate precise 5-digit decimal thickness for the new material
-                    string currentGauge = edits.MtlGauge ?? ReadUserProperty(userDefined, "INPUT_PARAMETER_Mtl_Gauge");
-                    if (!string.IsNullOrEmpty(currentGauge))
-                    {
-                        string mappedThick = MapGaugeToThicknessDecimal(currentGauge, edits.YCMATL);
-                        if (!string.IsNullOrEmpty(mappedThick))
-                        {
-                            edits.Thickness = mappedThick;
-                        }
-                    }
-                }
 
                 bool dirty = false;
 
@@ -144,11 +131,8 @@ namespace UnitConstructionVerifier.Operations
                 if (activeMaterial != null)
                 {
                     dirty |= WriteUserProperty(userDefined, "YCMATL", activeMaterial);
-                    dirty |= WriteUserProperty(userDefined, "INPUT_PARAMETER_MaterialStyle", activeMaterial);
-                    dirty |= WriteUserProperty(userDefined, "INPUT_PARAMETER_MaterialType", activeMaterial);
                     dirty |= WriteAttributeToSet(doc, "MOM_DATA", "MATERIAL_TYPE_CODE", activeMaterial);
                     dirty |= WriteAttributeToSet(doc, "MOM_PARAMETER_SET", "MaterialStyle", activeMaterial, createSetIfMissing: false);
-                    dirty |= WriteAttributeToSet(doc, "MOM_PARAMETER_SET", "MaterialType", activeMaterial, createSetIfMissing: false);
                     
                     // Physical Material Sync
                     dirty |= SyncPhysicalMaterial(doc, activeMaterial);
@@ -164,7 +148,6 @@ namespace UnitConstructionVerifier.Operations
 
                     if (!string.IsNullOrEmpty(existingMaterial))
                     {
-                        dirty |= WriteUserProperty(userDefined, "INPUT_PARAMETER_MaterialStyle", existingMaterial);
                         dirty |= WriteAttributeToSet(doc, "MOM_DATA", "MATERIAL_TYPE_CODE", existingMaterial, createSetIfMissing: true, onlyIfBlank: true);
                     }
                 }
@@ -176,26 +159,12 @@ namespace UnitConstructionVerifier.Operations
                     dirty |= WriteAttributeToSet(doc, "MOM_PARAMETER_SET", "Mtl_Gauge", edits.MtlGauge, createSetIfMissing: false);
                 }
 
-                // 4. Hard-Edit Flag, SQ Part Attributes & Visual Appearance Sync (Always stamped for edited rows)
-                dirty |= WriteUserProperty(userDefined, "IS_HARD_EDITED", "TRUE");
-                dirty |= WriteAttributeToSet(doc, "MOM_DATA", "PART_SOURCE", "SQPart");
-                dirty |= WriteAttributeToSet(doc, "MOM_DATA", "DOCUMENT_STATUS", "Changed_SQ");
-                dirty |= SyncHardEditAppearance(doc);
-
-                // 5. Description Synchronization (Matching YCShell MarkAsChanged standard)
-                try
+                // 4. Hard-Edit Flag & Visual Appearance Sync
+                if (dirty)
                 {
-                    PropertySet tracking = sets["Design Tracking Properties"];
-                    Property descProp = tracking["Description"];
-                    string currentDesc = descProp?.Value?.ToString() ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(currentDesc) &&
-                        !currentDesc.StartsWith("SQ PART", StringComparison.OrdinalIgnoreCase))
-                    {
-                        descProp.Value = "SQ PART - " + currentDesc;
-                        dirty = true;
-                    }
+                    dirty |= WriteUserProperty(userDefined, "IS_HARD_EDITED", "TRUE");
+                    dirty |= SyncHardEditAppearance(doc);
                 }
-                catch { }
 
                 // Update and save
                 if (dirty)
@@ -492,7 +461,7 @@ namespace UnitConstructionVerifier.Operations
                     oldCmValue = Convert.ToDouble(parameter.Value);
                 }
 
-                if (Math.Abs(oldCmValue - cmValue) < 1e-7)
+                if (Math.Abs(oldCmValue - cmValue) <= 0.0001)
                 {
                     return false;
                 }

@@ -7,6 +7,13 @@
         "src/**"
       ],
       "verified_at_commit": "3c2ecdac70959b4cfc4a568a961778f1ef8f6c0d"
+    },
+    {
+      "path": "docs/architecture/unit_progress_tracker.md",
+      "scope": [
+        "Pigeon/UnitProgressTracker/src/**"
+      ],
+      "verified_at_commit": "1ef64f8da50d760a714c84045c2afa53a774b29b"
     }
   ]
 }

@@ -24,22 +24,24 @@ public class GeometryScanner
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
             return new List<SurfaceModel>();
 
-        bool inventorRunning = InventorComReader.IsInventorRunning();
-        string[] files = inventorRunning
-            ? Directory.GetFiles(folderPath, "*.iam", SearchOption.AllDirectories)
-            : Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories)
-                       .Where(f => !f.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase))
-                       .ToArray();
+        var jsonFiles = Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith(".uptproj", StringComparison.OrdinalIgnoreCase) &&
+                        !f.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        var iamFiles = Directory.GetFiles(folderPath, "*.iam", SearchOption.AllDirectories);
+
+        var allFilePaths = jsonFiles.Concat(iamFiles).Distinct().ToArray();
 
         var result = new List<SurfaceModel>();
         var seenNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        int total = files.Length;
+        int total = allFilePaths.Length;
 
-        for (int i = 0; i < files.Length; i++)
+        for (int i = 0; i < allFilePaths.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            string file = files[i];
+            string file = allFilePaths[i];
             string fileName = Path.GetFileName(file);
 
             progress?.Report(new ProgressReport(
@@ -49,9 +51,9 @@ public class GeometryScanner
                 StatusMessage: $"Scanning {i + 1} of {total}: {fileName}"
             ));
 
-            SurfaceModel? model = inventorRunning
-                ? await ScanIamFileAsync(file, folderPath, cancellationToken)
-                : await Task.Run(() => ScanJsonFile(file, folderPath), cancellationToken);
+            SurfaceModel? model = file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                ? await Task.Run(() => ScanJsonFile(file, folderPath), cancellationToken)
+                : await ScanIamFileAsync(file, folderPath, cancellationToken);
 
             if (model != null && seenNumbers.Add(model.SurfaceNumber))
             {
@@ -78,17 +80,20 @@ public class GeometryScanner
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // 1. Check for adjacent .json sidecar for instant lightweight scanning
+            string jsonPath = Path.ChangeExtension(iamPath, ".json");
+            if (File.Exists(jsonPath))
+            {
+                var jsonModel = ScanJsonFile(jsonPath, rootFolder);
+                if (jsonModel != null) return jsonModel;
+            }
+
+            // 2. Fallback to background/invisible COM attribute reading
             string? json = InventorComReader.TryReadConfigJsonAttribute(iamPath);
             if (!string.IsNullOrWhiteSpace(json))
             {
                 return ParseConfigJson(json, iamPath, rootFolder, "iam");
-            }
-
-            // Per-file fallback to adjacent .json sidecar
-            string jsonPath = Path.ChangeExtension(iamPath, ".json");
-            if (File.Exists(jsonPath))
-            {
-                return ScanJsonFile(jsonPath, rootFolder);
             }
 
             return null;

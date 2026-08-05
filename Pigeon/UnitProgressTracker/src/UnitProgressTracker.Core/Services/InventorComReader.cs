@@ -56,7 +56,7 @@ public class InventorComReader
             docsObj = invApp.Documents;
             dynamic docs = docsObj;
 
-            docObj = docs.Open(iamPath, true);
+            docObj = docs.Open(iamPath, false);
             if (docObj == null) return null;
 
             dynamic doc = docObj;

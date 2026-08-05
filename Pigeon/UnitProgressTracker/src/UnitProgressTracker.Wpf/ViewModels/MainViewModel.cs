@@ -88,7 +88,6 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _isScanning;
     private double _scanProgress;
     private string _scanProgressLabel = string.Empty;
-    private CancellationTokenSource? _scanCts;
     private readonly DispatcherTimer _autoSaveTimer;
 
     public ProjectStateModel ProjectState { get; private set; } = new();
@@ -99,8 +98,13 @@ public class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<BomRow> MisplacedRows { get; } = new();
     public ObservableCollection<string> AvailableSkids { get; } = new();
     public ObservableCollection<string> AvailableSegments { get; } = new();
-    public ObservableCollection<RecentProjectItemViewModel> RecentProjects { get; } = new();
     public ShellFolderPlan? CurrentBomPlan { get; private set; }
+
+    // Decomposed Child ViewModels
+    public ScanProgressViewModel ScanProgressVM { get; } = new();
+    public BomFilterViewModel BomFilterVM { get; } = new();
+    public ProjectNavigationViewModel ProjectNavVM { get; } = new();
+    public ObservableCollection<RecentProjectItemViewModel> RecentProjects => ProjectNavVM.RecentProjects;
 
     // Callbacks wired by MainWindow
     public Action? RequestViewportRefresh { get; set; }
@@ -381,7 +385,7 @@ public class MainViewModel : INotifyPropertyChanged
         ExportMarkdownCommand = new RelayCommand(_ => ExecuteExportMarkdown(), _ => Surfaces.Count > 0);
         ToggleWireframeCommand = new RelayCommand(_ => WireframeVisible = !WireframeVisible);
         ToggleSurfaceVisibilityCommand = new RelayCommand(p => ExecuteToggleSurfaceVisibility(p as SurfaceModel));
-        CancelScanCommand = new RelayCommand(_ => _scanCts?.Cancel(), _ => IsScanning);
+        CancelScanCommand = new RelayCommand(_ => ScanProgressVM.CancelScan(), _ => IsScanning);
         AsyncScanFolderCommand = new AsyncRelayCommand(_ => ExecuteAsyncScanAsync());
 
         // M3 Command Initializations
@@ -635,25 +639,22 @@ public class MainViewModel : INotifyPropertyChanged
     // Surface loading & M3 dynamic features
     // -----------------------------------------------------------------------
 
-    public void LoadFolder(string folderPath)
+    public async Task LoadFolderAsync(string folderPath)
     {
         CurrentFolderPath = folderPath;
-        StatusMessage = $"Scanning surfaces in {Path.GetFileName(folderPath)}...";
+        await ExecuteAsyncScanAsync();
+    }
 
-        var scanned = GeometryScanner.ScanJsonFolder(folderPath);
-        Surfaces.Clear();
-        foreach (var surf in scanned) Surfaces.Add(surf);
-
-        StatusMessage = $"Loaded {Surfaces.Count} surfaces.";
-        MarkDirty();
-        RequestViewportRefresh?.Invoke();
+    public void LoadFolder(string folderPath)
+    {
+        LoadFolderAsync(folderPath).GetAwaiter().GetResult();
     }
 
     public async Task ExecuteAsyncScanAsync()
     {
         if (string.IsNullOrWhiteSpace(CurrentFolderPath)) return;
 
-        _scanCts = new CancellationTokenSource();
+        var token = ScanProgressVM.StartNewScan();
         IsScanning = true;
         ScanProgress = 0;
         ScanProgressLabel = "Starting scan...";
@@ -667,32 +668,35 @@ public class MainViewModel : INotifyPropertyChanged
                 ScanProgressLabel = p.Total > 0
                     ? $"Scanning {p.Scanned}/{p.Total} — {p.CurrentFile}"
                     : (string.IsNullOrEmpty(p.StatusMessage) ? "Done." : p.StatusMessage);
+
+                ScanProgressVM.ReportProgress(p.Percent, ScanProgressLabel);
             });
 
             var results = await GeometryScanner.ScanIamFolderAsync(
                 CurrentFolderPath,
                 progress,
-                _scanCts.Token);
+                token);
 
             foreach (var surf in results) Surfaces.Add(surf);
             StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded.";
+            ScanProgressVM.CompleteScan(Surfaces.Count);
             MarkDirty();
             RequestViewportRefresh?.Invoke();
         }
         catch (OperationCanceledException)
         {
             StatusMessage = "IAM scan cancelled by user.";
+            ScanProgressVM.FailScan("Cancelled by user");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Scan error: {ex.Message}";
+            ScanProgressVM.FailScan(ex.Message);
         }
         finally
         {
             IsScanning = false;
             ScanProgressLabel = string.Empty;
-            _scanCts?.Dispose();
-            _scanCts = null;
         }
     }
 
