@@ -109,7 +109,7 @@ public class AdversarialM1Tests : IDisposable
         Assert.True(ExcelBomImporter.ShouldKeepRow("391-abc", "MB"));
         Assert.True(ExcelBomImporter.ShouldKeepRow("391-123", "MB"));
         Assert.True(ExcelBomImporter.ShouldKeepRow("291-xyz", "MB"));
-        Assert.True(ExcelBomImporter.ShouldKeepRow("5e0101", "MB"));
+        Assert.True(ExcelBomImporter.ShouldKeepRow("091Z010136-0993", "<--", "ROOF CAP SPLIT COVER"));
         Assert.False(ExcelBomImporter.ShouldKeepRow("091-123", "MB"));
         Assert.False(ExcelBomImporter.ShouldKeepRow("491-123", "MB"));
     }

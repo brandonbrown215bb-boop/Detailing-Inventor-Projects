@@ -297,15 +297,14 @@ namespace UnitConstructionVerifier.Tests
             {
                 Parts = new List<IptProperties>
                 {
-                    // A custom roof cap part number 091-30119-007
-                    // This is classified as Misc Trim, so it should NOT be checked against the standard Trim settings,
-                    // and therefore should NOT produce a mismatch.
+                    // A display-only split cover part number 091-30117-075
+                    // This is classified as Split Cover (display-only), so it should NOT produce a mismatch.
                     new IptProperties
                     {
                         OwnerIamPath = "Roof.iam",
                         PartNumber = "Custom-Roof-Trim",
-                        ModelNumber = "091-30119-007",
-                        Description = "roof corner cap - custom",
+                        ModelNumber = "091-30117-075",
+                        Description = "roof split cover - custom",
                         MtlGauge = "18",
                         YCMATL = "STL GALV" 
                     }

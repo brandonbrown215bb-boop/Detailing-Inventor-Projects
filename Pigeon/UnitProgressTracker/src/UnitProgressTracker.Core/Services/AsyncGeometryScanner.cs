@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 using UnitProgressTracker.Core.Models;
@@ -14,6 +15,7 @@ public class IamScanProgress
     public double Percent => Total > 0 ? (double)Scanned / Total * 100 : 0;
 }
 
+[SupportedOSPlatform("windows")]
 public class AsyncGeometryScanner
 {
     /// <summary>

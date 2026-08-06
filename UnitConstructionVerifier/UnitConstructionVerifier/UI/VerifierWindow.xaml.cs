@@ -440,7 +440,8 @@ namespace UnitConstructionVerifier.UI
                             isMismatch = false;
                         }
 
-                        AddGridRow(gridRows, p.PartNumber, p.Description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
+                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
+                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
                     }
                 }
 
@@ -477,7 +478,8 @@ namespace UnitConstructionVerifier.UI
                             isMismatch = false;
                         }
 
-                        AddGridRow(gridRows, p.PartNumber, p.Description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
+                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
+                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
                     }
                 }
 
@@ -516,7 +518,8 @@ namespace UnitConstructionVerifier.UI
                             isMismatch = false;
                         }
 
-                        AddGridRow(gridRows, p.PartNumber, p.Description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
+                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
+                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
                     }
                 }
 

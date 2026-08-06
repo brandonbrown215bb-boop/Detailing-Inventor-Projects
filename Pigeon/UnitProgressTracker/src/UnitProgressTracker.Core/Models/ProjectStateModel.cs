@@ -12,4 +12,5 @@ public class ProjectStateModel
     public Dictionary<string, SurfaceRecordModel> Surfaces { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, RetiredSurfaceRecordModel> Retired { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public BomImportResult? Bom { get; set; }
+    public DisplayPreferences Preferences { get; set; } = new();
 }

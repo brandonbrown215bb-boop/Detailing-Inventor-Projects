@@ -1,0 +1,211 @@
+<Window x:Class="UnitProgressTracker.Wpf.OptionsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:UnitProgressTracker.Wpf"
+        Title="Options &amp; Preferences" Height="580" Width="680"
+        WindowStartupLocation="CenterOwner"
+        Background="#0F172A" Foreground="#F8FAFC">
+
+    <Window.Resources>
+        <local:ColorHexToBrushConverter x:Key="HexToBrushConverter" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Options &amp; Preferences" FontSize="18" FontWeight="Bold" Foreground="#38BDF8" Margin="0,0,0,16" />
+
+        <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}" Background="#1E293B" BorderBrush="#334155">
+            <!-- Tab 0: Status Colors & Hazard Stripes -->
+            <TabItem Header="Status Colors">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <TextBlock Text="Configure Status States &amp; Fill Types" FontWeight="Bold" Foreground="#F8FAFC" VerticalAlignment="Center" />
+                        <Button Content="+ Add State" Command="{Binding AddStatusStateCommand}" DockPanel.Dock="Right" Padding="8,4" Background="#0284C7" Foreground="White" BorderThickness="0" />
+                    </DockPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding StatusStates}" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#334155" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="State ID" Binding="{Binding Id}" Width="90" IsReadOnly="True" />
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="140" />
+                            <DataGridTextColumn Header="Color Hex" Binding="{Binding ColorHex}" Width="100" />
+                            <DataGridTemplateColumn Header="Color Swatch" Width="70">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="24" Height="16" Background="{Binding ColorHex, Converter={StaticResource HexToBrushConverter}}" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Fill Type" Width="110">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox SelectedValue="{Binding FillType, Mode=TwoWay}" SelectedValuePath="Tag" Background="#0F172A" Foreground="White">
+                                            <ComboBoxItem Content="Solid" Tag="solid" />
+                                            <ComboBoxItem Content="Hazard Stripe" Tag="stripe" />
+                                        </ComboBox>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Action" Width="65">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="✕" Command="{Binding DataContext.DeleteStatusStateCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Foreground="#EF4444" Background="Transparent" BorderThickness="0" HorizontalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 1: 3D View & FPS & Sticker Customization -->
+            <TabItem Header="3D View &amp; Stickers">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <TextBlock Text="Viewport Options" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                        <CheckBox Content="Show Skid Floor Grid (sized to skids)" IsChecked="{Binding Preferences.ViewerOptions.ShowGrid, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
+                        <CheckBox Content="Show 3D Skid Ground Labels" IsChecked="{Binding Preferences.ViewerOptions.ShowSkidLabels, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
+                        <CheckBox Content="Show Interactive Status Legend" IsChecked="{Binding Preferences.ViewerOptions.ShowLegend, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
+                        <CheckBox Content="Show Surface Hover Info Tooltip" IsChecked="{Binding Preferences.ViewerOptions.ShowHoverTooltip, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
+                        <CheckBox Content="Enable FPS Movement Controls (WASD, Space/Shift)" IsChecked="{Binding Preferences.ViewerOptions.FpsControlsEnabled, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Default Surface Opacity" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
+                        <DockPanel Margin="0,0,0,16">
+                            <TextBlock Text="{Binding Preferences.ViewerOptions.SurfaceOpacity, StringFormat='{}{0:P0}'}" Width="40" Foreground="#38BDF8" VerticalAlignment="Center" DockPanel.Dock="Right" />
+                            <Slider Minimum="0.1" Maximum="1.0" Value="{Binding Preferences.ViewerOptions.SurfaceOpacity, Mode=TwoWay}" VerticalAlignment="Center" />
+                        </DockPanel>
+
+                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
+
+                        <TextBlock Text="3D Sticker Label Styling" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Font Family" Foreground="#94A3B8" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.FontFamily, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Text Color Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.TextColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Background Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.BackgroundColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Border Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.BorderColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Tab 2: Appearance & Accessibility -->
+            <TabItem Header="Appearance &amp; Accessibility">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <TextBlock Text="System Theme &amp; Color Palette" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                        <CheckBox Content="Auto-Sync with Windows System Theme" IsChecked="{Binding Preferences.ThemeOptions.AutoSyncWithSystemTheme, Mode=TwoWay}" Foreground="White" Margin="0,0,0,12" ToolTip="Automatically switch between Dark, Light, and Windows High Contrast modes based on Windows OS settings." />
+
+                        <TextBlock Text="Theme Preset Override" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
+                        <ComboBox SelectedValue="{Binding Preferences.ThemeOptions.ThemeName, Mode=TwoWay}" SelectedValuePath="Tag" Margin="0,0,0,12" Padding="6,4" Background="#0F172A" Foreground="White">
+                            <ComboBoxItem Content="Dark Slate (Default)" Tag="Dark" />
+                            <ComboBoxItem Content="Light Slate" Tag="Light" />
+                            <ComboBoxItem Content="High Contrast" Tag="HighContrast" />
+                        </ComboBox>
+
+                        <CheckBox Content="Enable High Contrast Accessibility Override" IsChecked="{Binding Preferences.ThemeOptions.HighContrastOverride, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" ToolTip="Force high-contrast black/yellow/cyan palette for maximum legibility (WCAG AAA)." />
+
+                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Accessibility &amp; UI Scaling" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                        <CheckBox Content="High Visibility Keyboard Focus Borders (2px Outline)" IsChecked="{Binding Preferences.ThemeOptions.HighVisibilityFocus, Mode=TwoWay}" Foreground="White" Margin="0,0,0,12" ToolTip="Display a prominent 2px high-contrast outline around controls focused via Tab key." />
+
+                        <TextBlock Text="UI Font Scale (100% to 150%)" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
+                        <DockPanel Margin="0,0,0,16">
+                            <TextBlock Text="{Binding Preferences.ThemeOptions.UiFontScale, StringFormat='{}{0:P0}'}" Width="45" Foreground="#38BDF8" FontWeight="Bold" VerticalAlignment="Center" DockPanel.Dock="Right" />
+                            <Slider Minimum="1.0" Maximum="1.5" SmallChange="0.05" LargeChange="0.1" Value="{Binding Preferences.ThemeOptions.UiFontScale, Mode=TwoWay}" VerticalAlignment="Center" />
+                        </DockPanel>
+
+                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Custom Palette Colors" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                        <TextBlock Text="Accent Color Hex" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Preferences.ThemeOptions.AccentColorHex, Mode=TwoWay}" Padding="6,4" Background="#0F172A" Foreground="White" BorderBrush="#334155" Margin="0,0,0,12" />
+
+                        <TextBlock Text="Panel Background Hex" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Preferences.ThemeOptions.PanelBackgroundHex, Mode=TwoWay}" Padding="6,4" Background="#0F172A" Foreground="White" BorderBrush="#334155" Margin="0,0,0,16" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Tab 3: Default Checklist Templates -->
+            <TabItem Header="Checklist Templates">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Global Audit Checklist Items" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
+
+                    <ListBox Grid.Row="1" ItemsSource="{Binding ChecklistTemplate}" Background="#0F172A" BorderBrush="#334155">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="6,4">
+                                    <DockPanel>
+                                        <Button Content="✕" Command="{Binding DataContext.DeleteChecklistTemplateItemCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" DockPanel.Dock="Right" Foreground="#EF4444" Background="Transparent" BorderThickness="0" />
+                                        <TextBlock Text="{Binding}" Foreground="White" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <DockPanel Grid.Row="2" Margin="0,12,0,0">
+                        <Button Content="+ Add Item" Click="OnAddChecklistItemClick" DockPanel.Dock="Right" Padding="8,4" Background="#0284C7" Foreground="White" BorderThickness="0" Margin="8,0,0,0" />
+                        <TextBox x:Name="NewChecklistTemplateBox" Padding="6,4" Background="#0F172A" Foreground="White" BorderBrush="#334155" KeyDown="OnNewChecklistTemplateKeyDown" />
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <DockPanel Grid.Row="2" Margin="0,16,0,0">
+            <Button Content="Reset Defaults" Command="{Binding ResetDefaultsCommand}" DockPanel.Dock="Left" Padding="12,6" Background="#334155" Foreground="White" BorderThickness="0" />
+            <Button Content="Cancel" Click="OnCancelClick" DockPanel.Dock="Right" Padding="16,6" Background="#334155" Foreground="White" BorderThickness="0" />
+            <Button Content="Save Options" Click="OnSaveClick" DockPanel.Dock="Right" Padding="16,6" Margin="0,0,8,0" Background="#0284C7" Foreground="White" FontWeight="Bold" BorderThickness="0" />
+        </DockPanel>
+    </Grid>
+</Window>

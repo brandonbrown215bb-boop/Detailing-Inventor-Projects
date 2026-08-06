@@ -1,0 +1,43 @@
+{
+  "Version": "1.0",
+  "KeptPrefixes": [
+    "391-",
+    "291-",
+    "386-",
+    "486-",
+    "251-",
+    "091Z"
+  ],
+  "DroppedPrefixes": [
+    "007-",
+    "024-",
+    "025-",
+    "026-",
+    "028-",
+    "035-",
+    "091-",
+    "290-",
+    "491-"
+  ],
+  "AlwaysKeepDescriptionKeywords": [
+    "DOOR",
+    "SPLIT COVER",
+    "DRAIN PAN",
+    "SAFETY GRATE",
+    "HEAT WHEEL",
+    "WING COIL",
+    "INLET HOOD",
+    "DDFAN",
+    "WALL",
+    "RECONNECT",
+    "LEAK TEST",
+    "HUMIDIFIER SUPPORT"
+  ],
+  "AlwaysDropDescriptionKeywords": [
+    "FACTOR",
+    "SHIP SKID",
+    "SHRINK WRAP",
+    "CONDUIT",
+    "CLAMP"
+  ]
+}

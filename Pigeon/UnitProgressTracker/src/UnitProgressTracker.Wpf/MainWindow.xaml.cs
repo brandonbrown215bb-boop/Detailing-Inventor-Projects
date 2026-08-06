@@ -24,10 +24,12 @@ public partial class MainWindow : Window
         ViewModel.RequestViewportRefresh = Refresh3DViewport;
         ViewModel.RequestHighlightSurface = sn => Viewport3D.HighlightSurface(sn);
         ViewModel.RequestSetWireframe = v => Viewport3D.SetWireframeVisible(v);
+        ViewModel.RequestSetSkidGrid = v => Viewport3D.SetShowSkidGrid(v);
         ViewModel.RequestSetOpacity = o => Viewport3D.SetGlobalOpacity(o);
         ViewModel.RequestSetSurfaceVisibility = (hidden, sn) => Viewport3D.SetSurfaceVisibility(hidden, sn);
 
         Viewport3D.SurfacePicked += OnSurfacePickedIn3D;
+        Viewport3D.SurfaceHovered += OnSurfaceHoveredIn3D;
     }
 
     private void OnWindowClosing(object? sender, CancelEventArgs e)
@@ -43,9 +45,29 @@ public partial class MainWindow : Window
         ViewModel.SelectSurfaceByNumber(surfaceNumber);
     }
 
+    private void OnSurfaceHoveredIn3D(SurfaceModel? surface, Point mousePos)
+    {
+        if (surface != null && ViewModel.ShowHoverTooltip)
+        {
+            HoverTooltipSkidText.Text = $"Skid: {surface.SkidTag}";
+            HoverTooltipPartText.Text = $"Part: {(string.IsNullOrEmpty(surface.PartNumber) ? "N/A" : surface.PartNumber)}";
+            HoverTooltipTypeText.Text = $"Type: {surface.TypeTag}";
+            HoverTooltipSideText.Text = $"Side: {surface.SideTag}";
+
+            Canvas.SetLeft(HoverTooltipBorder, Math.Min(mousePos.X + 15, ActualWidth - 220));
+            Canvas.SetTop(HoverTooltipBorder, Math.Min(mousePos.Y + 15, ActualHeight - 150));
+            HoverTooltipBorder.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            HoverTooltipBorder.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void Refresh3DViewport()
     {
         Viewport3D.LoadSurfaces(ViewModel.Surfaces, ViewModel.GetStatusColor);
+        ViewModel.RebuildGroupedSurfaces();
     }
 
     private async void OnOpenFolderClick(object sender, RoutedEventArgs e)
@@ -57,6 +79,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             await ViewModel.LoadFolderAsync(dialog.FolderName);
+            Refresh3DViewport();
         }
     }
 
@@ -65,6 +88,7 @@ public partial class MainWindow : Window
         if (ViewModel.HasFolder)
         {
             await ViewModel.LoadFolderAsync(ViewModel.CurrentFolderPath!);
+            Refresh3DViewport();
         }
     }
 
@@ -77,7 +101,10 @@ public partial class MainWindow : Window
             new SurfaceModel
             {
                 SurfaceNumber = "391Z010142-0001",
+                PartNumber = "391-60228-261",
                 SurfaceUnitSide = "Roof",
+                ConfigurationKind = "Roof",
+                SkidId = 1,
                 StateId = "done",
                 Checklist = new System.Collections.Generic.Dictionary<string, bool>
                 {
@@ -91,7 +118,10 @@ public partial class MainWindow : Window
             new SurfaceModel
             {
                 SurfaceNumber = "391Z010142-0002",
+                PartNumber = "391-60228-262",
                 SurfaceUnitSide = "Left Wall",
+                ConfigurationKind = "Wall",
+                SkidId = 1,
                 StateId = "built",
                 Checklist = new System.Collections.Generic.Dictionary<string, bool>
                 {
@@ -105,7 +135,10 @@ public partial class MainWindow : Window
             new SurfaceModel
             {
                 SurfaceNumber = "391Z010142-0003",
+                PartNumber = "391-60228-263",
                 SurfaceUnitSide = "Right Wall",
+                ConfigurationKind = "Wall",
+                SkidId = 2,
                 StateId = "corrected",
                 Checklist = new System.Collections.Generic.Dictionary<string, bool>
                 {
@@ -114,12 +147,15 @@ public partial class MainWindow : Window
                     ["Verified openings"] = false,
                     ["Paperwork complete"] = false
                 },
-                Boxes = new List<GeometryBox> { new(0, 0, 78, 140, 120, 2) }
+                Boxes = new List<GeometryBox> { new(160, 0, 0, 140, 120, 2) }
             },
             new SurfaceModel
             {
                 SurfaceNumber = "391Z010142-0004",
+                PartNumber = "391-60228-264",
                 SurfaceUnitSide = "Unit Base",
+                ConfigurationKind = "UnitBase",
+                SkidId = 2,
                 StateId = "associated",
                 Checklist = new System.Collections.Generic.Dictionary<string, bool>
                 {
@@ -128,7 +164,7 @@ public partial class MainWindow : Window
                     ["Verified openings"] = true,
                     ["Paperwork complete"] = false
                 },
-                Boxes = new List<GeometryBox> { new(0, 0, 0, 140, 10, 80) }
+                Boxes = new List<GeometryBox> { new(160, 0, 0, 140, 10, 80) }
             }
         };
 
@@ -138,8 +174,8 @@ public partial class MainWindow : Window
         {
             new BomRow { PartNumber = "391-0101", Quantity = "1", Unit = "EA", Skid = "1 [FR-MB]", Segment = "MB", Description = "Roof Panel Assembly", ExtDescription = "16 GA STL GALV" },
             new BomRow { PartNumber = "391-0102", Quantity = "1", Unit = "EA", Skid = "1 [FR-MB]", Segment = "FR", Description = "Filter Rack Casing", ExtDescription = "2" },
-            new BomRow { PartNumber = "391-0103", Quantity = "1", Unit = "EA", Skid = "1 [FR-MB]", Segment = "<--", Description = "Coil Panel Assembly" },
-            new BomRow { PartNumber = "391-0104", Quantity = "2", Unit = "EA", Skid = "1 [FR-MB]", Segment = "MB", Description = "SQ Custom Door Assembly" }
+            new BomRow { PartNumber = "391-0103", Quantity = "1", Unit = "EA", Skid = "2 [AH-DP]", Segment = "<--", Description = "Coil Panel Assembly" },
+            new BomRow { PartNumber = "391-0104", Quantity = "2", Unit = "EA", Skid = "2 [AH-DP]", Segment = "MB", Description = "SQ Custom Door Assembly" }
         };
 
         ViewModel.LoadBomRows(demoBom);
@@ -183,9 +219,10 @@ public partial class MainWindow : Window
 
     private void OnStatusSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (StatusComboBox.SelectedValue is string stateId)
+        if (StatusComboBox.IsDropDownOpen && StatusComboBox.SelectedValue is string stateId)
         {
             ViewModel.UpdateSelectedSurfaceStatus(stateId);
+            Refresh3DViewport();
         }
     }
 
@@ -209,6 +246,26 @@ public partial class MainWindow : Window
         {
             OnAddChecklistItemClick(sender, e);
             e.Handled = true;
+        }
+    }
+
+    private void OnApplyRenumberClick(object sender, RoutedEventArgs e)
+    {
+        string text = RenumberInputBox.Text?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(text))
+        {
+            ViewModel.RenumberSurfaceCommand.Execute(text);
+            RenumberInputBox.Clear();
+            Refresh3DViewport();
+        }
+    }
+
+    private void OnLegendFilterClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string stateId)
+        {
+            ViewModel.SearchText = stateId;
+            ViewModel.RebuildGroupedSurfaces();
         }
     }
 }

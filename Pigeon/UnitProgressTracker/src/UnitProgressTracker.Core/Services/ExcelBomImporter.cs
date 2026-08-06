@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using ExcelDataReader;
 using UnitProgressTracker.Core.Models;
 
@@ -14,7 +15,6 @@ public class BomImportResult
     public List<BomRow> AllRows { get; set; } = new();
     public List<BomRow> KeptRows { get; set; } = new();
     public List<BomRow> DroppedRows { get; set; } = new();
-    public BomRow? UnitHeader { get; set; }
     public Dictionary<string, int> KeptCountByPrefix { get; set; } = new();
     public int TotalRowCount => AllRows.Count;
     public int KeptCount => KeptRows.Count;
@@ -23,41 +23,87 @@ public class BomImportResult
 
 public class ExcelBomImporter
 {
+    private static readonly BomFilterConfig Config = LoadConfig();
+
+    private static BomFilterConfig LoadConfig()
+    {
+        try
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string configPath = Path.Combine(baseDir, "Services", "bom_filter_config.json");
+            if (!File.Exists(configPath))
+            {
+                configPath = Path.Combine(baseDir, "bom_filter_config.json");
+            }
+            if (!File.Exists(configPath))
+            {
+                string asmLoc = Path.GetDirectoryName(typeof(ExcelBomImporter).Assembly.Location) ?? string.Empty;
+                configPath = Path.Combine(asmLoc, "Services", "bom_filter_config.json");
+                if (!File.Exists(configPath))
+                {
+                    configPath = Path.Combine(asmLoc, "bom_filter_config.json");
+                }
+            }
+
+            if (File.Exists(configPath))
+            {
+                string json = File.ReadAllText(configPath);
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var loaded = JsonSerializer.Deserialize<BomFilterConfig>(json, opts);
+                if (loaded != null) return loaded;
+            }
+        }
+        catch
+        {
+            // Fallback to default in-memory config if loading fails
+        }
+        return new BomFilterConfig();
+    }
+
     public static bool ShouldKeepRow(string partNumber, string segment)
+    {
+        return ShouldKeepRow(partNumber, segment, string.Empty);
+    }
+
+    public static bool ShouldKeepRow(string partNumber, string segment, string description)
     {
         if (string.IsNullOrWhiteSpace(partNumber)) return false;
 
         string pn = partNumber.Trim();
-        string seg = segment?.Trim() ?? string.Empty;
+        string pnUpper = pn.ToUpperInvariant();
+        string descUpper = description?.Trim().ToUpperInvariant() ?? string.Empty;
 
-        // Drop Hardware / Conduit / Stock Prefixes
-        string[] dropHardwarePrefixes = new[] { "007-", "025-", "026-", "028-", "035-", "091-" };
-        if (dropHardwarePrefixes.Any(p => pn.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+        // 1. Check AlwaysDropDescriptionKeywords
+        if (!string.IsNullOrEmpty(descUpper))
+        {
+            if (Config.AlwaysDropDescriptionKeywords.Any(kw => descUpper.Contains(kw.ToUpperInvariant())))
+            {
+                return false;
+            }
+        }
+
+        // 2. Check AlwaysKeepDescriptionKeywords
+        if (!string.IsNullOrEmpty(descUpper))
+        {
+            if (Config.AlwaysKeepDescriptionKeywords.Any(kw => descUpper.Contains(kw.ToUpperInvariant())))
+            {
+                return true;
+            }
+        }
+
+        // 3. Check DroppedPrefixes
+        if (Config.DroppedPrefixes.Any(p => pnUpper.StartsWith(p.ToUpperInvariant())))
         {
             return false;
         }
 
-        // Drop MAPICS Factor Multipliers
-        if (pn.StartsWith("491-", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        // Keep Unit Header Root
-        if (pn.StartsWith("5E", StringComparison.OrdinalIgnoreCase))
+        // 4. Check KeptPrefixes
+        if (Config.KeptPrefixes.Any(p => pnUpper.StartsWith(p.ToUpperInvariant())))
         {
             return true;
         }
 
-        // Segment Placeholder Rule (<--)
-        if (string.Equals(seg, "<--", StringComparison.Ordinal))
-        {
-            return pn.StartsWith("391-", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // Keep Main Assembly & Subassembly Prefixes
-        string[] keptPrefixes = new[] { "391-", "291-", "386-", "486-", "251-" };
-        return keptPrefixes.Any(p => pn.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+        return false;
     }
 
     public BomImportResult ImportBom(string filePath)
@@ -92,72 +138,122 @@ public class ExcelBomImporter
             ? ExcelReaderFactory.CreateCsvReader(stream)
             : ExcelReaderFactory.CreateReader(stream);
 
-        bool isFirstRow = true;
-        while (reader.Read())
+        int colPn = 0, colQty = 1, colUnit = 2, colSkid = 3, colSeg = 4, colDesc = 5, colExtDesc = 6;
+        bool headerFound = false;
+
+        do
         {
-            string partNumber = reader.GetValue(0)?.ToString()?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(partNumber)) continue;
-
-            // Header row detection
-            if (isFirstRow && (partNumber.Equals("Part Number", StringComparison.OrdinalIgnoreCase) ||
-                               partNumber.Equals("PartNumber", StringComparison.OrdinalIgnoreCase) ||
-                               partNumber.Equals("Part #", StringComparison.OrdinalIgnoreCase)))
+            while (reader.Read())
             {
-                isFirstRow = false;
-                continue;
-            }
-            isFirstRow = false;
+                int fieldCount = reader.FieldCount;
+                if (fieldCount == 0) continue;
 
-            string quantity = reader.FieldCount > 1 ? reader.GetValue(1)?.ToString()?.Trim() ?? string.Empty : string.Empty;
-            string unit = reader.FieldCount > 2 ? reader.GetValue(2)?.ToString()?.Trim() ?? string.Empty : string.Empty;
-            string skid = reader.FieldCount > 3 ? reader.GetValue(3)?.ToString()?.Trim() ?? string.Empty : string.Empty;
-            string segment = reader.FieldCount > 4 ? reader.GetValue(4)?.ToString()?.Trim() ?? string.Empty : string.Empty;
-            string description = reader.FieldCount > 5 ? reader.GetValue(5)?.ToString()?.Trim() ?? string.Empty : string.Empty;
-            string extDescription = reader.FieldCount > 6 ? reader.GetValue(6)?.ToString()?.Trim() ?? string.Empty : string.Empty;
+                // Find the first non-empty cell in columns 0..3 for part number (handles tree-indented Grouped formats)
+                int pnColIndex = -1;
+                string partNumber = string.Empty;
 
-            var row = new BomRow
-            {
-                PartNumber = partNumber,
-                Quantity = quantity,
-                Unit = unit,
-                Skid = skid,
-                Segment = segment,
-                Description = description,
-                ExtDescription = extDescription
-            };
-
-            result.AllRows.Add(row);
-
-            if (ShouldKeepRow(partNumber, segment))
-            {
-                result.KeptRows.Add(row);
-
-                if (partNumber.StartsWith("5E", StringComparison.OrdinalIgnoreCase) && result.UnitHeader == null)
+                for (int c = 0; c < Math.Min(4, fieldCount); c++)
                 {
-                    result.UnitHeader = row;
+                    string val = reader.GetValue(c)?.ToString()?.Trim() ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(val)) continue;
+                    if (val.StartsWith("[") || val.StartsWith("Seg #", StringComparison.OrdinalIgnoreCase)) break;
+
+                    if (val.Equals("Part Number", StringComparison.OrdinalIgnoreCase) ||
+                        val.Equals("PartNumber", StringComparison.OrdinalIgnoreCase) ||
+                        val.Equals("Part #", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!headerFound)
+                        {
+                            for (int h = 0; h < fieldCount; h++)
+                            {
+                                string colVal = reader.GetValue(h)?.ToString()?.Trim().ToLowerInvariant() ?? string.Empty;
+                                if (colVal.Contains("part number") || colVal.Contains("partnumber") || colVal.Equals("part #")) colPn = h;
+                                else if (colVal.Equals("quantity") || colVal.Equals("qty")) colQty = h;
+                                else if (colVal.Equals("unit")) colUnit = h;
+                                else if (colVal.Equals("skid")) colSkid = h;
+                                else if (colVal.Equals("segment") || colVal.Equals("seg")) colSeg = h;
+                                else if (colVal.Contains("ext. description") || colVal.Contains("ext description")) colExtDesc = h;
+                                else if (colVal.Contains("description") || colVal.Equals("desc")) colDesc = h;
+                            }
+                            headerFound = true;
+                        }
+                        pnColIndex = -1;
+                        break;
+                    }
+
+                    partNumber = val;
+                    pnColIndex = c;
+                    break;
                 }
 
-                string prefix = GetPrefixKey(partNumber);
-                if (!result.KeptCountByPrefix.ContainsKey(prefix))
+                if (pnColIndex < 0 || string.IsNullOrWhiteSpace(partNumber))
                 {
-                    result.KeptCountByPrefix[prefix] = 0;
+                    continue;
                 }
-                result.KeptCountByPrefix[prefix]++;
+
+                // Determine relative column offsets based on part number cell position
+                int effectiveQtyCol = (pnColIndex == colPn) ? colQty : (pnColIndex + 1);
+                int effectiveUnitCol = (pnColIndex == colPn) ? colUnit : -1;
+                int effectiveSkidCol = (pnColIndex == colPn) ? colSkid : -1;
+                int effectiveSegCol = (pnColIndex == colPn) ? colSeg : -1;
+                int effectiveDescCol = (pnColIndex == colPn) ? colDesc : (pnColIndex + 3);
+                int effectiveExtDescCol = (pnColIndex == colPn) ? colExtDesc : (pnColIndex + 4);
+
+                string quantity = GetValueSafe(reader, effectiveQtyCol, fieldCount);
+                string unit = GetValueSafe(reader, effectiveUnitCol, fieldCount);
+                string skid = GetValueSafe(reader, effectiveSkidCol, fieldCount);
+                string segment = GetValueSafe(reader, effectiveSegCol, fieldCount);
+                string description = GetValueSafe(reader, effectiveDescCol, fieldCount);
+                string extDescription = GetValueSafe(reader, effectiveExtDescCol, fieldCount);
+
+                var row = new BomRow
+                {
+                    PartNumber = partNumber,
+                    Quantity = quantity,
+                    Unit = unit,
+                    Skid = skid,
+                    Segment = segment,
+                    Description = description,
+                    ExtDescription = extDescription
+                };
+
+                result.AllRows.Add(row);
+
+                string combinedDesc = row.CombinedDescription;
+                if (ShouldKeepRow(partNumber, segment, combinedDesc))
+                {
+                    result.KeptRows.Add(row);
+
+                    string prefix = GetPrefixKey(partNumber);
+                    if (!result.KeptCountByPrefix.ContainsKey(prefix))
+                    {
+                        result.KeptCountByPrefix[prefix] = 0;
+                    }
+                    result.KeptCountByPrefix[prefix]++;
+                }
+                else
+                {
+                    result.DroppedRows.Add(row);
+                }
             }
-            else
-            {
-                result.DroppedRows.Add(row);
-            }
-        }
+        } while (reader.NextResult());
 
         return result;
     }
 
+    private static string GetValueSafe(IExcelDataReader reader, int index, int fieldCount)
+    {
+        if (index >= 0 && index < fieldCount)
+        {
+            return reader.GetValue(index)?.ToString()?.Trim() ?? string.Empty;
+        }
+        return string.Empty;
+    }
+
     private static string GetPrefixKey(string partNumber)
     {
-        if (partNumber.StartsWith("5E", StringComparison.OrdinalIgnoreCase)) return "5E";
         int dashIdx = partNumber.IndexOf('-');
         if (dashIdx > 0) return partNumber.Substring(0, dashIdx + 1).ToUpperInvariant();
-        return partNumber.Length >= 3 ? partNumber.Substring(0, 3).ToUpperInvariant() : partNumber.ToUpperInvariant();
+        return partNumber.Length >= 4 ? partNumber.Substring(0, 4).ToUpperInvariant() : partNumber.ToUpperInvariant();
     }
 }

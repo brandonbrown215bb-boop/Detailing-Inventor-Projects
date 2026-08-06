@@ -92,6 +92,8 @@ public class MainViewModel : INotifyPropertyChanged
 
     public ProjectStateModel ProjectState { get; private set; } = new();
     public ObservableCollection<SurfaceModel> Surfaces { get; } = new();
+    public ObservableCollection<SurfaceGroupViewModel> GroupedSurfaces { get; } = new();
+    public ObservableCollection<SurfaceModel> RemovedSurfaces { get; } = new();
     public ObservableCollection<StatusState> StatusStates { get; } = new();
     public ObservableCollection<ShellFolderEntry> BomEntries { get; } = new();
     public ObservableCollection<ShellFolderEntry> FilteredBomEntries { get; } = new();
@@ -110,6 +112,7 @@ public class MainViewModel : INotifyPropertyChanged
     public Action? RequestViewportRefresh { get; set; }
     public Action<string>? RequestHighlightSurface { get; set; }
     public Action<bool>? RequestSetWireframe { get; set; }
+    public Action<bool>? RequestSetSkidGrid { get; set; }
     public Action<double>? RequestSetOpacity { get; set; }
     public Action<bool, string>? RequestSetSurfaceVisibility { get; set; }
 
@@ -242,6 +245,182 @@ public class MainViewModel : INotifyPropertyChanged
         set { _shellRootPath = value; OnPropertyChanged(); RecalculateEntryAbsolutePaths(); }
     }
 
+    public DisplayPreferences Preferences => ProjectState.Preferences;
+
+    public string GroupMode
+    {
+        get => Preferences.ListDisplay.GroupMode;
+        set
+        {
+            Preferences.ListDisplay.GroupMode = value;
+            OnPropertyChanged();
+            RebuildGroupedSurfaces();
+            MarkDirty();
+        }
+    }
+
+    public string NameMode
+    {
+        get => Preferences.ListDisplay.NameMode;
+        set
+        {
+            Preferences.ListDisplay.NameMode = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public string SortMode
+    {
+        get => Preferences.ListDisplay.SortMode;
+        set
+        {
+            Preferences.ListDisplay.SortMode = value;
+            OnPropertyChanged();
+            RebuildGroupedSurfaces();
+            MarkDirty();
+        }
+    }
+
+    public bool ShowTypeTag
+    {
+        get => Preferences.ListDisplay.ShowTypeTag;
+        set
+        {
+            Preferences.ListDisplay.ShowTypeTag = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public bool ShowSkidTag
+    {
+        get => Preferences.ListDisplay.ShowSkidTag;
+        set
+        {
+            Preferences.ListDisplay.ShowSkidTag = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public bool ShowSideTag
+    {
+        get => Preferences.ListDisplay.ShowSideTag;
+        set
+        {
+            Preferences.ListDisplay.ShowSideTag = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public bool ShowSkidGrid
+    {
+        get => Preferences.ViewerOptions.ShowGrid;
+        set
+        {
+            Preferences.ViewerOptions.ShowGrid = value;
+            OnPropertyChanged();
+            RequestSetSkidGrid?.Invoke(value);
+            MarkDirty();
+        }
+    }
+
+    public bool ShowLegend
+    {
+        get => Preferences.ViewerOptions.ShowLegend;
+        set
+        {
+            Preferences.ViewerOptions.ShowLegend = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public bool ShowHoverTooltip
+    {
+        get => Preferences.ViewerOptions.ShowHoverTooltip;
+        set
+        {
+            Preferences.ViewerOptions.ShowHoverTooltip = value;
+            OnPropertyChanged();
+            MarkDirty();
+        }
+    }
+
+    public int ActiveSurfacesCount => Surfaces.Count(s => !s.IsHidden);
+    public int HiddenSurfacesCount => Surfaces.Count(s => s.IsHidden);
+    public int RemovedSurfacesCount => RemovedSurfaces.Count;
+
+    public void RebuildGroupedSurfaces()
+    {
+        GroupedSurfaces.Clear();
+
+        IEnumerable<SurfaceModel> query = Surfaces;
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            query = query.Where(s => s.SurfaceNumber.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                                  || s.PartNumber.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                                  || s.SurfaceUnitSide.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (GroupMode == "skid")
+        {
+            var groups = query.GroupBy(s => s.SkidId).OrderBy(g => g.Key);
+            foreach (var g in groups)
+            {
+                var grpVM = new SurfaceGroupViewModel
+                {
+                    GroupKey = $"Skid {g.Key}",
+                    DisplayName = $"Skid {g.Key} ({g.Count()} surfaces)"
+                };
+                grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+
+                foreach (var surf in g)
+                    grpVM.Surfaces.Add(surf);
+
+                GroupedSurfaces.Add(grpVM);
+            }
+        }
+        else if (GroupMode == "type")
+        {
+            var groups = query.GroupBy(s => s.TypeTag).OrderBy(g => g.Key);
+            foreach (var g in groups)
+            {
+                var grpVM = new SurfaceGroupViewModel
+                {
+                    GroupKey = g.Key,
+                    DisplayName = $"{g.Key} ({g.Count()} surfaces)"
+                };
+                grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+
+                foreach (var surf in g)
+                    grpVM.Surfaces.Add(surf);
+
+                GroupedSurfaces.Add(grpVM);
+            }
+        }
+        else
+        {
+            var grpVM = new SurfaceGroupViewModel
+            {
+                GroupKey = "All Surfaces",
+                DisplayName = $"All Surfaces ({query.Count()})"
+            };
+            grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+
+            foreach (var surf in query)
+                grpVM.Surfaces.Add(surf);
+
+            GroupedSurfaces.Add(grpVM);
+        }
+
+        OnPropertyChanged(nameof(ActiveSurfacesCount));
+        OnPropertyChanged(nameof(HiddenSurfacesCount));
+        OnPropertyChanged(nameof(RemovedSurfacesCount));
+    }
+
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
@@ -360,6 +539,19 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ClearNotesCommand { get; private set; } = null!;
     public ICommand ToggleSelectedSurfaceVisibilityCommand { get; private set; } = null!;
 
+    // Esmund Parity Commands
+    public ICommand ShowAllSurfacesCommand { get; }
+    public ICommand RenumberSurfaceCommand { get; }
+    public ICommand LinkPreviousSurfaceCommand { get; }
+    public ICommand ReplaceFromIamCommand { get; }
+    public ICommand RemoveSurfaceCommand { get; }
+    public ICommand OpenOptionsDialogCommand { get; }
+    public ICommand OpenRecentProjectsDialogCommand { get; }
+    public ICommand OpenBomAddDialogCommand { get; }
+    public ICommand ImportJsonCommand { get; }
+    public ICommand ExportJsonCommand { get; }
+    public ICommand AddSurfacesFromFolderCommand { get; }
+
     public MainViewModel()
     {
         foreach (var state in StatusStateService.GetDefaultStates())
@@ -394,6 +586,19 @@ public class MainViewModel : INotifyPropertyChanged
         DeleteChecklistItemCommand = new RelayCommand(p => ExecuteDeleteChecklistItem(p as string), _ => HasSelectedSurface);
         ClearNotesCommand = new RelayCommand(_ => SelectedSurfaceNotes = string.Empty, _ => HasSelectedSurface && !string.IsNullOrEmpty(SelectedSurfaceNotes));
         ToggleSelectedSurfaceVisibilityCommand = new RelayCommand(_ => ExecuteToggleSurfaceVisibility(SelectedSurface), _ => HasSelectedSurface);
+
+        // Esmund Parity Commands Initializations
+        ShowAllSurfacesCommand = new RelayCommand(_ => ExecuteShowAllSurfaces());
+        RenumberSurfaceCommand = new RelayCommand(p => ExecuteRenumberSurface(p as string), _ => HasSelectedSurface);
+        LinkPreviousSurfaceCommand = new RelayCommand(p => ExecuteLinkPreviousSurface(p as string), _ => HasSelectedSurface);
+        ReplaceFromIamCommand = new RelayCommand(_ => ExecuteReplaceFromIam(), _ => HasSelectedSurface);
+        RemoveSurfaceCommand = new RelayCommand(_ => ExecuteRemoveSurface(), _ => HasSelectedSurface);
+        OpenOptionsDialogCommand = new RelayCommand(_ => ExecuteOpenOptionsDialog());
+        OpenRecentProjectsDialogCommand = new RelayCommand(_ => ExecuteOpenRecentProjectsDialog());
+        OpenBomAddDialogCommand = new RelayCommand(_ => ExecuteOpenBomAddDialog());
+        ImportJsonCommand = new RelayCommand(_ => ExecuteImportJson());
+        ExportJsonCommand = new RelayCommand(_ => ExecuteExportJson(), _ => Surfaces.Count > 0);
+        AddSurfacesFromFolderCommand = new RelayCommand(_ => ExecuteAddSurfacesFromFolder());
 
         // Setup 5-minute auto-save background timer
         _autoSaveTimer = new DispatcherTimer
@@ -714,7 +919,7 @@ public class MainViewModel : INotifyPropertyChanged
 
     public void UpdateSelectedSurfaceStatus(string stateId)
     {
-        if (SelectedSurface != null)
+        if (SelectedSurface != null && !string.Equals(SelectedSurface.StateId, stateId, StringComparison.OrdinalIgnoreCase))
         {
             SelectedSurface.StateId = stateId;
             MarkDirty();
@@ -1005,6 +1210,166 @@ public class MainViewModel : INotifyPropertyChanged
             entry.AbsolutePath = !string.IsNullOrWhiteSpace(ShellRootPath)
                 ? Path.Combine(ShellRootPath, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar))
                 : null;
+        }
+    }
+
+    private void ExecuteShowAllSurfaces()
+    {
+        foreach (var surf in Surfaces)
+        {
+            surf.IsHidden = false;
+        }
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+        StatusMessage = "Restored all hidden surfaces.";
+    }
+
+    private void ExecuteRenumberSurface(string? newNum)
+    {
+        if (SelectedSurface == null || string.IsNullOrWhiteSpace(newNum)) return;
+        string oldNum = SelectedSurface.EffectiveDisplayNumber;
+        if (!SelectedSurface.PreviousNumbers.Contains(oldNum))
+            SelectedSurface.PreviousNumbers.Add(oldNum);
+
+        SelectedSurface.DisplayNumber = newNum.Trim();
+        MarkDirty();
+        RebuildGroupedSurfaces();
+        StatusMessage = $"Renumbered surface {oldNum} -> {newNum.Trim()}.";
+    }
+
+    private void ExecuteLinkPreviousSurface(string? prevNum)
+    {
+        if (SelectedSurface == null || string.IsNullOrWhiteSpace(prevNum)) return;
+        if (!SelectedSurface.PreviousNumbers.Contains(prevNum.Trim()))
+        {
+            SelectedSurface.PreviousNumbers.Add(prevNum.Trim());
+            MarkDirty();
+            StatusMessage = $"Linked previous surface history {prevNum.Trim()} -> {SelectedSurface.SurfaceNumber}.";
+        }
+    }
+
+    private void ExecuteReplaceFromIam()
+    {
+        if (SelectedSurface == null) return;
+        var dlg = new OpenFileDialog
+        {
+            Title = $"Select Inventor Assembly (.iam) to replace geometry for {SelectedSurface.SurfaceNumber}",
+            Filter = "Inventor Assembly (*.iam)|*.iam|All Files (*.*)|*.*"
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            StatusMessage = $"Replacing geometry for {SelectedSurface.SurfaceNumber} from {Path.GetFileName(dlg.FileName)}...";
+            MarkDirty();
+        }
+    }
+
+    private void ExecuteRemoveSurface()
+    {
+        if (SelectedSurface == null) return;
+        var target = SelectedSurface;
+        SelectedSurface = null;
+
+        Surfaces.Remove(target);
+        if (!RemovedSurfaces.Contains(target))
+            RemovedSurfaces.Add(target);
+
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+        MarkDirty();
+        StatusMessage = $"Removed surface {target.SurfaceNumber} to Retired section.";
+    }
+
+    private void ExecuteOpenOptionsDialog()
+    {
+        var vm = new OptionsViewModel(Preferences, StatusStates);
+        var dlg = new OptionsDialog(vm)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            StatusStates.Clear();
+            foreach (var s in vm.StatusStates) StatusStates.Add(s);
+
+            RebuildGroupedSurfaces();
+            RequestSetSkidGrid?.Invoke(ShowSkidGrid);
+            RequestViewportRefresh?.Invoke();
+            MarkDirty();
+            StatusMessage = "Saved options and display preferences.";
+        }
+    }
+
+    private void ExecuteOpenRecentProjectsDialog()
+    {
+        var dlg = new RecentProjectsDialog(RecentProjects)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            if (dlg.ClearRequested)
+            {
+                ExecuteClearRecentProjects();
+            }
+            else if (dlg.SelectedProject != null)
+            {
+                ExecuteOpenRecentProject(dlg.SelectedProject.FilePath);
+            }
+        }
+    }
+
+    private void ExecuteOpenBomAddDialog()
+    {
+        var vm = new BomAddEntryViewModel(ProjectState.Bom);
+        var dlg = new BomAddEntryDialog(vm)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            var entry = new ShellFolderEntry
+            {
+                PartNumber = vm.PartNumber,
+                Skid = vm.SelectedSkid,
+                Segment = vm.SelectedSegment,
+                Description = vm.Description,
+                Quantity = vm.Quantity.ToString(),
+                RelativePath = $"Shell/{vm.SelectedSkid}/{vm.SelectedSegment}"
+            };
+            BomEntries.Add(entry);
+            FilterBomEntries();
+            MarkDirty();
+            StatusMessage = $"Added 391- entry {entry.PartNumber} ({entry.Skid}).";
+        }
+    }
+
+    private void ExecuteImportJson()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Import Project JSON",
+            Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            LoadProjectFromFile(dlg.FileName);
+        }
+    }
+
+    private void ExecuteExportJson()
+    {
+        ExecuteSaveProjectAs();
+    }
+
+    private async void ExecuteAddSurfacesFromFolder()
+    {
+        var dlg = new OpenFolderDialog
+        {
+            Title = "Add surface(s) from folder..."
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            await LoadFolderAsync(dlg.FolderName);
         }
     }
 

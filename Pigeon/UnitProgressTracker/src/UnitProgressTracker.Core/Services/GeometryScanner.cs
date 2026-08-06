@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,11 +10,74 @@ using UnitProgressTracker.Core.Models;
 
 namespace UnitProgressTracker.Core.Services;
 
+[SupportedOSPlatform("windows")]
 public class GeometryScanner
 {
+    private static readonly HashSet<string> SkipFolderNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "oldversions", "archive", "archived", "backup", "backups", "temp", "tmp", "_restore", ".unit-surface-viewer"
+    };
+
+    public static string[] GetScannableFiles(string rootFolder)
+    {
+        var results = new List<string>();
+        if (string.IsNullOrWhiteSpace(rootFolder) || !Directory.Exists(rootFolder))
+            return Array.Empty<string>();
+
+        void WalkDirectory(string currentDir, int depth)
+        {
+            if (depth > 12) return;
+
+            string dirName = Path.GetFileName(currentDir);
+            if (dirName.StartsWith(".") || SkipFolderNames.Contains(dirName))
+                return;
+
+            try
+            {
+                var files = Directory.GetFiles(currentDir);
+                foreach (var file in files)
+                {
+                    string ext = Path.GetExtension(file);
+                    string name = Path.GetFileName(file);
+
+                    if (ext.Equals(".json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!file.EndsWith(".uptproj", StringComparison.OrdinalIgnoreCase) &&
+                            !file.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase))
+                        {
+                            results.Add(file);
+                        }
+                    }
+                    else if (ext.Equals(".iam", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Filter for surface assemblies (e.g. 391Z*.iam) and ignore 391-*.iam
+                        if (name.StartsWith("391Z", StringComparison.OrdinalIgnoreCase) &&
+                            !name.StartsWith("391-", StringComparison.OrdinalIgnoreCase))
+                        {
+                            results.Add(file);
+                        }
+                    }
+                }
+
+                var subDirs = Directory.GetDirectories(currentDir);
+                foreach (var subDir in subDirs)
+                {
+                    WalkDirectory(subDir, depth + 1);
+                }
+            }
+            catch
+            {
+                // Ignore inaccessible directories
+            }
+        }
+
+        WalkDirectory(rootFolder, 0);
+        return results.Distinct().ToArray();
+    }
+
     /// <summary>
-    /// Asynchronously scans a folder for .iam assembly files via active Inventor COM,
-    /// falling back to .json geometry sidecar files when Inventor is not running.
+    /// Asynchronously scans a folder for surface assembly files (.iam / .json) via headless COM / Apprentice,
+    /// without attaching to active Inventor GUI processes. Skipping OldVersions and backup folders.
     /// Progress reports and cancellation tokens are fully supported.
     /// </summary>
     public static async Task<List<SurfaceModel>> ScanIamFolderAsync(
@@ -24,14 +88,7 @@ public class GeometryScanner
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
             return new List<SurfaceModel>();
 
-        var jsonFiles = Directory.GetFiles(folderPath, "*.json", SearchOption.AllDirectories)
-            .Where(f => !f.EndsWith(".uptproj", StringComparison.OrdinalIgnoreCase) &&
-                        !f.Contains(".unit-surface-viewer", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        var iamFiles = Directory.GetFiles(folderPath, "*.iam", SearchOption.AllDirectories);
-
-        var allFilePaths = jsonFiles.Concat(iamFiles).Distinct().ToArray();
+        var allFilePaths = GetScannableFiles(folderPath);
 
         var result = new List<SurfaceModel>();
         var seenNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -133,6 +190,26 @@ public class GeometryScanner
             string partNumber = conf.TryGetProperty("partNumber", out var pn) ? pn.GetString() ?? surfaceNumber : surfaceNumber;
             string surfaceType = conf.TryGetProperty("surfaceType", out var st) ? st.GetString() ?? "" : "";
             string side = conf.TryGetProperty("surfaceUnitSide", out var sus) ? sus.GetString() ?? "" : "";
+            string configKind = conf.TryGetProperty("configurationKind", out var ck) ? ck.GetString() ?? "" : "";
+
+            int rawSkid = 0;
+            if (conf.TryGetProperty("skidId", out var skElem))
+            {
+                if (skElem.ValueKind == JsonValueKind.Number && skElem.TryGetInt32(out int idVal))
+                    rawSkid = idVal;
+                else if (skElem.ValueKind == JsonValueKind.String && int.TryParse(skElem.GetString(), out int parsedVal))
+                    rawSkid = parsedVal;
+            }
+            else if (conf.TryGetProperty("skidNumber", out var skNumElem))
+            {
+                if (skNumElem.ValueKind == JsonValueKind.Number && skNumElem.TryGetInt32(out int numVal))
+                    rawSkid = numVal;
+                else if (skNumElem.ValueKind == JsonValueKind.String && int.TryParse(skNumElem.GetString(), out int parsedVal2))
+                    rawSkid = parsedVal2;
+            }
+
+            // Skids start at 0 in config data: 0 or null -> 1, 1 -> 2, 2 -> 3...
+            int displaySkidId = rawSkid >= 0 ? rawSkid + 1 : 1;
 
             return new SurfaceModel
             {
@@ -143,6 +220,9 @@ public class GeometryScanner
                 PartNumber = partNumber,
                 SurfaceType = surfaceType,
                 SurfaceUnitSide = side,
+                ConfigurationKind = configKind,
+                SkidId = displaySkidId,
+                SkidNumber = $"Skid {displaySkidId}",
                 Boxes = boxes
             };
         }
@@ -156,32 +236,36 @@ public class GeometryScanner
     {
         var boxes = new List<GeometryBox>();
 
-        if (conf.TryGetProperty("roof", out var roof) && roof.TryGetProperty("geometryList", out var roofList) && roofList.ValueKind == JsonValueKind.Array)
+        void ProcessGeometryList(JsonElement parent, string listPropName)
         {
-            foreach (var item in roofList.EnumerateArray())
+            if (parent.TryGetProperty(listPropName, out var listElem) && listElem.ValueKind == JsonValueKind.Array)
             {
-                var box = ParseGeometryBox(item);
-                if (box != null) boxes.Add(box);
-            }
-        }
-
-        if (conf.TryGetProperty("wall", out var wall) && wall.TryGetProperty("geometryList", out var wallList) && wallList.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in wallList.EnumerateArray())
-            {
-                var box = ParseGeometryBox(item);
-                if (box != null) boxes.Add(box);
-            }
-        }
-
-        if (conf.TryGetProperty("unitBase", out var ub) && ub.TryGetProperty("unitBaseGeometryList", out var ubList) && ubList.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var entry in ubList.EnumerateArray())
-            {
-                if (entry.TryGetProperty("geometry", out var geom))
+                foreach (var item in listElem.EnumerateArray())
                 {
-                    var box = ParseGeometryBox(geom);
-                    if (box != null) boxes.Add(box);
+                    if (item.TryGetProperty("geometry", out var geom))
+                    {
+                        var box = ParseGeometryBox(geom);
+                        if (box != null) boxes.Add(box);
+                    }
+                    else
+                    {
+                        var box = ParseGeometryBox(item);
+                        if (box != null) boxes.Add(box);
+                    }
+                }
+            }
+        }
+
+        string[] parentKeys = { "roof", "wall", "unitBase", "floor", "endPanel", "door" };
+        string[] listKeys = { "geometryList", "unitBaseGeometryList", "floorGeometryList" };
+
+        foreach (var parentKey in parentKeys)
+        {
+            if (conf.TryGetProperty(parentKey, out var parent))
+            {
+                foreach (var listKey in listKeys)
+                {
+                    ProcessGeometryList(parent, listKey);
                 }
             }
         }
@@ -191,24 +275,35 @@ public class GeometryScanner
 
     private static GeometryBox? ParseGeometryBox(JsonElement elem)
     {
-        double GetDouble(string prop)
+        double GetCoordDouble(string prop)
         {
             if (elem.TryGetProperty(prop, out var val))
             {
                 if (val.ValueKind == JsonValueKind.Number) return val.GetDouble();
                 if (val.ValueKind == JsonValueKind.String && double.TryParse(val.GetString(), out double d)) return d;
             }
-            return double.NaN;
+            return 0.0; // Position coordinates default to 0.0 if omitted
         }
 
-        double x = GetDouble("x");
-        double y = GetDouble("y");
-        double z = GetDouble("z");
-        double xl = GetDouble("xLength");
-        double yl = GetDouble("yLength");
-        double zl = GetDouble("zLength");
+        double GetLengthDouble(string prop)
+        {
+            if (elem.TryGetProperty(prop, out var val))
+            {
+                if (val.ValueKind == JsonValueKind.Number) return val.GetDouble();
+                if (val.ValueKind == JsonValueKind.String && double.TryParse(val.GetString(), out double d)) return d;
+            }
+            return double.NaN; // Length dimensions are required
+        }
 
-        if (double.IsNaN(x) || double.IsNaN(y) || double.IsNaN(z) || double.IsNaN(xl) || double.IsNaN(yl) || double.IsNaN(zl))
+        double x = GetCoordDouble("x");
+        double y = GetCoordDouble("y");
+        double z = GetCoordDouble("z");
+
+        double xl = GetLengthDouble("xLength");
+        double yl = GetLengthDouble("yLength");
+        double zl = GetLengthDouble("zLength");
+
+        if (double.IsNaN(xl) || double.IsNaN(yl) || double.IsNaN(zl))
             return null;
 
         if (xl <= 0 || yl <= 0 || zl <= 0) return null;
@@ -216,3 +311,4 @@ public class GeometryScanner
         return new GeometryBox(x, y, z, xl, yl, zl);
     }
 }
+

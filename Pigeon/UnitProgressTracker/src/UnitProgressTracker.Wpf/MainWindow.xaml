@@ -4,8 +4,8 @@
         xmlns:controls="clr-namespace:UnitProgressTracker.Wpf.Controls"
         xmlns:local="clr-namespace:UnitProgressTracker.Wpf"
         Title="{Binding WindowTitle}"
-        Height="900" Width="1440" MinHeight="640" MinWidth="1024"
-        Background="{StaticResource BgDarkBrush}"
+        Height="920" Width="1480" MinHeight="640" MinWidth="1024"
+        Background="{DynamicResource BgDarkBrush}"
         Closing="OnWindowClosing">
 
     <Window.Resources>
@@ -26,7 +26,7 @@
         </Grid.RowDefinitions>
 
         <!-- Main Menu Bar -->
-        <Menu Grid.Row="0" Background="{StaticResource HeaderBgBrush}" Foreground="{StaticResource TextMainBrush}" Padding="4,2">
+        <Menu Grid.Row="0" Background="{DynamicResource HeaderBgBrush}" Foreground="{DynamicResource TextMainBrush}" Padding="4,2">
             <MenuItem Header="_File">
                 <MenuItem Header="_New Project" Command="{Binding NewProjectCommand}" InputGestureText="Ctrl+N" />
                 <MenuItem Header="_Open Project..." Command="{Binding OpenProjectCommand}" InputGestureText="Ctrl+O" />
@@ -35,45 +35,48 @@
                 <MenuItem Header="_Save Project" Command="{Binding SaveProjectCommand}" InputGestureText="Ctrl+S" />
                 <MenuItem Header="Save Project _As..." Command="{Binding SaveProjectAsCommand}" InputGestureText="Ctrl+Shift+S" />
                 <Separator />
-                <MenuItem Header="Recent _Projects" ItemsSource="{Binding RecentProjects}">
-                    <MenuItem.ItemContainerStyle>
-                        <Style TargetType="MenuItem">
-                            <Setter Property="Header" Value="{Binding DisplayName}" />
-                            <Setter Property="Command" Value="{Binding DataContext.OpenRecentProjectCommand, RelativeSource={RelativeSource AncestorType=Menu}}" />
-                            <Setter Property="CommandParameter" Value="{Binding FilePath}" />
-                            <Setter Property="ToolTip" Value="{Binding FilePath}" />
-                        </Style>
-                    </MenuItem.ItemContainerStyle>
-                </MenuItem>
+                <MenuItem Header="Recent _Projects..." Command="{Binding OpenRecentProjectsDialogCommand}" />
                 <MenuItem Header="Clear Recent Projects" Command="{Binding ClearRecentProjectsCommand}" IsEnabled="{Binding HasRecentProjects}" />
                 <Separator />
+                <MenuItem Header="Rescan" Click="OnRescanClick" IsEnabled="{Binding HasFolder}" />
+                <MenuItem Header="Add surface(s) from folder..." Command="{Binding AddSurfacesFromFolderCommand}" />
+                <Separator />
                 <MenuItem Header="Import _Excel BOM..." Command="{Binding ImportExcelBomCommand}" />
+                <MenuItem Header="Import _JSON..." Command="{Binding ImportJsonCommand}" />
+                <MenuItem Header="Export _JSON..." Command="{Binding ExportJsonCommand}" />
                 <MenuItem Header="Export _Audit Report (Markdown)..." Command="{Binding ExportMarkdownCommand}" />
+                <Separator />
+                <MenuItem Header="⚙ _Options &amp; Preferences..." Command="{Binding OpenOptionsDialogCommand}" />
                 <Separator />
                 <MenuItem Header="E_xit" Command="{Binding ExitCommand}" InputGestureText="Alt+F4" />
             </MenuItem>
-            
+
             <MenuItem Header="_View">
                 <MenuItem Header="_3D Surfaces" Click="OnSurfacesTabClick" />
                 <MenuItem Header="_BOM Shell Export" Click="OnBomTabClick" />
                 <Separator />
                 <MenuItem Header="Toggle _Wireframe" Command="{Binding ToggleWireframeCommand}" />
+                <MenuItem Header="Show Skid Floor Grid" IsCheckable="True" IsChecked="{Binding ShowSkidGrid, Mode=TwoWay}" />
+                <MenuItem Header="Show Status Legend" IsCheckable="True" IsChecked="{Binding ShowLegend, Mode=TwoWay}" />
+                <MenuItem Header="Show Hover Info Tooltip" IsCheckable="True" IsChecked="{Binding ShowHoverTooltip, Mode=TwoWay}" />
+                <Separator />
                 <MenuItem Header="_Fit View" Click="OnFitViewClick" />
                 <MenuItem Header="_Reset Camera" Click="OnResetCameraClick" />
             </MenuItem>
         </Menu>
 
         <!-- Secondary Action Toolbar -->
-        <Border Grid.Row="1" Background="{StaticResource HeaderBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,1" Padding="12,6">
+        <Border Grid.Row="1" Background="{DynamicResource HeaderBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1" Padding="12,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Unit Progress Tracker" Foreground="{StaticResource AccentBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <TextBlock Text="Unit Progress Tracker" Foreground="{DynamicResource AccentBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,16,0" VerticalAlignment="Center" />
                     <Button Content="Open Folder..." Click="OnOpenFolderClick" Margin="0,0,6,0" />
                     <Button Content="Rescan" Click="OnRescanClick" Margin="0,0,6,0" />
                     <Button Content="⟳ Async Scan" Command="{Binding AsyncScanFolderCommand}" IsEnabled="{Binding IsNotScanning}" Margin="0,0,6,0" />
                     <Button Content="✕ Cancel" Command="{Binding CancelScanCommand}" Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,6,0" />
-                    <Button Content="Load Demo Data" Click="OnLoadDemoDataClick" Margin="0,0,16,0" />
+                    <Button Content="Load Demo Data" Click="OnLoadDemoDataClick" Margin="0,0,12,0" />
                     <Button Content="Export Audit MD" Command="{Binding ExportMarkdownCommand}" Margin="0,0,6,0" />
+                    <Button Content="⚙ Options..." Command="{Binding OpenOptionsDialogCommand}" Margin="0,0,6,0" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -86,93 +89,173 @@
         <!-- Main Workspace -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="220" />
+                <ColumnDefinition Width="340" MinWidth="260" />
                 <ColumnDefinition Width="5" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="5" />
-                <ColumnDefinition Width="340" MinWidth="280" />
+                <ColumnDefinition Width="360" MinWidth="300" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left Panel (Surfaces / BOM List) -->
-            <Border Grid.Column="0" Background="{StaticResource PanelBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <!-- Left Panel (Surfaces List & BOM Shell View) -->
+            <Border Grid.Column="0" Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
                 <Grid>
                     <!-- Surfaces List View -->
                     <DockPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource TabToVisibilityConverter}, ConverterParameter=0}">
-                        <Border DockPanel.Dock="Top" Padding="8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        <Border DockPanel.Dock="Top" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Background="{DynamicResource HeaderBgBrush}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" DockPanel.Dock="Left" Width="180" Margin="0,0,6,0" Padding="4" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" BorderBrush="{DynamicResource BorderBrush}" />
+                                    <Button Content="Show All" Command="{Binding ShowAllSurfacesCommand}" DockPanel.Dock="Right" Padding="6,2" FontSize="11" />
+                                    <Border Background="{DynamicResource AccentBrush}" CornerRadius="10" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ActiveSurfacesCount}" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" />
+                                    </Border>
+                                </DockPanel>
+
+                                <!-- List Controls Toolbar -->
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <DockPanel Grid.Row="0" Margin="0,0,0,4">
+                                        <TextBlock Text="Group:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <ComboBox SelectedValue="{Binding GroupMode, Mode=TwoWay}" SelectedValuePath="Tag" Width="85" Margin="0,0,6,0" FontSize="10">
+                                            <ComboBoxItem Content="Skid" Tag="skid" />
+                                            <ComboBoxItem Content="Type" Tag="type" />
+                                            <ComboBoxItem Content="Flat" Tag="flat" />
+                                        </ComboBox>
+
+                                        <TextBlock Text="Sort:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <ComboBox SelectedValue="{Binding SortMode, Mode=TwoWay}" SelectedValuePath="Tag" Width="95" FontSize="10">
+                                            <ComboBoxItem Content="Default" Tag="default" />
+                                            <ComboBoxItem Content="Skid" Tag="skid" />
+                                            <ComboBoxItem Content="Type" Tag="type" />
+                                            <ComboBoxItem Content="Skid + Type" Tag="skid-type" />
+                                        </ComboBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox Content="Type" IsChecked="{Binding ShowTypeTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,8,0" />
+                                        <CheckBox Content="Skid" IsChecked="{Binding ShowSkidTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,8,0" />
+                                        <CheckBox Content="Side" IsChecked="{Binding ShowSideTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
                         </Border>
 
-                        <ListBox ItemsSource="{Binding Surfaces}" SelectedItem="{Binding SelectedSurface}" Background="Transparent" BorderThickness="0" Margin="4">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="8,6" Margin="2" CornerRadius="4">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#1f2937" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                                                        <Setter Property="Background" Value="#111827" />
-                                                        <Setter Property="Opacity" Value="0.5" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Left" Background="#0f172a" BorderBrush="#38bdf8" BorderThickness="1" CornerRadius="3" Padding="4,2" Margin="0,0,8,0">
-                                                <TextBlock Text="{Binding ShortLabel}" Foreground="#38bdf8" FontFamily="Consolas" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                                            </Border>
-                                            <Button DockPanel.Dock="Right" Content="{Binding IsHidden, Converter={StaticResource BoolToVisibilityTextConverter}}" Command="{Binding DataContext.ToggleSurfaceVisibilityCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Margin="4,0,0,0" Padding="4,2" FontSize="10" ToolTip="Toggle Visibility" />
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding SurfaceNumber}" Foreground="{StaticResource TextMainBrush}" FontWeight="SemiBold" FontSize="12" />
-                                                <TextBlock Text="{Binding SurfaceUnitSide}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
+                        <!-- Hierarchical Grouped Surfaces List -->
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="4">
+                                <ItemsControl ItemsSource="{Binding GroupedSurfaces}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,6" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                                <Expander.Header>
+                                                    <DockPanel Width="280">
+                                                        <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" />
+                                                        <Button Content="{Binding ToggleButtonText}" Command="{Binding ToggleGroupVisibilityCommand}" DockPanel.Dock="Right" Padding="4,1" FontSize="10" Margin="4,0,0,0" Background="{DynamicResource TagBgBrush}" Foreground="{DynamicResource TextMainBrush}" BorderThickness="0" />
+                                                    </DockPanel>
+                                                </Expander.Header>
+
+                                                <ListBox ItemsSource="{Binding Surfaces}" SelectedItem="{Binding DataContext.SelectedSurface, RelativeSource={RelativeSource AncestorType=Window}}" Background="Transparent" BorderThickness="0" Margin="2">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Padding="6,4" Margin="2" CornerRadius="4">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                                                <Setter Property="Background" Value="{DynamicResource HeaderBgBrush}" />
+                                                                                <Setter Property="Opacity" Value="0.5" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+
+                                                                <DockPanel>
+                                                                    <Border DockPanel.Dock="Left" Background="{DynamicResource InputBgBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="3" Padding="4,2" Margin="0,0,6,0">
+                                                                        <TextBlock Text="{Binding ShortLabel}" Foreground="{DynamicResource BadgeTextBrush}" FontFamily="Consolas" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+                                                                    </Border>
+
+                                                                    <Button DockPanel.Dock="Right" Content="{Binding IsHidden, Converter={StaticResource BoolToVisibilityTextConverter}}" Command="{Binding DataContext.ToggleSurfaceVisibilityCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Margin="4,0,0,0" Padding="4,1" FontSize="10" ToolTip="Toggle Surface Visibility" />
+
+                                                                    <StackPanel VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding EffectiveDisplayNumber}" Foreground="{DynamicResource TextMainBrush}" FontWeight="SemiBold" FontSize="12" />
+
+                                                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                            <Border Visibility="{Binding DataContext.ShowSkidTag, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}" Background="{DynamicResource AccentBrush}" CornerRadius="2" Padding="3,1" Margin="0,0,4,0">
+                                                                                <TextBlock Text="{Binding SkidTag}" Foreground="#FFFFFF" FontSize="9" FontWeight="Bold" />
+                                                                            </Border>
+
+                                                                            <Border Visibility="{Binding DataContext.ShowTypeTag, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}" Background="{DynamicResource TagBgBrush}" CornerRadius="2" Padding="3,1" Margin="0,0,4,0">
+                                                                                <TextBlock Text="{Binding TypeTag}" Foreground="{DynamicResource TextMainBrush}" FontSize="9" />
+                                                                            </Border>
+
+                                                                            <Border Visibility="{Binding DataContext.ShowSideTag, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}" Background="{DynamicResource InputBgBrush}" CornerRadius="2" Padding="3,1">
+                                                                                <TextBlock Text="{Binding SideTag}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" />
+                                                                            </Border>
+                                                                        </StackPanel>
+                                                                    </StackPanel>
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </Expander>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Collapsible Removed Surfaces Section -->
+                                <Expander Header="{Binding RemovedSurfacesCount, StringFormat='Removed Surfaces ({0})'}" Margin="0,8,0,0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextMutedBrush}">
+                                    <ListBox ItemsSource="{Binding RemovedSurfaces}" Background="Transparent" BorderThickness="0" Margin="2">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="6,4" Margin="2" Background="{DynamicResource InputBgBrush}" CornerRadius="4">
+                                                    <DockPanel>
+                                                        <TextBlock Text="{Binding SurfaceNumber}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextDecorations="Strikethrough" />
+                                                    </DockPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
                     </DockPanel>
 
                     <!-- BOM Shell Entries View -->
                     <DockPanel Visibility="{Binding SelectedTabIndex, Converter={StaticResource TabToVisibilityConverter}, ConverterParameter=1}">
-                        <Border DockPanel.Dock="Top" Padding="8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Background="#0f172a">
+                        <Border DockPanel.Dock="Top" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Background="{DynamicResource HeaderBgBrush}">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,6">
-                                    <TextBlock Text="Shell Root:" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" />
+                                    <TextBlock Text="Shell Root:" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" />
                                     <Button Content="Change..." Click="OnSetShellRootClick" DockPanel.Dock="Right" Margin="6,0,0,0" Padding="6,2" />
-                                    <TextBox Text="{Binding ShellRootPath}" IsReadOnly="True" VerticalAlignment="Center" Background="#1f2937" />
+                                    <TextBox Text="{Binding ShellRootPath}" IsReadOnly="True" VerticalAlignment="Center" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" />
                                 </DockPanel>
 
                                 <DockPanel Margin="0,0,0,6">
-                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="140" DockPanel.Dock="Left" Margin="0,0,6,0" />
+                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="140" DockPanel.Dock="Left" Margin="0,0,6,0" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" />
                                     <ComboBox ItemsSource="{Binding AvailableSkids}" SelectedItem="{Binding SelectedSkidFilter}" Width="110" DockPanel.Dock="Right" />
                                 </DockPanel>
 
                                 <DockPanel Margin="0,0,0,6">
                                     <ComboBox ItemsSource="{Binding AvailableSegments}" SelectedItem="{Binding SelectedSegmentFilter}" Width="110" DockPanel.Dock="Right" />
-                                    <CheckBox Content="SQ Custom Doors Only" IsChecked="{Binding IsCustomSqOnly}" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center" FontSize="11" />
+                                    <CheckBox Content="SQ Custom Doors Only" IsChecked="{Binding IsCustomSqOnly}" Foreground="{DynamicResource TextMainBrush}" VerticalAlignment="Center" FontSize="11" />
                                 </DockPanel>
 
                                 <DockPanel>
                                     <Button Content="Import Excel BOM" Command="{Binding ImportExcelBomCommand}" Margin="0,0,4,0" Padding="6,4" />
-                                    <Button Content="+ Add" Command="{Binding AddBomRowCommand}" Margin="0,0,4,0" Padding="6,4" />
+                                    <Button Content="+ Add Entry" Command="{Binding OpenBomAddDialogCommand}" Margin="0,0,4,0" Padding="6,4" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" />
                                     <Button Content="- Delete" Command="{Binding DeleteBomRowCommand}" Margin="0,0,4,0" Padding="6,4" />
-                                    <Button Content="Export Folders" Click="OnCreateShellFoldersClick" Background="#0284c7" Foreground="White" FontWeight="Bold" Padding="8,4" />
+                                    <Button Content="Export Folders" Click="OnCreateShellFoldersClick" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" Padding="8,4" />
                                 </DockPanel>
                             </StackPanel>
                         </Border>
 
-                        <Border DockPanel.Dock="Top" Visibility="{Binding HasMisplacedCoilPanels, Converter={StaticResource BoolToVisibilityConverter}}" Background="#451a03" BorderBrush="#f59e0b" BorderThickness="0,0,0,1" Padding="8">
-                            <StackPanel>
-                                <DockPanel>
-                                    <TextBlock Text="⚠️ Misplaced Coil Lines" Foreground="#fbbf24" FontWeight="Bold" VerticalAlignment="Center" />
-                                    <Button Content="{Binding MisplacedDetailsToggleText}" Command="{Binding ToggleMisplacedDetailsCommand}" DockPanel.Dock="Right" Padding="6,2" FontSize="10" />
-                                </DockPanel>
-                                <TextBlock Text="{Binding MisplacedCoilPanelMessage}" Foreground="#fef3c7" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" />
-                            </StackPanel>
-                        </Border>
-
-                        <DataGrid ItemsSource="{Binding FilteredBomEntries}" SelectedItem="{Binding SelectedBomEntry}" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#1e293b" BorderThickness="0">
+                        <DataGrid ItemsSource="{Binding FilteredBomEntries}" SelectedItem="{Binding SelectedBomEntry}" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource BorderBrush}" BorderThickness="0">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" Width="100" />
                                 <DataGridTextColumn Header="Skid" Binding="{Binding Skid}" Width="80" />
@@ -189,13 +272,45 @@
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
 
             <!-- Center Viewport (HelixToolkit 3D Surface Viewport) -->
-            <Border Grid.Column="2" Background="#020617">
+            <Border Grid.Column="2" Background="{DynamicResource BgDarkBrush}">
                 <Grid>
                     <controls:Surface3DViewport x:Name="Viewport3D" />
 
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Padding="8,6" Background="#800f172a" CornerRadius="6" BorderBrush="#334155" BorderThickness="1">
+                    <!-- Floating Status Legend Canvas Overlay -->
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="8,6" Background="{DynamicResource CardBgBrush}" CornerRadius="6" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Visibility="{Binding ShowLegend, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Status States" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6" />
+                            <ItemsControl ItemsSource="{Binding StatusStates}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Click="OnLegendFilterClick" Tag="{Binding Id}" Background="Transparent" BorderThickness="0" Padding="0,2">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="10" Height="10" Background="{Binding ColorHex, Converter={StaticResource HexToBrushConverter}}" CornerRadius="2" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextMainBrush}" FontSize="10" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Floating Surface Hover Info Tooltip Popup -->
+                    <Canvas>
+                        <Border x:Name="HoverTooltipBorder" Visibility="Collapsed" Padding="8,6" Background="{DynamicResource CardBgBrush}" CornerRadius="6" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5">
+                            <StackPanel>
+                                <TextBlock x:Name="HoverTooltipSkidText" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="11" />
+                                <TextBlock x:Name="HoverTooltipPartText" Foreground="{DynamicResource TextMainBrush}" FontSize="10" />
+                                <TextBlock x:Name="HoverTooltipTypeText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                <TextBlock x:Name="HoverTooltipSideText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                            </StackPanel>
+                        </Border>
+                    </Canvas>
+
+                    <!-- Floating Opacity & Viewport Controls -->
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Padding="8,6" Background="{DynamicResource CardBgBrush}" CornerRadius="6" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Opacity:" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="Opacity:" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <Slider Width="80" Minimum="0.1" Maximum="1.0" Value="{Binding GlobalOpacity, Mode=TwoWay}" ValueChanged="OnOpacitySliderChanged" VerticalAlignment="Center" Margin="0,0,12,0" />
                             <ToggleButton Content="Wireframe" IsChecked="{Binding WireframeVisible, Mode=TwoWay}" Padding="6,2" FontSize="11" Margin="0,0,6,0" />
                             <Button Content="Fit View" Click="OnFitViewClick" Padding="6,2" FontSize="11" Margin="0,0,4,0" />
@@ -208,23 +323,46 @@
             <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
 
             <!-- Right Detail Panel (Status & Interactive Checklist) -->
-            <Border Grid.Column="4" Background="{StaticResource PanelBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0">
+            <Border Grid.Column="4" Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16" IsEnabled="{Binding HasSelectedSurface}">
                         <DockPanel Margin="0,0,0,12">
-                            <TextBlock Text="Surface Details" Foreground="{StaticResource AccentBrush}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" />
+                            <TextBlock Text="Surface Details" Foreground="{DynamicResource AccentBrush}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" />
                             <Button Content="{Binding SelectedSurface.IsHidden, Converter={StaticResource BoolToVisibilityToggleConverter}}" Command="{Binding ToggleSelectedSurfaceVisibilityCommand}" DockPanel.Dock="Right" Padding="6,2" FontSize="10" />
                         </DockPanel>
 
-                        <TextBlock Text="Surface Number" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,2" />
-                        <TextBlock Text="{Binding SelectedSurface.SurfaceNumber}" Foreground="{StaticResource TextMainBrush}" FontSize="16" FontWeight="Bold" Margin="0,0,0,12" />
+                        <!-- Full Metadata Display -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Unit Side" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,2" />
-                        <TextBlock Text="{Binding SelectedSurface.SurfaceUnitSide}" Foreground="{StaticResource TextMainBrush}" FontSize="13" Margin="0,0,0,12" />
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Surface Number" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedSurface.EffectiveDisplayNumber}" Foreground="{DynamicResource TextMainBrush}" FontSize="14" FontWeight="Bold" Margin="0,2" />
 
-                        <!-- Status State Selector with Manage Button -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Skid" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedSurface.SkidTag}" Foreground="{DynamicResource AccentBrush}" FontSize="12" FontWeight="Bold" Margin="0,2" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Part Number" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedSurface.PartNumber}" Foreground="{DynamicResource TextMainBrush}" FontSize="12" Margin="0,2" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Type / Side" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2" />
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="{Binding SelectedSurface.TypeTag}" Foreground="{DynamicResource TextMainBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding SelectedSurface.SideTag}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Status State Selector -->
                         <DockPanel Margin="0,0,0,4">
-                            <TextBlock Text="Status State" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock Text="Status State" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
                             <Button Content="⚙ Manage..." Command="{Binding ManageStatusStatesCommand}" DockPanel.Dock="Right" Padding="4,1" FontSize="10" />
                         </DockPanel>
                         <ComboBox x:Name="StatusComboBox" ItemsSource="{Binding StatusStates}" SelectedValue="{Binding SelectedSurface.StateId, Mode=OneWay}" SelectedValuePath="Id" SelectionChanged="OnStatusSelectionChanged" Margin="0,0,0,16">
@@ -238,23 +376,23 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
-                        <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,0,0,16" />
+                        <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,0,0,16" />
 
                         <!-- Interactive Audit Checklist -->
                         <DockPanel Margin="0,0,0,4">
-                            <TextBlock Text="Audit Checklist" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding ChecklistProgressText}" Foreground="{StaticResource AccentBrush}" FontSize="10" VerticalAlignment="Center" DockPanel.Dock="Right" />
+                            <TextBlock Text="Audit Checklist" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ChecklistProgressText}" Foreground="{DynamicResource AccentBrush}" FontSize="10" VerticalAlignment="Center" DockPanel.Dock="Right" />
                         </DockPanel>
 
-                        <ProgressBar Value="{Binding ChecklistProgressPercent, Mode=OneWay}" Height="4" Background="#1e293b" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8" />
+                        <ProgressBar Value="{Binding ChecklistProgressPercent, Mode=OneWay}" Height="4" Background="{DynamicResource TagBgBrush}" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8" />
 
                         <ItemsControl ItemsSource="{Binding ChecklistItems}" Margin="0,0,0,12">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#1e293b" CornerRadius="4" Padding="6,4" Margin="0,0,0,4">
+                                    <Border Background="{DynamicResource TagBgBrush}" CornerRadius="4" Padding="6,4" Margin="0,0,0,4">
                                         <DockPanel>
-                                            <Button Content="✕" Command="{Binding DataContext.DeleteChecklistItemCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Key}" DockPanel.Dock="Right" Padding="4,0" FontSize="10" Foreground="#ef4444" Background="Transparent" BorderThickness="0" ToolTip="Delete Item" />
-                                            <CheckBox Content="{Binding Key}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Foreground="{StaticResource TextMainBrush}" VerticalAlignment="Center" />
+                                            <Button Content="✕" Command="{Binding DataContext.DeleteChecklistItemCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Key}" DockPanel.Dock="Right" Padding="4,0" FontSize="10" Foreground="#EF4444" Background="Transparent" BorderThickness="0" ToolTip="Delete Item" />
+                                            <CheckBox Content="{Binding Key}" IsChecked="{Binding IsChecked, Mode=TwoWay}" Foreground="{DynamicResource TextMainBrush}" VerticalAlignment="Center" />
                                         </DockPanel>
                                     </Border>
                                 </DataTemplate>
@@ -262,53 +400,78 @@
                         </ItemsControl>
 
                         <!-- Add Checklist Item Box -->
-                        <Border Background="#1f2937" Padding="6" CornerRadius="4" Margin="0,0,0,16">
+                        <Border Background="{DynamicResource CardBgBrush}" Padding="6" CornerRadius="4" Margin="0,0,0,16">
                             <DockPanel>
                                 <Button Content="+ Add Item" Click="OnAddChecklistItemClick" DockPanel.Dock="Right" Padding="6,2" FontSize="11" Margin="6,0,0,0" />
-                                <TextBox x:Name="NewChecklistItemBox" KeyDown="OnNewChecklistItemKeyDown" />
+                                <TextBox x:Name="NewChecklistItemBox" KeyDown="OnNewChecklistItemKeyDown" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" />
                             </DockPanel>
                         </Border>
 
                         <!-- Multiline Notes Editor -->
                         <DockPanel Margin="0,0,0,4">
-                            <TextBlock Text="Notes" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock Text="Notes" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" />
                             <Button Content="Clear" Command="{Binding ClearNotesCommand}" DockPanel.Dock="Right" Padding="4,1" FontSize="10" />
                         </DockPanel>
-                        <TextBox Text="{Binding SelectedSurfaceNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" MinHeight="100" TextWrapping="Wrap" />
+                        <TextBox Text="{Binding SelectedSurfaceNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" MinHeight="80" TextWrapping="Wrap" Margin="0,0,0,16" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" />
+
+                        <!-- Collapsible Renumber & Surface History Section -->
+                        <Expander Header="Renumber &amp; Surface History" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource AccentBrush}">
+                            <Border Padding="8">
+                                <StackPanel>
+                                    <TextBlock Text="Surface Number" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,2" />
+                                    <DockPanel Margin="0,0,0,12">
+                                        <Button Content="Apply" Click="OnApplyRenumberClick" DockPanel.Dock="Right" Padding="8,2" Margin="6,0,0,0" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" BorderThickness="0" />
+                                        <TextBox x:Name="RenumberInputBox" Padding="4" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" BorderBrush="{DynamicResource BorderBrush}" />
+                                    </DockPanel>
+
+                                    <TextBlock Text="Surface History" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,4" />
+                                    <ItemsControl ItemsSource="{Binding SelectedSurface.PreviousNumbers}" Margin="0,0,0,12">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding StringFormat='↳ Retired: {0}'}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,1" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Button Content="Replace Geometry from IAM..." Command="{Binding ReplaceFromIamCommand}" Padding="6,4" Margin="0,0,0,8" Background="{DynamicResource TagBgBrush}" Foreground="{DynamicResource TextMainBrush}" BorderThickness="0" />
+                                    <Button Content="Remove Surface from Project" Command="{Binding RemoveSurfaceCommand}" Padding="6,4" Background="#DC2626" Foreground="White" FontWeight="SemiBold" BorderThickness="0" />
+                                </StackPanel>
+                            </Border>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>
 
         <!-- Bottom Status Bar -->
-        <Border Grid.Row="3" Background="{StaticResource HeaderBgBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,4">
-            <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
+        <Border Grid.Row="3" Background="{DynamicResource HeaderBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
         </Border>
 
-        <!-- Modal Progress Overlay for Async IAM Scan (Milestone M4) -->
+        <!-- Modal Progress Overlay for Async IAM Scan -->
         <Grid Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="1000"
               Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibilityConverter}}"
               Background="#CC0F172A">
             <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Width="500" Padding="28,24" Background="#1E293B"
-                    BorderBrush="#38BDF8" BorderThickness="1.5" CornerRadius="8">
+                    Width="500" Padding="28,24" Background="{DynamicResource CardBgBrush}"
+                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5" CornerRadius="8">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="20" ShadowDepth="0" Color="#38BDF8" Opacity="0.3" />
                 </Border.Effect>
                 <StackPanel>
                     <DockPanel Margin="0,0,0,14">
                         <TextBlock Text="⚡ Scanning Unit IAM Geometry..."
-                                   Foreground="#F8FAFC" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                                   Foreground="{DynamicResource TextMainBrush}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding ScanProgress, StringFormat='{}{0:F0}%'}"
-                                   Foreground="#38BDF8" FontWeight="Bold" FontSize="16" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                                   Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="16" DockPanel.Dock="Right" HorizontalAlignment="Right" />
                     </DockPanel>
 
                     <ProgressBar Value="{Binding ScanProgress}" Minimum="0" Maximum="100"
                                  Height="16" Margin="0,0,0,12"
-                                 Foreground="#38BDF8" Background="#0F172A" />
+                                 Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource InputBgBrush}" />
 
                     <TextBlock Text="{Binding ScanProgressLabel}"
-                               Foreground="#94A3B8" FontSize="12"
+                               Foreground="{DynamicResource TextMutedBrush}" FontSize="12"
                                TextTrimming="CharacterEllipsis" Margin="0,0,0,20" />
 
                     <Button Content="✕ Cancel Scan" Command="{Binding CancelScanCommand}"

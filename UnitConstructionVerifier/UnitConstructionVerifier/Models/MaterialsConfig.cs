@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace UnitConstructionVerifier.Models
@@ -14,7 +15,11 @@ namespace UnitConstructionVerifier.Models
         public static Dictionary<string, string> GaugeMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public static Dictionary<string, string> ThicknessMap { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public static Dictionary<string, string> PartClassifications { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static Dictionary<string, string> PartDescriptions { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public static List<PartRule> PartRules { get; } = new List<PartRule>();
+        public static HashSet<string> NonAutomatingChannels { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public static List<string> AluminumKeywords { get; } = new List<string>();
+        public static List<string> SteelKeywords { get; } = new List<string>();
 
         private static readonly List<string> DefaultGauges = new List<string>
         {
@@ -69,8 +74,8 @@ namespace UnitConstructionVerifier.Models
             PartClassifications["091-30117-082"] = "Liner";
             PartClassifications["091-30117-084"] = "Liner";
             PartClassifications["091-30117-073"] = "Liner";
-            PartClassifications["091-30119-006"] = "Liner";
-            PartClassifications["091-30119-007"] = "Misc Trim";
+            PartClassifications["091-30119-006"] = "Seal-Off Angle";
+            PartClassifications["091-30119-007"] = "Trim";
             PartClassifications["091-30117-083"] = "Skin";
             PartClassifications["091-30117-081"] = "Skin";
             PartClassifications["091-30117-177"] = "Skin";
@@ -85,14 +90,14 @@ namespace UnitConstructionVerifier.Models
             PartClassifications["091-30117-058"] = "Trim";
             PartClassifications["091-30117-072"] = "Trim";
             PartClassifications["091-30117-074"] = "Trim";
-            PartClassifications["091-30117-076"] = "Misc Trim";
-            PartClassifications["091-30117-011"] = "Misc Trim";
-            PartClassifications["091-30117-057"] = "Misc Trim";
-            PartClassifications["091-30117-049"] = "Misc Trim";
-            PartClassifications["091-30117-053"] = "Misc Trim";
-            PartClassifications["091-30117-022"] = "Misc Trim";
-            PartClassifications["091-30117-195"] = "Misc Trim";
-            PartClassifications["091-30117-196"] = "Misc Trim";
+            PartClassifications["091-30117-076"] = "Trim";
+            PartClassifications["091-30117-011"] = "Trim";
+            PartClassifications["091-30117-057"] = "Trim";
+            PartClassifications["091-30117-049"] = "Trim";
+            PartClassifications["091-30117-053"] = "Trim";
+            PartClassifications["091-30117-022"] = "Trim";
+            PartClassifications["091-30117-195"] = "Trim";
+            PartClassifications["091-30117-196"] = "Trim";
             PartClassifications["091-30117-064"] = "Channel";
             PartClassifications["091-30117-065"] = "Channel";
             PartClassifications["091-30117-085"] = "Channel";
@@ -116,6 +121,20 @@ namespace UnitConstructionVerifier.Models
             PartClassifications["091-30117-054"] = "Perimeter Angle";
             PartClassifications["091-30117-055"] = "Perimeter Angle";
             PartClassifications["091-30117-079"] = "Perimeter Angle";
+
+            NonAutomatingChannels.Clear();
+            NonAutomatingChannels.Add("091-30117-078");
+            NonAutomatingChannels.Add("091-30117-048");
+            NonAutomatingChannels.Add("091-30117-046");
+            NonAutomatingChannels.Add("091-30117-077");
+
+            AluminumKeywords.Clear();
+            AluminumKeywords.AddRange(new[] { "ALM", "ALUMINUM", "ALMB" });
+
+            SteelKeywords.Clear();
+            SteelKeywords.AddRange(new[] { "STL", "SST", "GALV", "STEEL", "GALVANIZED", "STAINLESS" });
+
+            PartDescriptions.Clear();
 
             PartRules.Clear();
         }
@@ -169,12 +188,39 @@ namespace UnitConstructionVerifier.Models
                                 GaugeMappings[kvp.Key] = kvp.Value;
                             }
                         }
+                        if (data.NonAutomatingChannels != null && data.NonAutomatingChannels.Count > 0)
+                        {
+                            NonAutomatingChannels.Clear();
+                            foreach (var item in data.NonAutomatingChannels)
+                            {
+                                if (!string.IsNullOrWhiteSpace(item))
+                                    NonAutomatingChannels.Add(item.Trim());
+                            }
+                        }
+                        if (data.AluminumKeywords != null && data.AluminumKeywords.Count > 0)
+                        {
+                            AluminumKeywords.Clear();
+                            AluminumKeywords.AddRange(data.AluminumKeywords);
+                        }
+                        if (data.SteelKeywords != null && data.SteelKeywords.Count > 0)
+                        {
+                            SteelKeywords.Clear();
+                            SteelKeywords.AddRange(data.SteelKeywords);
+                        }
                         if (data.PartClassifications != null)
                         {
                             PartClassifications.Clear();
                             foreach (var kvp in data.PartClassifications)
                             {
                                 PartClassifications[kvp.Key] = kvp.Value;
+                            }
+                        }
+                        if (data.PartDescriptions != null)
+                        {
+                            PartDescriptions.Clear();
+                            foreach (var kvp in data.PartDescriptions)
+                            {
+                                PartDescriptions[kvp.Key] = kvp.Value;
                             }
                         }
                         if (data.PartRules != null)
@@ -319,17 +365,15 @@ namespace UnitConstructionVerifier.Models
 
             string mappedHint = MapMaterial(materialHint).ToUpperInvariant();
             
-            bool hintIsAlm = mappedHint.Contains("ALM") || mappedHint.Contains("ALUMINUM");
-            bool hintIsSteelOrSstOrGalv = mappedHint.Contains("STL") || mappedHint.Contains("SST") || 
-                                         mappedHint.Contains("GALV") || mappedHint.Contains("STEEL") || 
-                                         mappedHint.Contains("GALVANIZED") || mappedHint.Contains("STAINLESS");
+            bool hintIsAlm = AluminumKeywords.Any(k => mappedHint.Contains(k.ToUpperInvariant()));
+            bool hintIsSteelOrSstOrGalv = SteelKeywords.Any(k => mappedHint.Contains(k.ToUpperInvariant()));
 
             // If the hint is not clearly one or the other, don't filter
             if (!hintIsAlm && !hintIsSteelOrSstOrGalv) return true;
 
             string keyUpper = thicknessMapKey.ToUpperInvariant();
-            bool keyIsAlm = keyUpper.Contains("ALM") || keyUpper.Contains("ALMB");
-            bool keyIsSteelOrSstOrGalv = keyUpper.Contains("STL") || keyUpper.Contains("SST") || keyUpper.Contains("GALV");
+            bool keyIsAlm = AluminumKeywords.Any(k => keyUpper.Contains(k.ToUpperInvariant()));
+            bool keyIsSteelOrSstOrGalv = SteelKeywords.Any(k => keyUpper.Contains(k.ToUpperInvariant()));
 
             if (hintIsAlm)
             {
@@ -542,17 +586,28 @@ namespace UnitConstructionVerifier.Models
             if (string.IsNullOrWhiteSpace(expectedChannel)) return expectedChannel;
 
             // Check if the part is one of the non-automating wall channel parts/brackets
-            if (modelNumber == "091-30117-078" || 
-                modelNumber == "091-30117-048" || 
-                modelNumber == "091-30117-046" || 
-                modelNumber == "091-30117-077")
+            if (!string.IsNullOrWhiteSpace(modelNumber) && NonAutomatingChannels.Contains(modelNumber))
             {
                 // Strip trailing '2', '3', or '4' suffix if present (e.g., "STL GALV3" -> "STL GALV")
-                if (expectedChannel.EndsWith("2")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
-                if (expectedChannel.EndsWith("3")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
-                if (expectedChannel.EndsWith("4")) return expectedChannel.Substring(0, expectedChannel.Length - 1);
+                if (expectedChannel.EndsWith("2") || expectedChannel.EndsWith("3") || expectedChannel.EndsWith("4"))
+                {
+                    return expectedChannel.Substring(0, expectedChannel.Length - 1);
+                }
             }
             return expectedChannel;
+        }
+
+        public static string GetPartDescription(string modelOrStockNumber, string defaultDescription)
+        {
+            if (!string.IsNullOrWhiteSpace(modelOrStockNumber))
+            {
+                string key = modelOrStockNumber.Trim();
+                if (PartDescriptions.TryGetValue(key, out string customDesc) && !string.IsNullOrWhiteSpace(customDesc))
+                {
+                    return customDesc;
+                }
+            }
+            return defaultDescription ?? string.Empty;
         }
 
         private class ConfigDataSchema
@@ -562,7 +617,11 @@ namespace UnitConstructionVerifier.Models
             public List<string>? Materials { get; set; }
             public Dictionary<string, string>? MaterialMappings { get; set; }
             public Dictionary<string, string>? GaugeMappings { get; set; }
+            public List<string>? NonAutomatingChannels { get; set; }
+            public List<string>? AluminumKeywords { get; set; }
+            public List<string>? SteelKeywords { get; set; }
             public Dictionary<string, string>? PartClassifications { get; set; }
+            public Dictionary<string, string>? PartDescriptions { get; set; }
             public List<PartRule>? PartRules { get; set; }
         }
     }

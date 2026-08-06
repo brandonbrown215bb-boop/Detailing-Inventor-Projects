@@ -13,7 +13,12 @@ public class SurfaceModel
     public string SurfaceUnitSide { get; set; } = string.Empty;
     public string ConfigurationKind { get; set; } = string.Empty;
     public string SkidNumber { get; set; } = string.Empty;
-    public int SkidId { get; set; } = 1;
+    private int _skidId = 1;
+    public int SkidId
+    {
+        get => _skidId <= 0 ? 1 : _skidId;
+        set => _skidId = value <= 0 ? 1 : value;
+    }
     public string StateId { get; set; } = "current";
     public string Notes { get; set; } = string.Empty;
     public bool IsHidden { get; set; }
@@ -23,13 +28,24 @@ public class SurfaceModel
     public List<string> PreviousNumbers { get; set; } = new();
     public string? GeometryFingerprint { get; set; }
 
+    public string EffectiveDisplayNumber => string.IsNullOrWhiteSpace(DisplayNumber) ? SurfaceNumber : DisplayNumber;
+
+    public string SkidTag => $"S{SkidId}";
+
+    public string TypeTag => string.IsNullOrWhiteSpace(ConfigurationKind)
+        ? (string.IsNullOrWhiteSpace(SurfaceType) ? "Surface" : SurfaceType)
+        : (ConfigurationKind == "UnitBase" ? "Base" : ConfigurationKind);
+
+    public string SideTag => string.IsNullOrWhiteSpace(SurfaceUnitSide) ? string.Empty : SurfaceUnitSide.Trim();
+
     public string ShortLabel
     {
         get
         {
-            if (string.IsNullOrEmpty(SurfaceNumber)) return "0000";
-            int dashIndex = SurfaceNumber.LastIndexOf('-');
-            string suffix = dashIndex >= 0 ? SurfaceNumber[(dashIndex + 1)..] : SurfaceNumber;
+            string num = EffectiveDisplayNumber;
+            if (string.IsNullOrEmpty(num)) return "0000";
+            int dashIndex = num.LastIndexOf('-');
+            string suffix = dashIndex >= 0 ? num[(dashIndex + 1)..] : num;
             return suffix.Length <= 4 ? suffix.PadLeft(4, '0') : suffix[^4..];
         }
     }

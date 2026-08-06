@@ -1,0 +1,58 @@
+using System.Collections.Generic;
+
+namespace UnitProgressTracker.Core.Models;
+
+public class ListDisplayOptions
+{
+    public string GroupMode { get; set; } = "skid"; // "skid", "type", "flat"
+    public string NameMode { get; set; } = "both";  // "both", "long", "short"
+    public string SortMode { get; set; } = "default"; // "default", "skid", "type", "skid-type"
+    public bool ShowTypeTag { get; set; } = true;
+    public bool ShowSkidTag { get; set; } = true;
+    public bool ShowSideTag { get; set; } = true;
+}
+
+public class ViewerOptions
+{
+    public bool ShowGrid { get; set; } = true;
+    public bool ShowSkidLabels { get; set; } = true;
+    public bool ShowLegend { get; set; } = true;
+    public bool ShowHoverTooltip { get; set; } = true;
+    public bool FpsControlsEnabled { get; set; } = true;
+    public double SurfaceOpacity { get; set; } = 0.9;
+    public bool WireframeVisible { get; set; } = true;
+}
+
+public class StickerOptions
+{
+    public string FontFamily { get; set; } = "Segoe UI";
+    public string TextColorHex { get; set; } = "#F8FAFC";
+    public string BackgroundColorHex { get; set; } = "#0F172A";
+    public string BorderColorHex { get; set; } = "#94A3B8";
+}
+
+public class ThemeOptions
+{
+    public string ThemeName { get; set; } = "Dark";
+    public string AccentColorHex { get; set; } = "#38BDF8";
+    public string PanelBackgroundHex { get; set; } = "#1E293B";
+    public bool AutoSyncWithSystemTheme { get; set; } = true;
+    public double UiFontScale { get; set; } = 1.0;
+    public bool HighVisibilityFocus { get; set; } = true;
+    public bool HighContrastOverride { get; set; } = false;
+}
+
+public class DisplayPreferences
+{
+    public ListDisplayOptions ListDisplay { get; set; } = new();
+    public ViewerOptions ViewerOptions { get; set; } = new();
+    public StickerOptions StickerOptions { get; set; } = new();
+    public ThemeOptions ThemeOptions { get; set; } = new();
+    public List<string> ChecklistTemplate { get; set; } = new()
+    {
+        "Verified dimensions",
+        "Verified material",
+        "Verified openings",
+        "Paperwork complete"
+    };
+}

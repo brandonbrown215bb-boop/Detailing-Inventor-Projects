@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace UnitProgressTracker.Core.Services;
 
+[SupportedOSPlatform("windows")]
 public class InventorComReader
 {
     [DllImport("oleaut32.dll", PreserveSig = false)]
@@ -40,62 +43,102 @@ public class InventorComReader
 
     public static string? TryReadConfigJsonAttribute(string iamPath)
     {
-        object? invObj = null;
-        object? docsObj = null;
+        if (string.IsNullOrWhiteSpace(iamPath) || !File.Exists(iamPath))
+            return null;
+
+        object? apprenticeObj = null;
         object? docObj = null;
-        object? attrSetsObj = null;
-        object? attrSetObj = null;
-        object? attrObj = null;
 
         try
         {
-            invObj = GetActiveComObject("Inventor.Application");
-            if (invObj == null) return null;
+            Type? apprenticeType = Type.GetTypeFromProgID("Inventor.ApprenticeServer");
+            if (apprenticeType == null) return null;
 
-            dynamic invApp = invObj;
-            docsObj = invApp.Documents;
-            dynamic docs = docsObj;
+            apprenticeObj = Activator.CreateInstance(apprenticeType);
+            if (apprenticeObj == null) return null;
 
-            docObj = docs.Open(iamPath, false);
+            dynamic apprentice = apprenticeObj;
+            docObj = apprentice.Open(iamPath);
             if (docObj == null) return null;
 
             dynamic doc = docObj;
-            attrSetsObj = doc.AttributeSets;
-            dynamic attributeSets = attrSetsObj;
+            dynamic attributeSets = doc.AttributeSets;
 
-            if (attributeSets.NameExists["DOCUMENT_CONFIG_JSON"])
+            // 1. Try MOM_DATA attribute set (standard for 391Z/ICG surface assemblies)
+            try
             {
-                attrSetObj = attributeSets["DOCUMENT_CONFIG_JSON"];
-                dynamic set = attrSetObj;
-                if (set.NameExists["DOCUMENT_CONFIG_JSON"])
+                if (attributeSets.NameIsUsed["MOM_DATA"])
                 {
-                    attrObj = set["DOCUMENT_CONFIG_JSON"];
-                    dynamic attr = attrObj;
-                    return attr.Value as string;
+                    dynamic momSet = attributeSets["MOM_DATA"];
+                    if (momSet.NameIsUsed["DOCUMENT_CONFIG_JSON"])
+                    {
+                        dynamic attr = momSet["DOCUMENT_CONFIG_JSON"];
+                        string? val = attr.Value as string;
+                        if (!string.IsNullOrWhiteSpace(val)) return val;
+                    }
                 }
             }
+            catch { }
+
+            // 2. Try direct DOCUMENT_CONFIG_JSON attribute set
+            try
+            {
+                if (attributeSets.NameIsUsed["DOCUMENT_CONFIG_JSON"])
+                {
+                    dynamic jsonSet = attributeSets["DOCUMENT_CONFIG_JSON"];
+                    if (jsonSet.NameIsUsed["DOCUMENT_CONFIG_JSON"])
+                    {
+                        dynamic attr = jsonSet["DOCUMENT_CONFIG_JSON"];
+                        string? val = attr.Value as string;
+                        if (!string.IsNullOrWhiteSpace(val)) return val;
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Fallback: scan all attribute sets
+            try
+            {
+                foreach (dynamic set in attributeSets)
+                {
+                    foreach (dynamic attr in set)
+                    {
+                        if (string.Equals((string)attr.Name, "DOCUMENT_CONFIG_JSON", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string? val = attr.Value as string;
+                            if (!string.IsNullOrWhiteSpace(val)) return val;
+                        }
+                    }
+                }
+            }
+            catch { }
         }
         catch
         {
-            // Inventor COM read failure
+            // Apprentice Server COM read failure
         }
         finally
         {
-            SafeReleaseComObject(attrObj);
-            SafeReleaseComObject(attrSetObj);
-            SafeReleaseComObject(attrSetsObj);
             if (docObj != null)
             {
                 try
                 {
                     dynamic doc = docObj;
-                    doc.Close(true);
+                    doc.Close();
                 }
                 catch { }
                 SafeReleaseComObject(docObj);
             }
-            SafeReleaseComObject(docsObj);
-            SafeReleaseComObject(invObj);
+            if (apprenticeObj != null)
+            {
+                try
+                {
+                    dynamic apprentice = apprenticeObj;
+                    apprentice.Close();
+                }
+                catch { }
+                SafeReleaseComObject(apprenticeObj);
+            }
         }
 
         return null;
@@ -118,4 +161,5 @@ public class InventorComReader
         }
     }
 }
+
 

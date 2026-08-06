@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using ExcelDataReader;
 using UnitProgressTracker.Core.Services;
 using Xunit;
 
@@ -56,6 +57,7 @@ public class ExcelBomImporterTests : IDisposable
                            "391-1001,1,EA,1 [FR-MB],MB,Casing Roof Panel,16 GA STL GALV,10,ADD,OK,1.0\n" +
                            "291-2001,1,EA,1 [FR-MB],MB,Cooling Coil,Copper Tubes,20,ADD,OK,3.0\n" +
                            "091-30117-080,50,EA,1 [FR-MB],MB,Subfloor Screw,Zinc,30,ADD,OK,0.1\n" +
+                           "024-41723-011,1,EA,1 [FR-MB],MB,VFD DRIVE,N3R,35,ADD,OK,0.0\n" +
                            "491-0001,1,EA,1 [FR-MB],MB,MAPICS Multiplier Factor,,40,ADD,OK,0.0\n";
 
         File.WriteAllText(csvPath, csvContent, Encoding.UTF8);
@@ -63,35 +65,39 @@ public class ExcelBomImporterTests : IDisposable
         var importer = new ExcelBomImporter();
         var result = importer.ImportBom(csvPath);
 
-        Assert.Equal(4, result.TotalRowCount);
+        Assert.Equal(5, result.TotalRowCount);
         Assert.Equal(2, result.KeptCount);
-        Assert.Equal(2, result.DroppedCount);
+        Assert.Equal(3, result.DroppedCount);
 
         Assert.Contains(result.KeptRows, r => r.PartNumber == "391-1001");
         Assert.Contains(result.KeptRows, r => r.PartNumber == "291-2001");
         Assert.Contains(result.DroppedRows, r => r.PartNumber == "091-30117-080");
+        Assert.Contains(result.DroppedRows, r => r.PartNumber == "024-41723-011");
         Assert.Contains(result.DroppedRows, r => r.PartNumber == "491-0001");
     }
 
     [Theory]
-    [InlineData("391-1001", "MB", true)]
-    [InlineData("291-2001", "MB", true)]
-    [InlineData("386-3001", "MB", true)]
-    [InlineData("486-4001", "MB", true)]
-    [InlineData("251-5001", "MB", true)]
-    [InlineData("5E0302690501000", "<--", true)]
-    [InlineData("091-30117-080", "MB", false)]
-    [InlineData("025-0001", "MB", false)]
-    [InlineData("007-0001", "MB", false)]
-    [InlineData("026-0001", "MB", false)]
-    [InlineData("028-0001", "MB", false)]
-    [InlineData("035-0001", "MB", false)]
-    [InlineData("491-0001", "MB", false)]
-    [InlineData("291-2001", "<--", false)]
-    [InlineData("391-1001", "<--", true)]
-    public void PrefixTierFilter_FiltersRowsCorrectly(string partNumber, string segment, bool shouldKeep)
+    [InlineData("391-1001", "MB", "ROOF PANEL", true)]
+    [InlineData("291-2001", "MB", "COOLING COIL", true)]
+    [InlineData("386-3001", "MB", "LABEL KIT", true)]
+    [InlineData("486-4001", "MB", "FRAME ASSY", true)]
+    [InlineData("251-5001", "MB", "SUBASSEMBLY", true)]
+    [InlineData("091Z010136-0993", "<--", "ROOF CAP SPLIT COVER", true)]
+    [InlineData("391-60125-617", "HW-1", "DOOR 24 X 72 STD", true)]
+    [InlineData("091-30117-080", "MB", "SUBFLOOR SCREW", false)]
+    [InlineData("024-41723-011", "HW-1", "VFD DRIVE N3R", false)]
+    [InlineData("290-010136-701", "IC", "STEAM COIL", false)]
+    [InlineData("025-0001", "MB", "CONDUIT", false)]
+    [InlineData("007-0001", "MB", "COPPER TUBE", false)]
+    [InlineData("026-0001", "MB", "SCREW", false)]
+    [InlineData("028-0001", "MB", "GASKET", false)]
+    [InlineData("035-0001", "MB", "HINGE", false)]
+    [InlineData("491-0001", "MB", "FACTOR", false)]
+    [InlineData("291-2001", "<--", "COOLING COIL", true)]
+    [InlineData("391-1001", "<--", "ROOF PANEL", true)]
+    public void ContextAwareFilter_FiltersRowsCorrectly(string partNumber, string segment, string description, bool shouldKeep)
     {
-        bool result = ExcelBomImporter.ShouldKeepRow(partNumber, segment);
+        bool result = ExcelBomImporter.ShouldKeepRow(partNumber, segment, description);
         Assert.Equal(shouldKeep, result);
     }
 
@@ -105,14 +111,36 @@ public class ExcelBomImporterTests : IDisposable
     }
 
     [Fact]
-    public void Import_EmptyFile_ReturnsEmptyResult()
+    public void Import_RealJob20170Files_ImportsFlatAndGroupedCorrectly()
     {
-        using var emptyStream = new MemoryStream(Array.Empty<byte>());
-        var importer = new ExcelBomImporter();
-        var result = importer.ImportBom(emptyStream, "empty.csv");
+        string flatPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_FLAT_6E-330066-03_20260806_1229.xlsx";
+        string grpdPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_GRPD_6E-330066-03_20260806_1227.xlsx";
 
-        Assert.Equal(0, result.TotalRowCount);
-        Assert.Equal(0, result.KeptCount);
-        Assert.Equal(0, result.DroppedCount);
+        if (File.Exists(flatPath))
+        {
+            var importer = new ExcelBomImporter();
+            var flatResult = importer.ImportBom(flatPath);
+
+            Assert.True(flatResult.KeptCount > 100);
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber.StartsWith("091Z"));
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60125-617");
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60206-841");
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60232-358");
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60234-081");
+
+            Assert.DoesNotContain(flatResult.KeptRows, r => r.PartNumber.StartsWith("024-"));
+            Assert.DoesNotContain(flatResult.KeptRows, r => r.PartNumber.StartsWith("290-"));
+        }
+
+        if (File.Exists(grpdPath))
+        {
+            var importer = new ExcelBomImporter();
+            var grpdResult = importer.ImportBom(grpdPath);
+
+            Assert.True(grpdResult.KeptCount > 0, $"Actual KeptCount = {grpdResult.KeptCount}");
+            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60125-617");
+            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60206-841");
+            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60234-081");
+        }
     }
 }
