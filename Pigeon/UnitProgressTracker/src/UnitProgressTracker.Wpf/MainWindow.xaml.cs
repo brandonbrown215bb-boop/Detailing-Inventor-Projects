@@ -64,6 +64,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnBulkheadChannelsToggleClick(object sender, RoutedEventArgs e)
+    {
+        Viewport3D.SetShowBulkheadChannels(ViewModel.ShowBulkheadChannels);
+        Refresh3DViewport();
+    }
+
     private void Refresh3DViewport()
     {
         Viewport3D.LoadSurfaces(ViewModel.Surfaces, ViewModel.GetStatusColor);

@@ -24,6 +24,11 @@ public class SurfaceModel
     public bool IsHidden { get; set; }
     public Dictionary<string, bool> Checklist { get; set; } = new();
     public List<GeometryBox> Boxes { get; set; } = new();
+    public JobContextModel? JobContext { get; set; }
+    public CasingSpecModel? CasingSpec { get; set; }
+    public List<OpeningModel> Openings { get; set; } = new();
+    public List<BulkheadHolePatternModel> BulkheadHolePatterns { get; set; } = new();
+    public List<GeometryBox> BulkheadChannels { get; set; } = new();
     public string? DisplayNumber { get; set; }
     public List<string> PreviousNumbers { get; set; } = new();
     public string? GeometryFingerprint { get; set; }

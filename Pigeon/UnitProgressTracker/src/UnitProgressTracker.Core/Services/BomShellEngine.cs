@@ -73,7 +73,8 @@ public class BomShellEngine
     public static string? ParseSkidNumber(string skid)
     {
         if (string.IsNullOrWhiteSpace(skid)) return null;
-        var match = Regex.Match(skid.Trim(), @"^(\d+)");
+        var match = Regex.Match(skid.Trim(), @"\b(\d+)\b");
+        if (!match.Success) match = Regex.Match(skid.Trim(), @"(\d+)");
         return match.Success ? match.Groups[1].Value.PadLeft(2, '0') : null;
     }
 
@@ -114,14 +115,47 @@ public class BomShellEngine
         return result;
     }
 
-    public static string? ResolveSegmentFolder(string skid, string segment)
+    public static string? ResolveSegmentFolder(string skid, string segment, UnitConfigModel? unitConfig = null)
     {
         if (string.IsNullOrWhiteSpace(segment) || segment.Trim() == "<--") return null;
-        string prefix = segment.Split(" - ")[0].Trim();
-        string normalized = NormalizeSegmentCode(prefix);
+
+        string? skidNum = ParseSkidNumber(skid);
+        if (unitConfig != null && !string.IsNullOrWhiteSpace(skidNum))
+        {
+            string? fromConfig = UnitConfigParser.ResolveSegmentFolderFromConfig(skidNum, segment, unitConfig);
+            if (fromConfig != null) return fromConfig;
+        }
+
         var orderTokens = ParseSkidSegmentOrder(skid);
-        var hit = orderTokens.FirstOrDefault(t => t.Normalized == normalized);
-        return hit?.FolderPrefix;
+        if (orderTokens.Count == 0) return null;
+
+        var parts = segment.Split(" - ").Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+        foreach (var p in parts)
+        {
+            string normalized = NormalizeSegmentCode(p);
+            if (string.IsNullOrWhiteSpace(normalized) || Regex.IsMatch(normalized, @"^\d+$")) continue;
+
+            // 1. Exact match
+            var hit = orderTokens.FirstOrDefault(t => t.Normalized == normalized);
+            if (hit != null) return hit.FolderPrefix;
+
+            // 2. Index-1 fallback (e.g. HW1 -> HW) on same skid
+            if (normalized.EndsWith("1") && normalized.Length > 1)
+            {
+                string baseCode = normalized[..^1];
+                hit = orderTokens.FirstOrDefault(t => t.Normalized == baseCode);
+                if (hit != null) return hit.FolderPrefix;
+            }
+
+            // 3. Un-numbered fallback (e.g. HW -> HW1) on same skid
+            if (!char.IsDigit(normalized[^1]))
+            {
+                hit = orderTokens.FirstOrDefault(t => t.Normalized == normalized + "1");
+                if (hit != null) return hit.FolderPrefix;
+            }
+        }
+
+        return null;
     }
 
     public static string SanitizeAssemblyFolderName(string description, string extDescription = "")
@@ -156,7 +190,7 @@ public class BomShellEngine
         return string.Join("|", partNumber, skid, segment, description, extDescription ?? "");
     }
 
-    public ShellFolderPlan BuildPlan(IEnumerable<BomRow> rows, string? shellRoot = null)
+    public ShellFolderPlan BuildPlan(IEnumerable<BomRow> rows, string? shellRoot = null, UnitConfigModel? unitConfig = null)
     {
         var p391Rows = rows.Where(r => Is391Part(r.PartNumber)).ToList();
 
@@ -182,7 +216,7 @@ public class BomShellEngine
             }
 
             string? skidNum = ParseSkidNumber(row.Skid);
-            string? segmentFolder = ResolveSegmentFolder(row.Skid, row.Segment);
+            string? segmentFolder = ResolveSegmentFolder(row.Skid, row.Segment, unitConfig);
 
             if (skidNum == null || segmentFolder == null)
             {
@@ -259,7 +293,9 @@ public class BomShellEngine
                 ExcludedCount = excluded.Count,
                 MisplacedCount = misplaced.Count,
                 SkippedCount = skipped.Count,
-                CustomSqCount = entries.Count(e => e.IsCustomSq)
+                CustomSqCount = entries.Count(e => e.IsCustomSq),
+                ConfigLoaded = unitConfig != null,
+                ConfigWarnings = unitConfig?.Warnings ?? new List<string>()
             }
         };
     }

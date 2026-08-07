@@ -68,6 +68,16 @@ public class AsyncRelayCommand : ICommand
     }
 }
 
+public record CombinedBulkheadChannelViewModel(
+    string BulkheadPartNumber,
+    string BulkheadDesc,
+    string UnitSide,
+    double DoaOffset,
+    double StartOffset,
+    double ChannelSpan,
+    int TotalHoles
+);
+
 public class MainViewModel : INotifyPropertyChanged
 {
     private string? _currentFolderPath;
@@ -170,6 +180,19 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool HasRecentProjects => RecentProjects.Count > 0;
 
+    public static string NormalizeSide(string? side)
+    {
+        if (string.IsNullOrWhiteSpace(side)) return "";
+        string s = side.Trim().ToLowerInvariant();
+        if (s.Contains("roof") || s.Contains("top")) return "top";
+        if (s.Contains("floor") || s.Contains("bottom")) return "bottom";
+        if (s.Contains("left")) return "left";
+        if (s.Contains("right")) return "right";
+        if (s.Contains("front")) return "front";
+        if (s.Contains("rear") || s.Contains("back")) return "rear";
+        return s;
+    }
+
     public SurfaceModel? SelectedSurface
     {
         get => _selectedSurface;
@@ -179,6 +202,18 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelectedSurface));
             OnPropertyChanged(nameof(SelectedSurfaceNotes));
+            OnPropertyChanged(nameof(SelectedSurfaceCasingSpec));
+            OnPropertyChanged(nameof(SelectedSurfaceSideName));
+            OnPropertyChanged(nameof(SelectedSurfaceSkin));
+            OnPropertyChanged(nameof(SelectedSurfaceLiner));
+            OnPropertyChanged(nameof(SelectedSurfaceWallThickness));
+            OnPropertyChanged(nameof(IsSelectedSurfaceFloor));
+            OnPropertyChanged(nameof(SelectedSurfaceOpenings));
+            OnPropertyChanged(nameof(SelectedSurfaceBulkheadPatterns));
+            OnPropertyChanged(nameof(SelectedSurfaceBulkheadChannels));
+            OnPropertyChanged(nameof(SelectedSurfaceCombinedChannels));
+            OnPropertyChanged(nameof(CurrentJobContext));
+            OnPropertyChanged(nameof(HasJobContext));
             NotifyChecklistChanged();
             if (value != null)
                 RequestHighlightSurface?.Invoke(value.SurfaceNumber);
@@ -227,6 +262,161 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ChecklistProgressText));
     }
 
+    private bool _showBulkheadChannels = true;
+    public bool ShowBulkheadChannels
+    {
+        get => _showBulkheadChannels;
+        set
+        {
+            if (_showBulkheadChannels != value)
+            {
+                _showBulkheadChannels = value;
+                OnPropertyChanged();
+                RequestViewportRefresh?.Invoke();
+            }
+        }
+    }
+
+    public JobContextModel? CurrentJobContext => Surfaces.FirstOrDefault(s => s.JobContext != null && !string.IsNullOrEmpty(s.JobContext.SalesOrderNumber))?.JobContext;
+    public bool HasJobContext => CurrentJobContext != null;
+
+    public CasingSpecModel? SelectedSurfaceCasingSpec => SelectedSurface?.CasingSpec;
+
+    public string SelectedSurfaceSideName
+    {
+        get
+        {
+            if (SelectedSurface == null) return "";
+            string side = NormalizeSide(SelectedSurface.SideTag);
+            return side switch
+            {
+                "top" => "Top / Roof Surface",
+                "bottom" => "Bottom / Floor Surface",
+                "left" => "Left Wall Surface",
+                "right" => "Right Wall Surface",
+                "front" => "Front Wall Surface",
+                "rear" => "Rear Wall Surface",
+                _ => SelectedSurface.SideTag
+            };
+        }
+    }
+
+    public string SelectedSurfaceSkin
+    {
+        get
+        {
+            if (SelectedSurface?.CasingSpec == null) return "N/A";
+            string side = NormalizeSide(SelectedSurface.SideTag);
+            var spec = SelectedSurface.CasingSpec;
+            return side switch
+            {
+                "top" => !string.IsNullOrEmpty(spec.SkinTop) ? spec.SkinTop : "N/A",
+                "bottom" => !string.IsNullOrEmpty(spec.SkinBottom) ? spec.SkinBottom : "N/A",
+                "left" => !string.IsNullOrEmpty(spec.SkinLeft) ? spec.SkinLeft : "N/A",
+                "right" => !string.IsNullOrEmpty(spec.SkinRight) ? spec.SkinRight : "N/A",
+                "front" => !string.IsNullOrEmpty(spec.SkinFront) ? spec.SkinFront : "N/A",
+                "rear" => !string.IsNullOrEmpty(spec.SkinRear) ? spec.SkinRear : "N/A",
+                _ => !string.IsNullOrEmpty(spec.SkinTop) ? spec.SkinTop : "N/A"
+            };
+        }
+    }
+
+    public string SelectedSurfaceLiner
+    {
+        get
+        {
+            if (SelectedSurface?.CasingSpec == null) return "N/A";
+            string side = NormalizeSide(SelectedSurface.SideTag);
+            var spec = SelectedSurface.CasingSpec;
+            return side switch
+            {
+                "top" => !string.IsNullOrEmpty(spec.LinerTop) ? spec.LinerTop : "N/A",
+                "bottom" => !string.IsNullOrEmpty(spec.LinerBottom) ? spec.LinerBottom : "N/A",
+                "left" => !string.IsNullOrEmpty(spec.LinerLeft) ? spec.LinerLeft : "N/A",
+                "right" => !string.IsNullOrEmpty(spec.LinerRight) ? spec.LinerRight : "N/A",
+                "front" => !string.IsNullOrEmpty(spec.LinerFront) ? spec.LinerFront : "N/A",
+                "rear" => !string.IsNullOrEmpty(spec.LinerRear) ? spec.LinerRear : "N/A",
+                _ => !string.IsNullOrEmpty(spec.LinerTop) ? spec.LinerTop : "N/A"
+            };
+        }
+    }
+
+    public string SelectedSurfaceWallThickness
+    {
+        get
+        {
+            if (SelectedSurface?.CasingSpec == null) return "N/A";
+            string side = NormalizeSide(SelectedSurface.SideTag);
+            var spec = SelectedSurface.CasingSpec;
+            double? th = side switch
+            {
+                "top" => spec.WallThicknessTop,
+                "bottom" => spec.WallThicknessBottom,
+                "left" => spec.WallThicknessLeft,
+                "right" => spec.WallThicknessRight,
+                "front" => spec.WallThicknessFront,
+                "rear" => spec.WallThicknessRear,
+                _ => spec.WallThicknessTop
+            };
+            return (th.HasValue && th.Value > 0) ? $"{th.Value:0.0}\"" : "N/A";
+        }
+    }
+
+    public bool IsSelectedSurfaceFloor => NormalizeSide(SelectedSurface?.SideTag) == "bottom";
+
+    public IEnumerable<OpeningModel> SelectedSurfaceOpenings
+    {
+        get
+        {
+            if (SelectedSurface?.Openings == null) return Enumerable.Empty<OpeningModel>();
+            string surfSide = NormalizeSide(SelectedSurface.SideTag);
+            if (string.IsNullOrEmpty(surfSide)) return SelectedSurface.Openings;
+            return SelectedSurface.Openings.Where(o => NormalizeSide(o.UnitSide) == surfSide);
+        }
+    }
+
+    public IEnumerable<BulkheadHolePatternModel> SelectedSurfaceBulkheadPatterns => SelectedSurface?.BulkheadHolePatterns ?? Enumerable.Empty<BulkheadHolePatternModel>();
+
+    public IEnumerable<CombinedBulkheadChannelViewModel> SelectedSurfaceCombinedChannels
+    {
+        get
+        {
+            if (SelectedSurface?.BulkheadHolePatterns == null) return Enumerable.Empty<CombinedBulkheadChannelViewModel>();
+            string surfSide = NormalizeSide(SelectedSurface.SideTag);
+
+            var matching = SelectedSurface.BulkheadHolePatterns.Where(p => p.WidthQty > 0);
+            if (!string.IsNullOrEmpty(surfSide))
+            {
+                matching = matching.Where(p => NormalizeSide(p.UnitSide) == surfSide);
+            }
+
+            var result = new List<CombinedBulkheadChannelViewModel>();
+            foreach (var group in matching.GroupBy(p => new { Part = p.BulkheadPartNumber, Side = p.UnitSide }))
+            {
+                var first = group.First();
+                double minDoa = group.Min(p => p.DoaOffset);
+                double minOffset = group.Min(p => p.WidthOffset);
+                double maxEnd = group.Max(p => p.WidthOffset + (p.WidthQty > 1 ? (p.WidthQty - 1) * p.WidthSpacing : 0.0));
+                double span = Math.Max(1.5, (maxEnd - minOffset) + 1.5);
+                int totalHoles = (int)group.Sum(p => p.WidthQty);
+
+                result.Add(new CombinedBulkheadChannelViewModel(
+                    BulkheadPartNumber: first.BulkheadPartNumber,
+                    BulkheadDesc: first.BulkheadDescription,
+                    UnitSide: first.UnitSide,
+                    DoaOffset: minDoa,
+                    StartOffset: minOffset,
+                    ChannelSpan: span,
+                    TotalHoles: totalHoles
+                ));
+            }
+
+            return result;
+        }
+    }
+
+    public IEnumerable<GeometryBox> SelectedSurfaceBulkheadChannels => SelectedSurface?.BulkheadChannels ?? Enumerable.Empty<GeometryBox>();
+
     public ShellFolderEntry? SelectedBomEntry
     {
         get => _selectedBomEntry;
@@ -246,6 +436,11 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public DisplayPreferences Preferences => ProjectState.Preferences;
+
+    public bool HasUnitConfig => ProjectState.UnitConfig != null;
+    public string UnitConfigSummaryText => ProjectState.UnitConfig != null
+        ? $"Config: {ProjectState.UnitConfig.ProjectId ?? "Loaded"} ({ProjectState.UnitConfig.Skids.Count} Skids)"
+        : "No Config.xml loaded";
 
     public string GroupMode
     {
@@ -520,6 +715,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ClearRecentProjectsCommand { get; }
     public ICommand ExitCommand { get; }
     public ICommand ImportExcelBomCommand { get; }
+    public ICommand ImportUnitConfigCommand { get; }
     public ICommand SetShellRootFolderCommand { get; }
     public ICommand CreateShellFoldersCommand { get; }
     public ICommand OpenShellFolderCommand { get; }
@@ -568,6 +764,7 @@ public class MainViewModel : INotifyPropertyChanged
         ClearRecentProjectsCommand = new RelayCommand(_ => ExecuteClearRecentProjects(), _ => HasRecentProjects);
         ExitCommand = new RelayCommand(_ => ExecuteExit());
         ImportExcelBomCommand = new RelayCommand(_ => ExecuteImportExcelBom());
+        ImportUnitConfigCommand = new RelayCommand(_ => ExecuteImportUnitConfig());
         SetShellRootFolderCommand = new RelayCommand(_ => ExecuteSetShellRootFolder());
         CreateShellFoldersCommand = new RelayCommand(_ => CreateShellFolders(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && BomEntries.Count > 0);
         OpenShellFolderCommand = new RelayCommand(_ => ExecuteOpenShellFolder(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && Directory.Exists(ShellRootPath));
@@ -1049,6 +1246,43 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public void ExecuteImportUnitConfig()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select Ce3 Unit Config XML File",
+            Filter = "XML Files (*.xml)|*.xml|All Files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                string content = File.ReadAllText(dialog.FileName);
+                var config = UnitConfigParser.ParseUnitConfigXml(content, dialog.FileName);
+                ProjectState.UnitConfig = config;
+                MarkDirty();
+
+                if (ProjectState.Bom != null)
+                {
+                    LoadBomRows(ProjectState.Bom.KeptRows);
+                }
+                else if (BomEntries.Count > 0)
+                {
+                    LoadBomRows(GetCurrentBomRows());
+                }
+
+                StatusMessage = $"Imported unit Config.xml ({config.Skids.Count} skids, Project: {config.ProjectId ?? "N/A"}).";
+                OnPropertyChanged(nameof(UnitConfigSummaryText));
+                OnPropertyChanged(nameof(HasUnitConfig));
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error importing unit Config.xml: {ex.Message}";
+            }
+        }
+    }
+
     public void ExecuteSetShellRootFolder()
     {
         var dialog = new OpenFolderDialog { Title = "Select Shell Root Export Folder" };
@@ -1120,7 +1354,7 @@ public class MainViewModel : INotifyPropertyChanged
     public void LoadBomRows(IEnumerable<BomRow> rows)
     {
         var engine = new BomShellEngine();
-        CurrentBomPlan = engine.BuildPlan(rows, ShellRootPath);
+        CurrentBomPlan = engine.BuildPlan(rows, ShellRootPath, ProjectState.UnitConfig);
 
         BomEntries.Clear();
         foreach (var entry in CurrentBomPlan.Entries) BomEntries.Add(entry);

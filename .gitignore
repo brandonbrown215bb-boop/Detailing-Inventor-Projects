@@ -10,6 +10,7 @@
 *.userosscache
 *.sln.docstates
 *.env
+*.exe
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -221,7 +222,16 @@ publish/
 .graphify/
 graphify-out/
 .qmd/
+.codegraph/
 # AGENT_GROUND_END
+
+# IDE and OS metadata files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+ehthumbs.db
 .questboard/BOARD.local.md
 
 # Agent session scratch dirs (transient, not deliverables)

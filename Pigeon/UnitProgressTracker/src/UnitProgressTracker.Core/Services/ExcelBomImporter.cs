@@ -141,12 +141,58 @@ public class ExcelBomImporter
         int colPn = 0, colQty = 1, colUnit = 2, colSkid = 3, colSeg = 4, colDesc = 5, colExtDesc = 6;
         bool headerFound = false;
 
+        string currentSkid = string.Empty;
+        string currentSegment = string.Empty;
+
         do
         {
             while (reader.Read())
             {
                 int fieldCount = reader.FieldCount;
                 if (fieldCount == 0) continue;
+
+                // Inspect section headers for hierarchical context (Skid & Segment)
+                string cellA = GetValueSafe(reader, 0, fieldCount);
+                string cellB = GetValueSafe(reader, 1, fieldCount);
+
+                if (cellA.Contains("SKID #") || cellA.Contains("SKID SHP") || cellB.Contains("SKID #") || cellB.Contains("SKID SHP"))
+                {
+                    string text = cellA.Length > 0 ? cellA : cellB;
+                    var bracketMatch = System.Text.RegularExpressions.Regex.Match(text, @"\[([^\]]+)\]");
+                    var skidNumMatch = System.Text.RegularExpressions.Regex.Match(text, @"SKID #?(\d+)");
+
+                    if (skidNumMatch.Success)
+                    {
+                        string num = skidNumMatch.Groups[1].Value.PadLeft(2, '0');
+                        currentSkid = bracketMatch.Success
+                            ? $"{num} - [{bracketMatch.Groups[1].Value}]"
+                            : num;
+                    }
+                    else if (text.Contains("SKID SHP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var numMatch = System.Text.RegularExpressions.Regex.Match(text, @"491-\d+-(\d+)");
+                        string num = numMatch.Success ? numMatch.Groups[1].Value : "101";
+                        currentSkid = bracketMatch.Success
+                            ? $"{num} - [{bracketMatch.Groups[1].Value}]"
+                            : $"{num} - []";
+                    }
+                }
+
+                string segCandidate = cellB.Length > 0 ? cellB : cellA;
+                if (segCandidate.StartsWith("Seg #", StringComparison.OrdinalIgnoreCase))
+                {
+                    string rawSeg = segCandidate;
+                    int itemsIdx = rawSeg.LastIndexOf('(');
+                    if (itemsIdx > 0)
+                    {
+                        rawSeg = rawSeg.Substring(0, itemsIdx).Trim();
+                    }
+                    if (rawSeg.StartsWith("Seg #", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rawSeg = rawSeg.Substring(5).Trim();
+                    }
+                    currentSegment = rawSeg;
+                }
 
                 // Find the first non-empty cell in columns 0..3 for part number (handles tree-indented Grouped formats)
                 int pnColIndex = -1;
@@ -205,6 +251,23 @@ public class ExcelBomImporter
                 string segment = GetValueSafe(reader, effectiveSegCol, fieldCount);
                 string description = GetValueSafe(reader, effectiveDescCol, fieldCount);
                 string extDescription = GetValueSafe(reader, effectiveExtDescCol, fieldCount);
+
+                // Fallback to active hierarchical state context for Skid & Segment when absent or numeric
+                if (string.IsNullOrWhiteSpace(skid) || System.Text.RegularExpressions.Regex.IsMatch(skid, @"^\d+$"))
+                {
+                    if (!string.IsNullOrWhiteSpace(currentSkid))
+                    {
+                        skid = currentSkid;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(segment) || System.Text.RegularExpressions.Regex.IsMatch(segment, @"^\d+$"))
+                {
+                    if (!string.IsNullOrWhiteSpace(currentSegment))
+                    {
+                        segment = currentSegment;
+                    }
+                }
 
                 var row = new BomRow
                 {

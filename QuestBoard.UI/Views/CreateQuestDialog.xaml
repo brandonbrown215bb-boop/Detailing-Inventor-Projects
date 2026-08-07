@@ -1,0 +1,53 @@
+<UserControl x:Class="QuestBoard.UI.Views.CreateQuestDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="500" d:DesignWidth="600">
+    <Grid Background="#90000000">
+        <Border Width="550" VerticalAlignment="Center" HorizontalAlignment="Center"
+                Background="#FDF5E6" BorderBrush="#8B4513" BorderThickness="3" CornerRadius="10" Padding="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="8" Color="Black" Opacity="0.7"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="📜 POST NEW QUEST CARD" FontSize="18" FontWeight="Bold" Foreground="#8B4513" Margin="0,0,0,15"/>
+
+                <StackPanel Grid.Row="1">
+                    <!-- Title -->
+                    <TextBlock Text="QUEST TITLE *" FontWeight="Bold" Foreground="#5C3A21" FontSize="12"/>
+                    <TextBox x:Name="TitleTextBox" Margin="0,4,0,12" Padding="6" FontSize="14"/>
+
+                    <!-- Priority -->
+                    <TextBlock Text="PRIORITY" FontWeight="Bold" Foreground="#5C3A21" FontSize="12"/>
+                    <ComboBox x:Name="PriorityComboBox" SelectedIndex="1" Margin="0,4,0,12" Padding="6">
+                        <ComboBoxItem Content="high"/>
+                        <ComboBoxItem Content="medium"/>
+                        <ComboBoxItem Content="low"/>
+                    </ComboBox>
+
+                    <!-- Context -->
+                    <TextBlock Text="CONTEXT &amp; OBJECTIVE *" FontWeight="Bold" Foreground="#5C3A21" FontSize="12"/>
+                    <TextBox x:Name="ContextTextBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,4,0,12" Padding="6"/>
+
+                    <!-- Initial Next Action -->
+                    <TextBlock Text="INITIAL NEXT ACTION *" FontWeight="Bold" Foreground="#5C3A21" FontSize="12"/>
+                    <TextBox x:Name="NextActionTextBox" Margin="0,4,0,16" Padding="6"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Cancel" Width="90" Height="32" Click="Cancel_Click" Margin="0,0,8,0" Background="Transparent" Foreground="#8B4513" BorderBrush="#8B4513"/>
+                    <Button Content="📌 Post Quest" Width="120" Height="32" Click="PostQuest_Click" Background="#8B4513" Foreground="White" FontWeight="Bold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -40,6 +40,8 @@ public class ShellFolderPlanStats
     public int MisplacedCount { get; set; }
     public int SkippedCount { get; set; }
     public int CustomSqCount { get; set; }
+    public bool ConfigLoaded { get; set; }
+    public List<string> ConfigWarnings { get; set; } = new();
 }
 
 public class ShellFolderPlan

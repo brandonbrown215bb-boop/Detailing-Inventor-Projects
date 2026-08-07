@@ -113,8 +113,8 @@ public class ExcelBomImporterTests : IDisposable
     [Fact]
     public void Import_RealJob20170Files_ImportsFlatAndGroupedCorrectly()
     {
-        string flatPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_FLAT_6E-330066-03_20260806_1229.xlsx";
-        string grpdPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_GRPD_6E-330066-03_20260806_1227.xlsx";
+        string flatPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_FLAT_6E-330066-03_20260807_0653.xlsx";
+        string grpdPath = @"C:\Users\jbrow263\ISG\Jobs Checked\20170\BOM_GRPD_6E-330066-03_20260807_0652.xlsx";
 
         if (File.Exists(flatPath))
         {
@@ -123,13 +123,15 @@ public class ExcelBomImporterTests : IDisposable
 
             Assert.True(flatResult.KeptCount > 100);
             Assert.Contains(flatResult.KeptRows, r => r.PartNumber.StartsWith("091Z"));
-            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60125-617");
-            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60206-841");
-            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60232-358");
+            Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60233-529");
             Assert.Contains(flatResult.KeptRows, r => r.PartNumber == "391-60234-081");
 
             Assert.DoesNotContain(flatResult.KeptRows, r => r.PartNumber.StartsWith("024-"));
             Assert.DoesNotContain(flatResult.KeptRows, r => r.PartNumber.StartsWith("290-"));
+
+            var shellEngine = new BomShellEngine();
+            var plan = shellEngine.BuildPlan(flatResult.KeptRows);
+            Assert.Contains(plan.Entries, e => e.PartNumber == "391-60233-529" && e.SegmentFolder == "06 HW");
         }
 
         if (File.Exists(grpdPath))
@@ -138,9 +140,12 @@ public class ExcelBomImporterTests : IDisposable
             var grpdResult = importer.ImportBom(grpdPath);
 
             Assert.True(grpdResult.KeptCount > 0, $"Actual KeptCount = {grpdResult.KeptCount}");
-            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60125-617");
-            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60206-841");
-            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60234-081");
+            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60232-609");
+            Assert.Contains(grpdResult.KeptRows, r => r.PartNumber == "391-60232-611");
+
+            var shellEngine = new BomShellEngine();
+            var plan = shellEngine.BuildPlan(grpdResult.KeptRows);
+            Assert.True(plan.Entries.Count > 0, $"Grouped BOM entries should populate shell plan, but got {plan.Entries.Count}");
         }
     }
 }

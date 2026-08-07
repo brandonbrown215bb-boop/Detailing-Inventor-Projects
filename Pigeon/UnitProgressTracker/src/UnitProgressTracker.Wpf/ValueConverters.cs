@@ -142,3 +142,18 @@ public class ColorHexToBrushConverter : IValueConverter
         return "#94a3b8";
     }
 }
+
+/// <summary>Converts non-empty string to Visible, empty/null to Collapsed.</summary>
+public class StringToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        bool hasValue = value is string str && !string.IsNullOrWhiteSpace(str);
+        return hasValue ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}

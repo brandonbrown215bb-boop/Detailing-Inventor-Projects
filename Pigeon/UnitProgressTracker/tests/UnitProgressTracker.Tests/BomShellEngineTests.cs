@@ -140,6 +140,24 @@ public class BomShellEngineTests
         Assert.Equal("01 MB", result);
     }
 
+    [Fact]
+    public void ResolveSegmentFolder_HW1_Matches_HW_OnSameSkid()
+    {
+        string skid = "01 - [(RF2-XA4-XA3-HW-RF1-XA2-IP-XA1-FE)]";
+        string? result = BomShellEngine.ResolveSegmentFolder(skid, "HW-1 - Heat Wheel");
+
+        Assert.Equal("06 HW", result);
+    }
+
+    [Fact]
+    public void ResolveSegmentFolder_HW3_DoesNotMatch_HW_OnSameSkid()
+    {
+        string skid = "01 - [(RF2-XA4-XA3-HW-RF1-XA2-IP-XA1-FE)]";
+        string? result = BomShellEngine.ResolveSegmentFolder(skid, "HW-3 - Heat Wheel");
+
+        Assert.Null(result);
+    }
+
     [Theory]
     [InlineData("PANEL SQ TYPE A", true)]
     [InlineData("SQ ACCESS DOOR", true)]

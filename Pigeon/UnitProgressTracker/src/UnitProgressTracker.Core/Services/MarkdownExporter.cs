@@ -70,6 +70,20 @@ public static class MarkdownExporter
         sb.AppendLine($"*Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC*");
         sb.AppendLine();
 
+        // Job & Order Summary (if available)
+        var firstJobCtx = surfacesList.FirstOrDefault(s => s.JobContext != null && !string.IsNullOrEmpty(s.JobContext.SalesOrderNumber))?.JobContext;
+        if (firstJobCtx != null)
+        {
+            sb.AppendLine("## Job & Order Summary");
+            sb.AppendLine($"- **Sales Order Number:** `{firstJobCtx.SalesOrderNumber}`");
+            sb.AppendLine($"- **Job Name:** `{firstJobCtx.JobName}`");
+            sb.AppendLine($"- **COM # / Unit Tag:** `{firstJobCtx.ComNumber}` / `{firstJobCtx.UnitTag}` (Unit #{firstJobCtx.UnitNumber})");
+            sb.AppendLine($"- **Product & Housing:** `{firstJobCtx.ProductType}` ({firstJobCtx.UnitType}) — `{firstJobCtx.HousingStyle}`");
+            sb.AppendLine($"- **Mfg Location:** `{firstJobCtx.MfgLocation}`");
+            sb.AppendLine($"- **Skid Segment Sequence:** `{firstJobCtx.SkidSegmentSequence}`");
+            sb.AppendLine();
+        }
+
         // 2. Project Metadata Header / Stats
         if (options.IncludeProjectMetadata && project != null)
         {

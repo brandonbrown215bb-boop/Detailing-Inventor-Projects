@@ -11,6 +11,7 @@
             <local:BoolToWireframeLabelConverter x:Key="BoolToWireframeLabelConverter" />
             <local:BoolToVisibilityTextConverter x:Key="BoolToVisibilityTextConverter" />
             <local:BoolToVisibilityToggleConverter x:Key="BoolToVisibilityToggleConverter" />
+            <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
             
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/DarkTheme.xaml" />

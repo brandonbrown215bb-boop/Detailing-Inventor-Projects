@@ -35,8 +35,14 @@ public class Surface3DViewport : Grid
     // State mirrors
     private bool _wireframeVisible = true;
     private bool _showSkidGrid = true;
+    private bool _showBulkheadChannels = true;
     private double _globalOpacity = 1.0;
     private StickerOptions _stickerOptions = new();
+
+    public void SetShowBulkheadChannels(bool show)
+    {
+        _showBulkheadChannels = show;
+    }
 
     public event Action<string>? SurfacePicked;
     public event Action<SurfaceModel?, Point>? SurfaceHovered;
@@ -122,6 +128,25 @@ public class Surface3DViewport : Grid
 
                 var boxBounds = new Rect3D(box.X, box.Y, box.Z, box.XLength, box.YLength, box.ZLength);
                 totalBounds.Union(boxBounds);
+            }
+
+            // Render Bulkhead Channel 1.5" boxes in Amber accent color
+            if (_showBulkheadChannels && surface.BulkheadChannels != null && surface.BulkheadChannels.Count > 0)
+            {
+                Color amberColor = Color.FromRgb(255, 160, 0);
+                foreach (var bhChan in surface.BulkheadChannels)
+                {
+                    var bhBoxVisual = new BoxVisual3D
+                    {
+                        Center = new Point3D(bhChan.X + bhChan.XLength / 2.0, bhChan.Y + bhChan.YLength / 2.0, bhChan.Z + bhChan.ZLength / 2.0),
+                        Length = bhChan.XLength,
+                        Width = bhChan.YLength,
+                        Height = bhChan.ZLength,
+                    };
+                    ApplyBoxMaterial(bhBoxVisual, amberColor, 0.85);
+                    bhBoxVisual.SetValue(SurfaceNumberProperty, surface.SurfaceNumber);
+                    surfaceGroupVisual.Children.Add(bhBoxVisual);
+                }
             }
 
             // On-surface 3D sticker placement (depth-tested 3D mesh planes on outer faces)
