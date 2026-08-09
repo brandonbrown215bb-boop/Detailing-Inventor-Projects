@@ -1,8 +1,10 @@
 # UnitProgressTracker Detailer Remediation Plan
 
-- **Status:** Proposed implementation sequence
+- **Status:** Approved implementation sequence
 - **Scope:** `Pigeon/UnitProgressTracker`
 - **Reference implementation:** `Esmund/UnitProgressTracker` is parity evidence, not a code-sharing requirement.
+- **Approved contract:** [DETAILER_WORKFLOW_CONTRACT.md](./DETAILER_WORKFLOW_CONTRACT.md)
+- **Decision record:** [ADR 0002](../../docs/decisions/0002-unit-progress-tracker-project-contract.md)
 - **Coordination:** Every numbered step maps to one committed card under `.questboard/quests/`.
 
 ## Purpose
@@ -22,12 +24,12 @@ The current application has useful scan, render, BOM-import, and tracking pieces
 
 - The WPF application remains local-first and Windows-only.
 - Project data must not require a cloud service, PAT, account, or network connection.
-- The original Electron application may be inspected to establish detailer-visible behavior and saved-file compatibility expectations. Its implementation is not copied into the WPF runtime.
-- Existing `.uptproj` files must either load safely or produce an actionable compatibility message. They must never be silently interpreted as a successful blank project.
+- The original Electron application may be inspected to establish detailer-visible behavior. Its implementation and version 3 test-file format are not copied into the WPF runtime.
+- Version 4 `.uptproj` is the only production project-file format. Pre-production Pigeon version 2 and Esmund version 3 files are rejected with an actionable compatibility message and must never be silently interpreted as a successful blank project.
 - A failed or cancelled operation must preserve the last usable in-memory project.
 - Source geometry, tracking records, BOM data, status definitions, and display preferences need explicit ownership. No workflow should maintain a second unofficial copy.
 - `ProjectStateService` and other domain services are useful only when the shipped WPF path calls them; isolated unit tests are not parity evidence.
-- Promotion from `Pigeon/` to the repository root is outside every implementation quest until the final parity gate passes.
+- Promotion from `Pigeon/` to the repository root is outside every implementation quest until the required Step 14 promotion gate passes. Approved post-promotion visual work does not block that decision.
 
 ## Delivery rules
 
@@ -57,13 +59,16 @@ The current application has useful scan, render, BOM-import, and tracking pieces
 | 11 | Trustworthy UI | `Q-20260806-192657-d6e1` | Make legend filtering affect both the list and viewport |
 | 12 | Trustworthy UI | `Q-20260806-192651-0957` | Make surface and group visibility observable and persistent |
 | 13 | Trustworthy UI | `Q-20260808-143336-8ec5` | Make Options transactional and behaviorally complete |
-| 14 | Visual parity | `Q-20260806-192913-57d1` | Apply supported sticker settings to rendered labels |
-| 15 | Visual parity | `Q-20260807-155233-d335` | Correct bulkhead-channel segment-relative positioning |
-| 16 | Visual parity | `Q-20260807-155234-9859` | Render openings and doors in the 3D context |
-| 17 | Visual parity | `Q-20260807-154317-3047` | Provide useful opening and bulkhead hover details |
-| 18 | Promotion | `Q-20260807-200122-ca4a` | Verify parity evidence and decide whether Pigeon can move to root |
+| 14 | Promotion | `Q-20260807-200122-ca4a` | Verify required evidence and decide whether Pigeon can move to root |
+| 15 | Post-promotion visual | `Q-20260806-192913-57d1` | Apply supported sticker settings to rendered labels |
+| 16 | Post-promotion visual | `Q-20260807-155233-d335` | Correct bulkhead-channel segment-relative positioning |
+| 17 | Post-promotion visual | `Q-20260807-155234-9859` | Render openings and doors in the 3D context |
+| 18 | Post-promotion visual | `Q-20260807-154317-3047` | Provide useful opening and bulkhead hover details |
 
-Steps within a gate may be parallelized only when they do not modify the same state contract. Gates remain ordered.
+Steps within a gate may be parallelized only when they do not modify the same state
+contract. Gates remain ordered through Step 14. Steps 15-18 are approved work after
+promotion and do not reopen the promotion decision unless evidence exposes a data-
+safety regression.
 
 ---
 
@@ -80,7 +85,7 @@ The team shares one written meaning for Save, Open, Rescan, Add, Replace, Remove
 
 - The contract states whether `.uptproj` is a portable project or a tracking overlay. If both modes are supported, the file and UI distinguish them.
 - Project-scoped and application-scoped settings are listed explicitly.
-- Supported input schema versions and the behavior for newer, older, or malformed files are defined.
+- Version 4 is defined as the only production input/output schema, with explicit rejection behavior for pre-production version 2/version 3, newer, and malformed files.
 - Rescan rules define how exact matches, renamed geometry, new surfaces, missing surfaces, duplicates, cancellation, and partial failure affect tracking.
 - Esmund parity items are classified as required, intentionally changed, or deferred.
 - Each observable scenario is represented by a named automated or manual validation case assigned to a later quest.
@@ -106,7 +111,8 @@ The team can tell whether a remediation actually preserves detailer work on any 
 - MRU and settings tests use an isolated writable data root and never change the user's production profile.
 - The full solution builds with zero warnings.
 - All existing tests pass before behavioral remediation is considered complete; any deliberately corrected expectation is documented in the quest.
-- A reusable project round-trip fixture contains geometry, tracking, BOM, status definitions, checklist templates, retirement history, and preferences.
+- A reusable version 4 project round-trip fixture contains geometry, tracking, BOM, status definitions, checklist templates, retirement history, unresolved intrusion flags, camera position, and preferences.
+- Rejection fixtures cover Pigeon version 2, Esmund version 3, newer, corrupt, and incomplete files without mutating the current project.
 - Validation commands work from a clean checkout without relying on prior `bin`, `obj`, or profile state.
 
 ## Step 2 — Round-trip a usable project
@@ -121,11 +127,11 @@ Saving and reopening returns the detailer to a usable project, including a popul
 ### Acceptance criteria
 
 - A saved project carries every geometry and identity field needed by the surface list, detail panel, viewport, bulkhead overlays, and subsequent reconciliation.
-- Status, checklist, notes, visibility, display number, previous numbers, fingerprints, BOM, unit configuration, and supported preferences survive the same round trip.
+- Status, checklist, notes, visibility, display number, previous numbers, fingerprints, intrusion flags, BOM, unit configuration, camera position, and supported preferences survive the same round trip.
 - Reopening offline restores renderable surfaces and clearly identifies offline mode.
 - Reopening with a valid source folder does not silently replace saved tracking with scanner defaults.
 - Malformed or unsupported files leave the current project untouched and show an actionable error.
-- Existing supported project versions are migrated or rejected according to Step 0.
+- Pre-production Pigeon version 2 and Esmund version 3 files are rejected before mutation; no migration or conversion path is required.
 
 ## Step 3 — Preserve tracking through rescan
 
@@ -141,9 +147,10 @@ A detailer can rescan changed IAM data without losing status, checklist, notes, 
 - The current visible project is retained until a scan and reconciliation result is ready to apply.
 - Cancellation, fatal scan failure, or rejected partial results leave the prior project usable and unchanged.
 - Exact surface matches preserve tracking.
-- Renumber candidates use confirmed identity evidence and remain reviewable; ambiguous matches are never transferred silently.
+- Renumber candidates use confirmed identity evidence, and tracking transfers only after detailer confirmation; ambiguous matches are never transferred silently.
 - New surfaces receive the current project checklist template and default status.
-- Missing surfaces follow the approved retirement rule and retain audit history.
+- Missing surfaces remain pending until the detailer overrides the missing result, marks the surface unnecessary, or replaces it; every choice retains audit history.
+- New or changed fingerprints are checked for protrusion into other geometry. Intrusion warns without blocking, identifies the affected surfaces, and persists a flag until a later check proves it rectified.
 - One integration test proves scan → edit → rescan → save → reopen without tracking loss.
 
 ## Step 4 — Preserve custom status definitions
@@ -213,6 +220,7 @@ The detailer can replace one changed IAM surface without rescanning the full uni
 - Cancel, zero results, multiple results, duplicate active identity, and COM failure leave the project unchanged.
 - Same-identity replacement refreshes geometry while preserving tracking.
 - Changed identity follows the approved transfer/retirement rules and records lineage.
+- New or changed replacement geometry is checked for intrusion; a warning is non-blocking and its flag is persisted until rectified.
 - The list, detail panel, viewport, dirty state, and saved project agree immediately after replacement.
 
 ## Step 8 — Add surfaces incrementally
@@ -229,6 +237,7 @@ The detailer can add newly created surfaces without replacing the active project
 - Existing surfaces, selection, tracking, BOM, and project path remain intact.
 - Duplicate surfaces are skipped or explicitly resolved before changes are applied.
 - Accepted surfaces receive geometry, identity metadata, default status, and the current checklist template.
+- Accepted geometry is checked for intrusion; a warning is non-blocking and its flag is persisted until rectified.
 - Partial or failed scans present a reviewable result before changing the project.
 - Add is covered separately from full Open Folder and Rescan behavior.
 
@@ -244,6 +253,7 @@ A removed surface remains auditable and can be restored without recreating its d
 ### Acceptance criteria
 
 - Remove records who/when is not required, but it records when, source identity, fingerprint, tracking snapshot, and transfer reason.
+- Mark unnecessary from missing-surface reconciliation retires the surface with that auditable reason; Override and Replace leave distinct lineage events.
 - Retired surfaces do not reappear in the active list after save and reopen.
 - The Removed section is rehydrated from persisted state.
 - Restore returns geometry and tracking to the active project or explains why geometry must be reacquired.
@@ -261,7 +271,7 @@ When a project or surface cannot be read, the detailer knows what failed, what w
 
 ### Acceptance criteria
 
-- Invalid project JSON, unsupported versions, inaccessible folders, unreadable files, missing geometry, and COM/Apprentice failures have distinct user-facing outcomes.
+- Invalid project JSON, pre-production Pigeon v2/Esmund v3, newer unsupported versions, inaccessible folders, unreadable files, missing required geometry, and COM/Apprentice failures have distinct user-facing outcomes.
 - Partial scans report scanned, accepted, skipped, and failed files with reviewable identifiers.
 - Silent per-file failures no longer masquerade as a complete successful scan.
 - Diagnostics avoid credentials and sensitive configuration content.
@@ -316,13 +326,34 @@ Every exposed option either changes the product as labeled or is removed until s
 - Opening and cancelling Options leaves the project and running UI unchanged.
 - Reset Defaults does not affect the project until Save is accepted.
 - Saved options apply immediately and survive reopen at the scope defined in Step 0.
+- Camera position is project-owned, marks the project dirty when changed, and survives save/reopen without changing application-level preferences.
 - Name mode, sort mode, grid, skid labels, legend, hover information, opacity, wireframe, sticker style, theme, font scale, focus visibility, and FPS controls are each wired and tested or removed from the dialog.
 - Runtime controls and persisted preferences use one source of truth.
 
-## Step 14 — Apply sticker settings
+## Step 14 — Verify required parity and promotion readiness
+
+- **Quest:** `Q-20260807-200122-ca4a`
+- **Depends on:** Steps 0–13
+
+### Detailer outcome
+
+Pigeon is promoted only after the team has evidence that it can replace the established workflow without losing detailer work.
+
+### Acceptance criteria
+
+- The approved contract matrix is updated with pass, accepted difference, or approved post-promotion status for every workflow.
+- Automated build and test evidence is green with zero warnings.
+- Self-contained publish and fresh-machine launch smoke pass.
+- Save/reopen offline, rescan reconciliation, add, replace, retire/restore, BOM edits, filters, options, export, and shell-folder creation pass an end-to-end detailer smoke.
+- Inventor/Apprentice behavior is validated on the supported detailing workstation environment.
+- Architecture documentation is refreshed from the final source and verified with Agent Ground.
+- Sticker styling, bulkhead positioning, opening/door rendering, and overlay hover details remain visible, separately tracked post-promotion work and are not represented as complete.
+- Promotion to root is a separate, deliberate change after review approval; it is not bundled into remediation implementation.
+
+## Step 15 — Apply sticker settings after promotion
 
 - **Quest:** `Q-20260806-192913-57d1`
-- **Depends on:** Step 13
+- **Depends on:** Steps 13–14
 
 ### Detailer outcome
 
@@ -335,10 +366,10 @@ Surface labels remain legible and configurable at useful model scales and viewin
 - Settings apply to newly loaded and already visible surfaces.
 - A visual smoke matrix covers representative roof, wall, base, and dense-skid views.
 
-## Step 15 — Correct bulkhead-channel positioning
+## Step 16 — Correct bulkhead-channel positioning after promotion
 
 - **Quest:** `Q-20260807-155233-d335`
-- **Depends on:** Steps 2–3
+- **Depends on:** Steps 2–3 and 14
 
 ### Detailer outcome
 
@@ -351,10 +382,10 @@ Bulkhead channels appear at the correct segment-relative location rather than be
 - Calculated channel geometry survives save, reopen, rescan, and replacement.
 - Target data or Inventor evidence is attached for cases that cannot be proven synthetically.
 
-## Step 16 — Render openings and doors
+## Step 17 — Render openings and doors after promotion
 
 - **Quest:** `Q-20260807-155234-9859`
-- **Depends on:** Steps 2–3
+- **Depends on:** Steps 2–3 and 14
 
 ### Detailer outcome
 
@@ -367,10 +398,10 @@ The viewport gives the detailer enough spatial context to verify openings and do
 - Missing or incomplete opening data does not prevent the base surface from rendering.
 - Visibility, filtering, selection, save/reopen, and replacement keep overlays synchronized.
 
-## Step 17 — Add useful overlay hover details
+## Step 18 — Add useful overlay hover details after promotion
 
 - **Quest:** `Q-20260807-154317-3047`
-- **Depends on:** Steps 15–16
+- **Depends on:** Steps 16–17
 
 ### Detailer outcome
 
@@ -383,25 +414,6 @@ Hovering an opening, door, or bulkhead overlay identifies the engineering item w
 - Tooltip behavior respects the project preference and disappears reliably.
 - Dense geometry remains usable without stale or misleading hover content.
 
-## Step 18 — Verify parity and promotion readiness
-
-- **Quest:** `Q-20260807-200122-ca4a`
-- **Depends on:** All required prior steps
-
-### Detailer outcome
-
-Pigeon is promoted only after the team has evidence that it can replace the established workflow without losing detailer work.
-
-### Acceptance criteria
-
-- The Step 0 parity matrix is updated with pass, accepted difference, or explicitly deferred status for every workflow.
-- Automated build and test evidence is green with zero warnings.
-- Self-contained publish and fresh-machine launch smoke pass.
-- Save/reopen offline, rescan reconciliation, add, replace, retire/restore, BOM edits, filters, options, export, and shell-folder creation pass an end-to-end detailer smoke.
-- Inventor/Apprentice behavior is validated on the supported detailing workstation environment.
-- Architecture documentation is refreshed from the final source and verified with Agent Ground.
-- Promotion to root is a separate, deliberate change after review approval; it is not bundled into remediation implementation.
-
 ## Completion evidence template
 
 Every quest handoff to `review` should record:
@@ -409,7 +421,7 @@ Every quest handoff to `review` should record:
 - exact files changed;
 - tests added or changed and why;
 - exact validation commands and results;
-- saved-file versions exercised;
+- version 4 round trips and unsupported/corrupt file shapes exercised;
 - whether an Inventor workstation was required;
 - known limitations or deferred parity decisions;
 - one exact next action for the reviewer.
