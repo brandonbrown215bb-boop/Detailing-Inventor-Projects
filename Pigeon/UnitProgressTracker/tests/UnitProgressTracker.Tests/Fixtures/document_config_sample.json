@@ -1,0 +1,77 @@
+{
+  "configuration": {
+    "partNumber": "391-60231-001",
+    "surfaceType": "Roof",
+    "surfaceUnitSide": "Top",
+    "configurationKind": "Roof",
+    "skidId": 0,
+    "salesOrderNumber": "6E-110085-03",
+    "jobName": "Temple Animal Research",
+    "unitDescriptorList": [
+      {
+        "comNumber": "20138",
+        "unitTag": "AHU-3-1",
+        "unitNumber": 3
+      }
+    ],
+    "roof": {
+      "geometryList": [
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "xLength": 30,
+          "yLength": 75,
+          "zLength": 2
+        }
+      ]
+    },
+    "surfaceSegmentList": [
+      {
+        "segmentType": "RF",
+        "wallThickness_Top": 2.0,
+        "skinMaterialType_Top": "STL GALV",
+        "skinMaterialGauge_Top": 18,
+        "linerMaterialType_Top": "STL GALV",
+        "linerMaterialGauge_Top": 20,
+        "floorMaterialType": "STL GALV",
+        "floorMaterialGauge": 16,
+        "openingList": [
+          {
+            "openingType": "Door",
+            "openingShape": "Rectangular",
+            "unitSide": "Top",
+            "doorPartNumber": "391-60231-920",
+            "geometry": {
+              "x": 1,
+              "y": 2,
+              "z": 0,
+              "xLength": 3,
+              "yLength": 4,
+              "zLength": 1
+            }
+          }
+        ],
+        "bulkheadList": [
+          {
+            "partInfo": {
+              "partNumber": "391-60231-913",
+              "description": "Roof Bulkhead"
+            },
+            "holePatternList": [
+              {
+                "unitSide": "Top",
+                "index": 1,
+                "doaOffset": 5,
+                "widthOffset": 0.5,
+                "widthQTY": 2,
+                "widthSpacing": 4,
+                "holeDiameter": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

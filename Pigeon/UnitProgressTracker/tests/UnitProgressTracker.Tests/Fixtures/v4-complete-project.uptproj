@@ -1,0 +1,94 @@
+{
+  "format": "Pigeon.UnitProgressTracker.Project",
+  "version": 4,
+  "sourceFolder": "C:\\Units\\AHU-1001",
+  "updatedAt": "2026-08-08T12:00:00Z",
+  "geometry": {
+    "SURF-1001": {
+      "surfaceNumber": "SURF-1001",
+      "filePath": "C:\\Units\\AHU-1001\\SURF-1001.json",
+      "relativePath": "SURF-1001.json",
+      "sourceType": "json",
+      "partNumber": "391-101",
+      "surfaceType": "Roof",
+      "surfaceUnitSide": "Top",
+      "configurationKind": "Roof",
+      "skidNumber": "Skid 1",
+      "skidId": 1,
+      "boxes": [
+        { "x": 1, "y": 2, "z": 3, "xLength": 30, "yLength": 75, "zLength": 2 }
+      ],
+      "openings": [
+        { "segmentType": "RF", "openingType": "Door", "openingShape": "Rectangular", "unitSide": "Top", "doorPartNumber": "391-60231-920" }
+      ],
+      "bulkheadChannels": [
+        { "x": 1, "y": 2, "z": 3, "xLength": 1.5, "yLength": 1.5, "zLength": 1.5 }
+      ],
+      "displayNumber": "1001",
+      "previousNumbers": [ "0999" ],
+      "geometryFingerprint": "fixture-fingerprint"
+    }
+  },
+  "surfaces": {
+    "SURF-1001": {
+      "stateId": "built",
+      "checklist": { "Verified dimensions": true, "Verified material": false },
+      "notes": "Retain this note.",
+      "updatedAt": "2026-08-08T12:00:00Z",
+      "hidden": false,
+      "displayNumber": "1001",
+      "previousNumbers": [ "0999" ],
+      "geometryFingerprint": "fixture-fingerprint"
+    }
+  },
+  "retired": {
+    "0999": {
+      "retiredAt": "2026-08-07T12:00:00Z",
+      "supersededBy": "1001",
+      "transferType": "renumber",
+      "fileKey": "SURF-1001",
+      "geometryFingerprint": "fixture-fingerprint",
+      "snapshot": {
+        "stateId": "corrected",
+        "checklist": { "Verified dimensions": true },
+        "notes": "Prior tracking.",
+        "displayNumber": "0999",
+        "previousNumbers": [ "0988" ],
+        "geometryFingerprint": "fixture-fingerprint"
+      }
+    }
+  },
+  "bom": {
+    "sourceFilePath": "C:\\Units\\AHU-1001\\bom.xlsx",
+    "importedAt": "2026-08-08T12:00:00Z",
+    "allRows": [ { "partNumber": "391-101", "quantity": "1", "unit": "EA", "skid": "1", "segment": "RF", "description": "Roof Panel" } ],
+    "keptRows": [ { "partNumber": "391-101", "quantity": "1", "unit": "EA", "skid": "1", "segment": "RF", "description": "Roof Panel" } ],
+    "droppedRows": [],
+    "keptCountByPrefix": { "391": 1 }
+  },
+  "statusDefinitions": [
+    { "id": "current", "name": "Current", "colorHex": "#94a3b8", "fillType": "solid" },
+    { "id": "built", "name": "Built", "colorHex": "#3b82f6", "fillType": "solid" }
+  ],
+  "intrusionFlags": [
+    { "surfaceNumber": "SURF-1001", "affectedSurfaceNumbers": [ "SURF-1002" ], "message": "Fixture intrusion warning", "resolved": false }
+  ],
+  "camera": {
+    "positionX": 42,
+    "positionY": 10,
+    "positionZ": 18,
+    "targetX": 0,
+    "targetY": 0,
+    "targetZ": 0,
+    "upX": 0,
+    "upY": 1,
+    "upZ": 0
+  },
+  "preferences": {
+    "listDisplay": { "groupMode": "skid", "nameMode": "both", "sortMode": "default", "showTypeTag": true, "showSkidTag": true, "showSideTag": true },
+    "viewerOptions": { "showGrid": true, "showSkidLabels": true, "showLegend": true, "showHoverTooltip": true, "fpsControlsEnabled": true, "surfaceOpacity": 0.9, "wireframeVisible": true },
+    "stickerOptions": { "fontFamily": "Segoe UI", "textColorHex": "#F8FAFC", "backgroundColorHex": "#0F172A", "borderColorHex": "#94A3B8" },
+    "themeOptions": { "themeName": "Dark", "accentColorHex": "#38BDF8", "panelBackgroundHex": "#1E293B", "autoSyncWithSystemTheme": true, "uiFontScale": 1.0, "highVisibilityFocus": true, "highContrastOverride": false },
+    "checklistTemplate": [ "Verified dimensions", "Verified material", "Verified openings", "Paperwork complete" ]
+  }
+}

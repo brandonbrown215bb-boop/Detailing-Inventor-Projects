@@ -2,14 +2,35 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using UnitProgressTracker.Core.Models;
 
 namespace UnitProgressTracker.Core.Services;
 
 public static class AppSettingsService
 {
+    public const string DataRootEnvironmentVariable = "UNIT_PROGRESS_TRACKER_DATA_ROOT";
+    private static readonly AsyncLocal<string?> ScopedDataRoot = new();
+
+    public static IDisposable UseDataRoot(string dataRoot)
+    {
+        if (string.IsNullOrWhiteSpace(dataRoot))
+            throw new ArgumentException("Data root cannot be null or empty.", nameof(dataRoot));
+
+        string? previous = ScopedDataRoot.Value;
+        ScopedDataRoot.Value = Path.GetFullPath(dataRoot);
+        return new DataRootScope(previous);
+    }
+
     public static string GetSettingsFilePath()
     {
+        string? configuredRoot = ScopedDataRoot.Value
+            ?? Environment.GetEnvironmentVariable(DataRootEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            return Path.Combine(Path.GetFullPath(configuredRoot), "UnitProgressTracker", "settings.json");
+        }
+
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         return Path.Combine(appData, "UnitProgressTracker", "settings.json");
     }
@@ -81,5 +102,20 @@ public static class AppSettingsService
         settings.RecentProjects.Clear();
         settings.LastOpenedProject = null;
         SaveSettings(settings);
+    }
+
+    private sealed class DataRootScope : IDisposable
+    {
+        private readonly string? _previous;
+        private bool _disposed;
+
+        public DataRootScope(string? previous) => _previous = previous;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            ScopedDataRoot.Value = _previous;
+            _disposed = true;
+        }
     }
 }

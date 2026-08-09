@@ -341,8 +341,8 @@ public class M3ChallengerEmpiricalTests
         {
             Version = 2,
             SourceFolder = null,
-            Surfaces = null,
-            Retired = null
+            Surfaces = null!,
+            Retired = null!
         };
 
         string md = MarkdownExporter.ExportToMarkdown(project);

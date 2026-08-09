@@ -835,9 +835,14 @@ public class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            ProjectState.Version = 2;
+            ProjectState.Format = ProjectStateModel.FormatId;
+            ProjectState.Version = ProjectStateModel.CurrentVersion;
             ProjectState.SourceFolder = CurrentFolderPath;
             ProjectState.UpdatedAt = DateTime.UtcNow;
+
+            ProjectState.StatusDefinitions = StatusStates
+                .Select(state => new StatusState(state.Id, state.Name, state.ColorHex, state.FillType))
+                .ToList();
 
             foreach (var surf in Surfaces)
             {
@@ -858,6 +863,7 @@ public class MainViewModel : INotifyPropertyChanged
                 record.DisplayNumber = surf.DisplayNumber ?? key;
                 record.PreviousNumbers = surf.PreviousNumbers ?? new List<string>();
                 record.GeometryFingerprint = surf.GeometryFingerprint ?? GeometryFingerprinter.CalculateFingerprint(surf);
+                ProjectState.Geometry[key] = surf;
             }
 
             ProjectSerializer.SaveAtomic(filePath, ProjectState);
@@ -888,19 +894,32 @@ public class MainViewModel : INotifyPropertyChanged
                     CurrentFolderPath = project.SourceFolder;
 
                 Surfaces.Clear();
+                StatusStates.Clear();
+                foreach (var state in project.StatusDefinitions.Count > 0
+                    ? project.StatusDefinitions
+                    : StatusStateService.GetDefaultStates())
+                {
+                    StatusStates.Add(state);
+                }
+
                 foreach (var (key, rec) in project.Surfaces)
                 {
-                    var surf = new SurfaceModel
-                    {
-                        SurfaceNumber = key,
-                        DisplayNumber = rec.DisplayNumber ?? key,
-                        StateId = rec.StateId ?? "current",
-                        Notes = rec.Notes ?? string.Empty,
-                        IsHidden = rec.Hidden,
-                        Checklist = rec.Checklist != null ? new Dictionary<string, bool>(rec.Checklist, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, bool>(),
-                        PreviousNumbers = rec.PreviousNumbers != null ? new List<string>(rec.PreviousNumbers) : new List<string>(),
-                        GeometryFingerprint = rec.GeometryFingerprint
-                    };
+                    var surf = project.Geometry.TryGetValue(key, out var savedGeometry)
+                        ? savedGeometry
+                        : new SurfaceModel { SurfaceNumber = key };
+
+                    surf.SurfaceNumber = key;
+                    surf.DisplayNumber = rec.DisplayNumber ?? surf.DisplayNumber ?? key;
+                    surf.StateId = rec.StateId ?? surf.StateId ?? "current";
+                    surf.Notes = rec.Notes ?? string.Empty;
+                    surf.IsHidden = rec.Hidden;
+                    surf.Checklist = rec.Checklist != null
+                        ? new Dictionary<string, bool>(rec.Checklist, StringComparer.OrdinalIgnoreCase)
+                        : new Dictionary<string, bool>();
+                    surf.PreviousNumbers = rec.PreviousNumbers != null
+                        ? new List<string>(rec.PreviousNumbers)
+                        : new List<string>();
+                    surf.GeometryFingerprint = rec.GeometryFingerprint ?? surf.GeometryFingerprint;
                     Surfaces.Add(surf);
                 }
 

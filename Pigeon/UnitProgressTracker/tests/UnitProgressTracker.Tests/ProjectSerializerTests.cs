@@ -33,7 +33,7 @@ public class ProjectSerializerTests : IDisposable
         string filePath = Path.Combine(_tempDirectory, "test-project.uptproj");
         var model = new ProjectStateModel
         {
-            Version = 2,
+            Version = ProjectStateModel.CurrentVersion,
             SourceFolder = @"C:\Units\AHU_01",
             UpdatedAt = DateTime.UtcNow
         };
@@ -55,10 +55,10 @@ public class ProjectSerializerTests : IDisposable
     public void SaveAtomic_OverwritesExistingFileSafely()
     {
         string filePath = Path.Combine(_tempDirectory, "overwrite-project.uptproj");
-        var initialModel = new ProjectStateModel { Version = 2, SourceFolder = "Initial" };
+        var initialModel = new ProjectStateModel { Version = ProjectStateModel.CurrentVersion, SourceFolder = "Initial" };
         ProjectSerializer.SaveAtomic(filePath, initialModel);
 
-        var updatedModel = new ProjectStateModel { Version = 2, SourceFolder = "Updated" };
+        var updatedModel = new ProjectStateModel { Version = ProjectStateModel.CurrentVersion, SourceFolder = "Updated" };
         updatedModel.Surfaces["SURF-2002"] = new SurfaceRecordModel { DisplayNumber = "2002", StateId = "done" };
 
         ProjectSerializer.SaveAtomic(filePath, updatedModel);
@@ -86,7 +86,7 @@ public class ProjectSerializerTests : IDisposable
         string filePath = Path.Combine(_tempDirectory, "roundtrip.uptproj");
         var original = new ProjectStateModel
         {
-            Version = 2,
+            Version = ProjectStateModel.CurrentVersion,
             SourceFolder = @"C:\Units\AHU_1001",
             UpdatedAt = DateTime.UtcNow
         };
@@ -136,7 +136,7 @@ public class ProjectSerializerTests : IDisposable
         var loaded = ProjectSerializer.Load<ProjectStateModel>(filePath);
 
         Assert.NotNull(loaded);
-        Assert.Equal(2, loaded.Version);
+        Assert.Equal(ProjectStateModel.CurrentVersion, loaded.Version);
         Assert.Equal(@"C:\Units\AHU_1001", loaded.SourceFolder);
 
         Assert.True(loaded.Surfaces.ContainsKey("SURF-1001"));
@@ -162,16 +162,14 @@ public class ProjectSerializerTests : IDisposable
     }
 
     [Fact]
-    public void Load_ValidatesSchemaVersionAndHandlesVersion2()
+    public void Load_RejectsPreProductionVersion2()
     {
         string filePath = Path.Combine(_tempDirectory, "v2.uptproj");
         string jsonV2 = "{ \"version\": 2, \"sourceFolder\": \"C:\\\\Test\", \"surfaces\": {} }";
         File.WriteAllText(filePath, jsonV2);
 
         var loaded = ProjectSerializer.Load<ProjectStateModel>(filePath);
-        Assert.NotNull(loaded);
-        Assert.Equal(2, loaded.Version);
-        Assert.Equal(@"C:\Test", loaded.SourceFolder);
+        Assert.Null(loaded);
     }
 
     [Fact]
@@ -190,7 +188,7 @@ public class ProjectSerializerTests : IDisposable
         {
             var model = new ProjectStateModel
             {
-                Version = 2,
+                Version = ProjectStateModel.CurrentVersion,
                 SourceFolder = $"Folder_{i}"
             };
             ProjectSerializer.SaveAtomic(filePath, model);
@@ -199,6 +197,57 @@ public class ProjectSerializerTests : IDisposable
         Assert.True(File.Exists(filePath));
         var loaded = ProjectSerializer.Load<ProjectStateModel>(filePath);
         Assert.NotNull(loaded);
-        Assert.Equal(2, loaded.Version);
+        Assert.Equal(ProjectStateModel.CurrentVersion, loaded.Version);
+    }
+
+    [Fact]
+    public void Load_Version4Fixture_PreservesGeometryTrackingAndProjectState()
+    {
+        string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "v4-complete-project.uptproj");
+
+        var loaded = ProjectSerializer.Load<ProjectStateModel>(fixturePath);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(ProjectStateModel.FormatId, loaded.Format);
+        Assert.Equal(ProjectStateModel.CurrentVersion, loaded.Version);
+        Assert.Contains("SURF-1001", loaded.Geometry.Keys);
+        Assert.NotEmpty(loaded.Geometry["SURF-1001"].Boxes);
+        Assert.Equal("built", loaded.Surfaces["SURF-1001"].StateId);
+        Assert.Equal(1, loaded.Bom?.KeptRows.Count);
+        Assert.Contains(loaded.StatusDefinitions, state => state.Id == "built");
+        Assert.Contains("0988", loaded.Retired["0999"].Snapshot!.PreviousNumbers);
+        Assert.False(loaded.IntrusionFlags[0].Resolved);
+        Assert.Equal(42, loaded.Camera.PositionX);
+        Assert.Contains("Verified dimensions", loaded.Preferences.ChecklistTemplate);
+    }
+
+    [Theory]
+    [InlineData("v2", "{\"version\":2,\"surfaces\":{}}")]
+    [InlineData("v3", "{\"version\":3,\"surfaces\":{}}")]
+    [InlineData("newer", "{\"format\":\"Pigeon.UnitProgressTracker.Project\",\"version\":5,\"geometry\":{},\"surfaces\":{},\"retired\":{},\"statusDefinitions\":[],\"intrusionFlags\":[],\"camera\":{},\"preferences\":{}}")]
+    [InlineData("incomplete", "{\"format\":\"Pigeon.UnitProgressTracker.Project\",\"version\":4,\"surfaces\":{}}")]
+    public void Load_RejectsUnsupportedOrIncompleteProjectShapes(string name, string json)
+    {
+        string filePath = Path.Combine(_tempDirectory, name + ".uptproj");
+        File.WriteAllText(filePath, json);
+
+        Assert.Null(ProjectSerializer.Load<ProjectStateModel>(filePath));
+    }
+
+    [Fact]
+    public void MainViewModel_RejectingProjectFile_DoesNotReplaceCurrentProject()
+    {
+        string filePath = Path.Combine(_tempDirectory, "unsupported.uptproj");
+        File.WriteAllText(filePath, "{\"version\":2,\"surfaces\":{}}");
+
+        var vm = new UnitProgressTracker.Wpf.ViewModels.MainViewModel();
+        vm.Surfaces.Add(new SurfaceModel { SurfaceNumber = "CURRENT" });
+        var originalProject = vm.ProjectState;
+
+        vm.LoadProjectFromFile(filePath);
+
+        Assert.Same(originalProject, vm.ProjectState);
+        Assert.Single(vm.Surfaces);
+        Assert.Equal("CURRENT", vm.Surfaces[0].SurfaceNumber);
     }
 }

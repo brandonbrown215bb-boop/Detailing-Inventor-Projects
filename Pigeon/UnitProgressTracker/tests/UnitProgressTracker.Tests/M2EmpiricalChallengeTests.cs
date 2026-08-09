@@ -13,8 +13,7 @@ namespace UnitProgressTracker.Tests;
 public class M2EmpiricalChallengeTests : IDisposable
 {
     private readonly string _tempDir;
-    private readonly string _settingsBackupPath;
-    private readonly string _realSettingsPath;
+    private readonly IDisposable _settingsScope;
     private readonly Xunit.Abstractions.ITestOutputHelper _output;
 
     public M2EmpiricalChallengeTests(Xunit.Abstractions.ITestOutputHelper output)
@@ -23,17 +22,7 @@ public class M2EmpiricalChallengeTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), "UPT_Empirical_Tests_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempDir);
 
-        _realSettingsPath = AppSettingsService.GetSettingsFilePath();
-        _settingsBackupPath = Path.Combine(Path.GetTempPath(), "UPT_settings_backup_" + Guid.NewGuid().ToString("N") + ".json");
-
-        if (File.Exists(_realSettingsPath))
-        {
-            try
-            {
-                File.Copy(_realSettingsPath, _settingsBackupPath, true);
-            }
-            catch { }
-        }
+        _settingsScope = AppSettingsService.UseDataRoot(_tempDir);
     }
 
     public void Dispose()
@@ -43,18 +32,7 @@ public class M2EmpiricalChallengeTests : IDisposable
             try { Directory.Delete(_tempDir, true); } catch { }
         }
 
-        // Restore original settings if backed up
-        if (File.Exists(_settingsBackupPath))
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(_realSettingsPath)!;
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.Copy(_settingsBackupPath, _realSettingsPath, true);
-                File.Delete(_settingsBackupPath);
-            }
-            catch { }
-        }
+        _settingsScope.Dispose();
     }
 
     // =========================================================================

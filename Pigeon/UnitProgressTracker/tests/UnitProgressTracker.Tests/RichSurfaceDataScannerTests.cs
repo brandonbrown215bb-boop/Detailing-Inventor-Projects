@@ -9,7 +9,7 @@ public class RichSurfaceDataScannerTests
     [Fact]
     public void ParseConfigJson_ExtractsJobContext_CasingSpecs_Openings_And_Bulkheads()
     {
-        string sampleJsonPath = @"C:\Users\jbrow263\.gemini\antigravity\brain\175be4f3-dcad-4eed-b08b-2c6845028382\scratch\document_config_sample.json";
+        string sampleJsonPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "document_config_sample.json");
         Assert.True(File.Exists(sampleJsonPath));
 
         string jsonText = File.ReadAllText(sampleJsonPath);

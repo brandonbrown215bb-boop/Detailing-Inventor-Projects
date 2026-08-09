@@ -26,4 +26,8 @@
     <ProjectReference Include="..\..\src\UnitProgressTracker.Wpf\UnitProgressTracker.Wpf.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
