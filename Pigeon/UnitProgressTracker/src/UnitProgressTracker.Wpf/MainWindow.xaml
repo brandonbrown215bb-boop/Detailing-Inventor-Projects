@@ -47,6 +47,7 @@
                 <MenuItem Header="Import _JSON..." Command="{Binding ImportJsonCommand}" />
                 <MenuItem Header="Export _JSON..." Command="{Binding ExportJsonCommand}" />
                 <MenuItem Header="Export _Audit Report (Markdown)..." Command="{Binding ExportMarkdownCommand}" />
+                <MenuItem Header="Create _Shell Export Folders..." Command="{Binding CreateShellFoldersCommand}" />
                 <Separator />
                 <MenuItem Header="⚙ _Options &amp; Preferences..." Command="{Binding OpenOptionsDialogCommand}" />
                 <Separator />
@@ -78,6 +79,7 @@
                     <Button Content="✕ Cancel" Command="{Binding CancelScanCommand}" Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,6,0" />
                     <Button Content="Load Demo Data" Click="OnLoadDemoDataClick" Margin="0,0,12,0" />
                     <Button Content="Export Audit MD" Command="{Binding ExportMarkdownCommand}" Margin="0,0,6,0" />
+                    <Button Content="📁 Create Shell Folders" Command="{Binding CreateShellFoldersCommand}" Margin="0,0,6,0" ToolTip="Create physical shell export folders for 391- assembly entries" />
                     <Button Content="⚙ Options..." Command="{Binding OpenOptionsDialogCommand}" Margin="0,0,6,0" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" />
                 </StackPanel>
 
@@ -253,12 +255,12 @@
                                     <Button Content="Import Config.xml" Command="{Binding ImportUnitConfigCommand}" Margin="0,0,4,0" Padding="6,4" ToolTip="{Binding UnitConfigSummaryText}" />
                                     <Button Content="+ Add Entry" Command="{Binding OpenBomAddDialogCommand}" Margin="0,0,4,0" Padding="6,4" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" />
                                     <Button Content="- Delete" Command="{Binding DeleteBomRowCommand}" Margin="0,0,4,0" Padding="6,4" />
-                                    <Button Content="Export Folders" Click="OnCreateShellFoldersClick" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" Padding="8,4" />
+                                    <Button Content="Create Shell Folders" Command="{Binding CreateShellFoldersCommand}" Background="{DynamicResource AccentBrush}" Foreground="#FFFFFF" FontWeight="Bold" Padding="8,4" ToolTip="Create physical shell export folders for 391- assembly entries" />
                                 </DockPanel>
                             </StackPanel>
                         </Border>
 
-                        <DataGrid ItemsSource="{Binding FilteredBomEntries}" SelectedItem="{Binding SelectedBomEntry}" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource BorderBrush}" BorderThickness="0">
+                        <DataGrid ItemsSource="{Binding FilteredBomEntries}" SelectedItem="{Binding SelectedBomEntry}" CellEditEnding="OnBomDataGridCellEditEnding" AutoGenerateColumns="False" CanUserAddRows="False" Background="Transparent" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource BorderBrush}" BorderThickness="0">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Part Number" Binding="{Binding PartNumber}" Width="100" />
                                 <DataGridTextColumn Header="Skid" Binding="{Binding Skid}" Width="80" />

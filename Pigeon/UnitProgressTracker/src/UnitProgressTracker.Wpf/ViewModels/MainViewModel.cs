@@ -125,6 +125,24 @@ public class MainViewModel : INotifyPropertyChanged
     public Action<bool>? RequestSetSkidGrid { get; set; }
     public Action<double>? RequestSetOpacity { get; set; }
     public Action<bool, string>? RequestSetSurfaceVisibility { get; set; }
+    public Func<CameraStateModel>? RequestGetCameraState { get; set; }
+    public Action<CameraStateModel>? RequestSetCameraState { get; set; }
+    public Func<string?>? RequestBrowseShellRootFolder { get; set; }
+
+    private bool _isOfflineMode;
+    public bool IsOfflineMode
+    {
+        get => _isOfflineMode;
+        set
+        {
+            if (_isOfflineMode != value)
+            {
+                _isOfflineMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Properties
@@ -173,8 +191,9 @@ public class MainViewModel : INotifyPropertyChanged
             string name = string.IsNullOrEmpty(CurrentProjectPath)
                 ? (HasFolder ? Path.GetFileName(CurrentFolderPath)! : "Untitled Project")
                 : Path.GetFileName(CurrentProjectPath);
+            string offline = IsOfflineMode ? " [Offline Mode]" : "";
             string marker = IsDirty ? "*" : "";
-            return $"Unit Progress Tracker — {name}{marker}";
+            return $"Unit Progress Tracker — {name}{offline}{marker}";
         }
     }
 
@@ -766,7 +785,7 @@ public class MainViewModel : INotifyPropertyChanged
         ImportExcelBomCommand = new RelayCommand(_ => ExecuteImportExcelBom());
         ImportUnitConfigCommand = new RelayCommand(_ => ExecuteImportUnitConfig());
         SetShellRootFolderCommand = new RelayCommand(_ => ExecuteSetShellRootFolder());
-        CreateShellFoldersCommand = new RelayCommand(_ => CreateShellFolders(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && BomEntries.Count > 0);
+        CreateShellFoldersCommand = new RelayCommand(_ => CreateShellFolders(), _ => BomEntries.Count > 0);
         OpenShellFolderCommand = new RelayCommand(_ => ExecuteOpenShellFolder(), _ => !string.IsNullOrWhiteSpace(ShellRootPath) && Directory.Exists(ShellRootPath));
         AddBomRowCommand = new RelayCommand(_ => ExecuteAddBomRow());
         DeleteBomRowCommand = new RelayCommand(_ => ExecuteDeleteBomRow(), _ => SelectedBomEntry != null);
@@ -866,6 +885,28 @@ public class MainViewModel : INotifyPropertyChanged
                 ProjectState.Geometry[key] = surf;
             }
 
+            var cameraState = RequestGetCameraState?.Invoke();
+            if (cameraState != null)
+            {
+                ProjectState.Camera = cameraState;
+            }
+
+            var currentBomRows = GetCurrentBomRows();
+            if (currentBomRows.Count > 0)
+            {
+                ProjectState.Bom = new BomImportResult
+                {
+                    SourceFilePath = ProjectState.Bom?.SourceFilePath ?? string.Empty,
+                    ImportedAt = ProjectState.Bom?.ImportedAt ?? DateTime.UtcNow,
+                    KeptRows = currentBomRows,
+                    AllRows = currentBomRows
+                };
+            }
+            else
+            {
+                ProjectState.Bom = null;
+            }
+
             ProjectSerializer.SaveAtomic(filePath, ProjectState);
             AppSettingsService.AddRecentProject(filePath);
             RefreshRecentProjects();
@@ -886,54 +927,71 @@ public class MainViewModel : INotifyPropertyChanged
         try
         {
             var project = ProjectSerializer.Load<ProjectStateModel>(filePath);
-            if (project != null)
+            if (project == null)
             {
-                ProjectState = project;
-                CurrentProjectPath = filePath;
-                if (!string.IsNullOrEmpty(project.SourceFolder))
-                    CurrentFolderPath = project.SourceFolder;
-
-                Surfaces.Clear();
-                StatusStates.Clear();
-                foreach (var state in project.StatusDefinitions.Count > 0
-                    ? project.StatusDefinitions
-                    : StatusStateService.GetDefaultStates())
-                {
-                    StatusStates.Add(state);
-                }
-
-                foreach (var (key, rec) in project.Surfaces)
-                {
-                    var surf = project.Geometry.TryGetValue(key, out var savedGeometry)
-                        ? savedGeometry
-                        : new SurfaceModel { SurfaceNumber = key };
-
-                    surf.SurfaceNumber = key;
-                    surf.DisplayNumber = rec.DisplayNumber ?? surf.DisplayNumber ?? key;
-                    surf.StateId = rec.StateId ?? surf.StateId ?? "current";
-                    surf.Notes = rec.Notes ?? string.Empty;
-                    surf.IsHidden = rec.Hidden;
-                    surf.Checklist = rec.Checklist != null
-                        ? new Dictionary<string, bool>(rec.Checklist, StringComparer.OrdinalIgnoreCase)
-                        : new Dictionary<string, bool>();
-                    surf.PreviousNumbers = rec.PreviousNumbers != null
-                        ? new List<string>(rec.PreviousNumbers)
-                        : new List<string>();
-                    surf.GeometryFingerprint = rec.GeometryFingerprint ?? surf.GeometryFingerprint;
-                    Surfaces.Add(surf);
-                }
-
-                if (project.Bom != null && project.Bom.KeptRows != null && project.Bom.KeptRows.Count > 0)
-                {
-                    LoadBomRows(project.Bom.KeptRows);
-                }
-
-                AppSettingsService.AddRecentProject(filePath);
-                RefreshRecentProjects();
-                ClearDirty();
-                StatusMessage = $"Loaded project from {Path.GetFileName(filePath)} ({Surfaces.Count} surfaces).";
-                RequestViewportRefresh?.Invoke();
+                StatusMessage = "Error loading project: File is invalid or uses an unsupported project format (only Version 4 .uptproj files are supported).";
+                return;
             }
+
+            ProjectState = project;
+            CurrentProjectPath = filePath;
+            if (!string.IsNullOrEmpty(project.SourceFolder))
+                CurrentFolderPath = project.SourceFolder;
+
+            IsOfflineMode = !string.IsNullOrWhiteSpace(project.SourceFolder) && !Directory.Exists(project.SourceFolder);
+
+            Surfaces.Clear();
+            StatusStates.Clear();
+            foreach (var state in project.StatusDefinitions.Count > 0
+                ? project.StatusDefinitions
+                : StatusStateService.GetDefaultStates())
+            {
+                StatusStates.Add(state);
+            }
+
+            foreach (var (key, rec) in project.Surfaces)
+            {
+                var surf = project.Geometry.TryGetValue(key, out var savedGeometry)
+                    ? savedGeometry
+                    : new SurfaceModel { SurfaceNumber = key };
+
+                surf.SurfaceNumber = key;
+                surf.DisplayNumber = rec.DisplayNumber ?? surf.DisplayNumber ?? key;
+                surf.StateId = rec.StateId ?? surf.StateId ?? "current";
+                surf.Notes = rec.Notes ?? string.Empty;
+                surf.IsHidden = rec.Hidden;
+                surf.Checklist = rec.Checklist != null
+                    ? new Dictionary<string, bool>(rec.Checklist, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, bool>();
+                surf.PreviousNumbers = rec.PreviousNumbers != null
+                    ? new List<string>(rec.PreviousNumbers)
+                    : new List<string>();
+                surf.GeometryFingerprint = rec.GeometryFingerprint ?? surf.GeometryFingerprint;
+                Surfaces.Add(surf);
+            }
+
+            if (project.Bom != null && project.Bom.KeptRows != null && project.Bom.KeptRows.Count > 0)
+            {
+                LoadBomRows(project.Bom.KeptRows);
+            }
+            else
+            {
+                ClearBomState();
+            }
+
+            AppSettingsService.AddRecentProject(filePath);
+            RefreshRecentProjects();
+            ClearDirty();
+
+            string modeText = IsOfflineMode ? " (Offline Mode)" : string.Empty;
+            StatusMessage = $"Loaded project from {Path.GetFileName(filePath)}{modeText} ({Surfaces.Count} surfaces).";
+
+            if (project.Camera != null)
+            {
+                RequestSetCameraState?.Invoke(project.Camera);
+            }
+
+            RequestViewportRefresh?.Invoke();
         }
         catch (Exception ex)
         {
@@ -971,10 +1029,8 @@ public class MainViewModel : INotifyPropertyChanged
         if (!ConfirmUnsavedChanges()) return;
 
         Surfaces.Clear();
-        BomEntries.Clear();
-        FilteredBomEntries.Clear();
-        MisplacedRows.Clear();
         ProjectState = new ProjectStateModel();
+        ClearBomState();
         CurrentFolderPath = null;
         CurrentProjectPath = null;
         ClearDirty();
@@ -1079,7 +1135,6 @@ public class MainViewModel : INotifyPropertyChanged
         IsScanning = true;
         ScanProgress = 0;
         ScanProgressLabel = "Starting scan...";
-        Surfaces.Clear();
 
         try
         {
@@ -1093,25 +1148,38 @@ public class MainViewModel : INotifyPropertyChanged
                 ScanProgressVM.ReportProgress(p.Percent, ScanProgressLabel);
             });
 
-            var results = await GeometryScanner.ScanIamFolderAsync(
+            var candidateSurfaces = await GeometryScanner.ScanIamFolderAsync(
                 CurrentFolderPath,
                 progress,
                 token);
 
-            foreach (var surf in results) Surfaces.Add(surf);
-            StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded.";
+            var reconcileResult = RescanReconciler.Reconcile(
+                Surfaces,
+                candidateSurfaces,
+                ProjectState.Preferences?.ChecklistTemplate);
+
+            Surfaces.Clear();
+            foreach (var surf in reconcileResult.ReconciledSurfaces)
+            {
+                Surfaces.Add(surf);
+            }
+
+            ProjectState.IntrusionFlags = reconcileResult.IntrusionFlags;
+
+            IsOfflineMode = false;
+            StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded ({reconcileResult.ExactMatches.Count} matched, {reconcileResult.NewSurfaces.Count} new, {reconcileResult.MissingSurfaces.Count} missing, {reconcileResult.IntrusionFlags.Count} intrusion flags).";
             ScanProgressVM.CompleteScan(Surfaces.Count);
             MarkDirty();
             RequestViewportRefresh?.Invoke();
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "IAM scan cancelled by user.";
+            StatusMessage = "IAM scan cancelled by user. Active project state preserved.";
             ScanProgressVM.FailScan("Cancelled by user");
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Scan error: {ex.Message}";
+            StatusMessage = $"Scan error: {ex.Message}. Active project state preserved.";
             ScanProgressVM.FailScan(ex.Message);
         }
         finally
@@ -1353,7 +1421,7 @@ public class MainViewModel : INotifyPropertyChanged
         MarkDirty();
     }
 
-    private List<BomRow> GetCurrentBomRows()
+    public List<BomRow> GetCurrentBomRows()
     {
         var list = BomEntries.Select(entry => new BomRow
         {
@@ -1370,10 +1438,25 @@ public class MainViewModel : INotifyPropertyChanged
         return list;
     }
 
+    public void ClearBomState()
+    {
+        ProjectState.Bom = null;
+        CurrentBomPlan = new ShellFolderPlan();
+        BomEntries.Clear();
+        FilteredBomEntries.Clear();
+        MisplacedRows.Clear();
+        SelectedBomEntry = null;
+        OnPropertyChanged(nameof(HasMisplacedCoilPanels));
+        OnPropertyChanged(nameof(MisplacedCoilPanelsCount));
+        UpdateDropdownFilters();
+        FilterBomEntries();
+    }
+
     public void LoadBomRows(IEnumerable<BomRow> rows)
     {
+        var rowList = (rows ?? Enumerable.Empty<BomRow>()).ToList();
         var engine = new BomShellEngine();
-        CurrentBomPlan = engine.BuildPlan(rows, ShellRootPath, ProjectState.UnitConfig);
+        CurrentBomPlan = engine.BuildPlan(rowList, ShellRootPath, ProjectState.UnitConfig);
 
         BomEntries.Clear();
         foreach (var entry in CurrentBomPlan.Entries) BomEntries.Add(entry);
@@ -1387,6 +1470,13 @@ public class MainViewModel : INotifyPropertyChanged
         UpdateDropdownFilters();
         FilterBomEntries();
 
+        ProjectState.Bom = new BomImportResult
+        {
+            KeptRows = rowList,
+            AllRows = rowList,
+            ImportedAt = DateTime.UtcNow
+        };
+
         StatusMessage = $"Loaded BOM: {CurrentBomPlan.Entries.Count} shell folders planned, {CurrentBomPlan.Misplaced.Count} misplaced coil lines.";
     }
 
@@ -1394,15 +1484,33 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (string.IsNullOrWhiteSpace(ShellRootPath) || !Directory.Exists(ShellRootPath))
         {
-            StatusMessage = "Error: Please select a valid shell root folder first.";
-            return;
+            string? chosen = RequestBrowseShellRootFolder?.Invoke();
+            if (!string.IsNullOrWhiteSpace(chosen) && Directory.Exists(chosen))
+            {
+                ShellRootPath = chosen;
+                MarkDirty();
+                var currentRows = GetCurrentBomRows();
+                if (currentRows.Count > 0)
+                {
+                    LoadBomRows(currentRows);
+                }
+            }
+            else
+            {
+                StatusMessage = "Error: Shell folder export cancelled. No valid export root folder selected.";
+                return;
+            }
         }
 
-        if (CurrentBomPlan?.Entries.Count > 0 || BomEntries.Count > 0)
+        var targetEntries = BomEntries.Count > 0 ? BomEntries.ToList() : (CurrentBomPlan?.Entries ?? new List<ShellFolderEntry>());
+        if (targetEntries.Count > 0)
         {
-            var targetEntries = CurrentBomPlan?.Entries ?? BomEntries.ToList();
             int created = BomShellEngine.CreateShellFolders(ShellRootPath, targetEntries);
             StatusMessage = $"Successfully created {created} shell export folders in {ShellRootPath}.";
+        }
+        else
+        {
+            StatusMessage = "No valid 391- BOM shell entries available to export.";
         }
     }
 
@@ -1501,18 +1609,92 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void ExecuteReplaceFromIam()
+    private async void ExecuteReplaceFromIam()
     {
         if (SelectedSurface == null) return;
+
+        var targetSurface = SelectedSurface;
         var dlg = new OpenFileDialog
         {
-            Title = $"Select Inventor Assembly (.iam) to replace geometry for {SelectedSurface.SurfaceNumber}",
-            Filter = "Inventor Assembly (*.iam)|*.iam|All Files (*.*)|*.*"
+            Title = $"Select Inventor Assembly (.iam) to replace geometry for {targetSurface.SurfaceNumber}",
+            Filter = "Inventor Assembly or JSON (*.iam;*.json)|*.iam;*.json|Inventor Assembly (*.iam)|*.iam|JSON Files (*.json)|*.json|All Files (*.*)|*.*"
         };
-        if (dlg.ShowDialog() == true)
+
+        if (dlg.ShowDialog() != true) return;
+
+        string pickedFile = dlg.FileName;
+        string rootFolder = Path.GetDirectoryName(pickedFile) ?? string.Empty;
+
+        SurfaceModel? candidate = null;
+        if (pickedFile.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
         {
-            StatusMessage = $"Replacing geometry for {SelectedSurface.SurfaceNumber} from {Path.GetFileName(dlg.FileName)}...";
-            MarkDirty();
+            candidate = GeometryScanner.ParseConfigJson(File.ReadAllText(pickedFile), pickedFile, rootFolder, "json");
+        }
+        else
+        {
+            candidate = await GeometryScanner.ScanIamFileAsync(pickedFile, rootFolder);
+            if (candidate == null)
+            {
+                // Fallback for IAM files without sidecar JSON or embedded COM metadata
+                candidate = new SurfaceModel
+                {
+                    SurfaceNumber = Path.GetFileNameWithoutExtension(pickedFile),
+                    FilePath = pickedFile,
+                    RelativePath = !string.IsNullOrEmpty(rootFolder) ? Path.GetRelativePath(rootFolder, pickedFile) : pickedFile,
+                    SourceType = "iam",
+                    PartNumber = Path.GetFileNameWithoutExtension(pickedFile)
+                };
+            }
+        }
+
+        if (candidate == null)
+        {
+            StatusMessage = $"Replace failed: Could not read file {Path.GetFileName(pickedFile)}.";
+            return;
+        }
+
+        var result = ProjectStateService.ReplaceSurfaceInPlace(
+            ProjectState,
+            targetSurface,
+            candidate,
+            Surfaces);
+
+        if (!result.Success)
+        {
+            StatusMessage = $"Replace failed: {result.ErrorMessage}";
+            return;
+        }
+
+        if (result.Renumbered)
+        {
+            int idx = Surfaces.IndexOf(targetSurface);
+            if (idx >= 0)
+            {
+                Surfaces[idx] = candidate;
+            }
+            else
+            {
+                Surfaces.Remove(targetSurface);
+                Surfaces.Add(candidate);
+            }
+            SelectedSurface = candidate;
+        }
+        else
+        {
+            OnPropertyChanged(nameof(SelectedSurface));
+        }
+
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+        MarkDirty();
+
+        if (result.IntrusionDetected)
+        {
+            StatusMessage = $"Replaced {result.OldSurfaceNumber} -> {result.NewSurfaceNumber} (Warning: Geometry intrusion detected).";
+        }
+        else
+        {
+            StatusMessage = $"Successfully replaced surface {result.OldSurfaceNumber} -> {result.NewSurfaceNumber}.";
         }
     }
 
@@ -1574,25 +1756,56 @@ public class MainViewModel : INotifyPropertyChanged
     private void ExecuteOpenBomAddDialog()
     {
         var vm = new BomAddEntryViewModel(ProjectState.Bom);
+        if (AvailableSkids.Count > 1)
+        {
+            vm.AvailableSkids.Clear();
+            foreach (var sk in AvailableSkids)
+            {
+                if (sk != "All Skids") vm.AvailableSkids.Add(sk);
+            }
+            if (vm.AvailableSkids.Count > 0)
+                vm.SelectedSkid = vm.AvailableSkids[0];
+        }
+
+        if (AvailableSegments.Count > 1)
+        {
+            vm.AvailableSegments.Clear();
+            foreach (var sg in AvailableSegments)
+            {
+                if (sg != "All Segments") vm.AvailableSegments.Add(sg);
+            }
+            if (vm.AvailableSegments.Count > 0)
+                vm.SelectedSegment = vm.AvailableSegments[0];
+        }
+
         var dlg = new BomAddEntryDialog(vm)
         {
             Owner = System.Windows.Application.Current.MainWindow
         };
         if (dlg.ShowDialog() == true)
         {
-            var entry = new ShellFolderEntry
+            string partNum = string.IsNullOrWhiteSpace(vm.PartNumber) ? "391-NEW" : vm.PartNumber.Trim();
+            if (!partNum.StartsWith("391-", StringComparison.OrdinalIgnoreCase))
             {
-                PartNumber = vm.PartNumber,
-                Skid = vm.SelectedSkid,
-                Segment = vm.SelectedSegment,
-                Description = vm.Description,
-                Quantity = vm.Quantity.ToString(),
-                RelativePath = $"Shell/{vm.SelectedSkid}/{vm.SelectedSegment}"
+                partNum = "391-" + partNum;
+            }
+
+            var newRow = new BomRow
+            {
+                PartNumber = partNum,
+                Quantity = vm.Quantity > 0 ? vm.Quantity.ToString() : "1",
+                Unit = "EA",
+                Skid = vm.SelectedSkid ?? "1 [FR-MB]",
+                Segment = vm.SelectedSegment ?? "MB",
+                Description = string.IsNullOrWhiteSpace(vm.Description) ? "Custom Assembly" : vm.Description.Trim(),
+                ExtDescription = vm.ExtDescription?.Trim() ?? string.Empty
             };
-            BomEntries.Add(entry);
-            FilterBomEntries();
+
+            var currentRows = GetCurrentBomRows();
+            currentRows.Add(newRow);
+            LoadBomRows(currentRows);
             MarkDirty();
-            StatusMessage = $"Added 391- entry {entry.PartNumber} ({entry.Skid}).";
+            StatusMessage = $"Added 391- entry {newRow.PartNumber} ({newRow.Skid}).";
         }
     }
 

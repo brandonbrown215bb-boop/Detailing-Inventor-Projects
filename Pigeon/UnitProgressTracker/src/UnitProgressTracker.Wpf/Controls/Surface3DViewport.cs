@@ -77,6 +77,37 @@ public class Surface3DViewport : Grid
         if (options != null) _stickerOptions = options;
     }
 
+    public CameraStateModel GetCameraState()
+    {
+        if (_helixViewport.Camera is ProjectionCamera cam)
+        {
+            return new CameraStateModel
+            {
+                PositionX = cam.Position.X,
+                PositionY = cam.Position.Y,
+                PositionZ = cam.Position.Z,
+                TargetX = cam.LookDirection.X + cam.Position.X,
+                TargetY = cam.LookDirection.Y + cam.Position.Y,
+                TargetZ = cam.LookDirection.Z + cam.Position.Z,
+                UpX = cam.UpDirection.X,
+                UpY = cam.UpDirection.Y,
+                UpZ = cam.UpDirection.Z
+            };
+        }
+        return new CameraStateModel();
+    }
+
+    public void SetCameraState(CameraStateModel? state)
+    {
+        if (state == null || _helixViewport.Camera is not ProjectionCamera cam) return;
+        cam.Position = new Point3D(state.PositionX, state.PositionY, state.PositionZ);
+        cam.LookDirection = new Vector3D(
+            state.TargetX - state.PositionX,
+            state.TargetY - state.PositionY,
+            state.TargetZ - state.PositionZ);
+        cam.UpDirection = new Vector3D(state.UpX, state.UpY, state.UpZ);
+    }
+
     public void LoadSurfaces(IEnumerable<SurfaceModel> surfaces, Func<string, string> getStatusColorHex)
     {
         ClearSurfaces();

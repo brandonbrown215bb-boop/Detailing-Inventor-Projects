@@ -249,5 +249,59 @@ public class ProjectSerializerTests : IDisposable
         Assert.Same(originalProject, vm.ProjectState);
         Assert.Single(vm.Surfaces);
         Assert.Equal("CURRENT", vm.Surfaces[0].SurfaceNumber);
+        Assert.Contains("unsupported project format", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void MainViewModel_LoadProject_OfflineMode_RestoresGeometryAndSetsOfflineFlag()
+    {
+        string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "v4-complete-project.uptproj");
+        var vm = new UnitProgressTracker.Wpf.ViewModels.MainViewModel();
+
+        vm.LoadProjectFromFile(fixturePath);
+
+        Assert.True(vm.IsOfflineMode);
+        Assert.Contains("Offline Mode", vm.StatusMessage);
+        Assert.Contains("Offline Mode", vm.WindowTitle);
+        Assert.NotEmpty(vm.Surfaces);
+        Assert.Equal("SURF-1001", vm.Surfaces[0].SurfaceNumber);
+        Assert.NotEmpty(vm.Surfaces[0].Boxes);
+    }
+
+    [Fact]
+    public void MainViewModel_SaveAndLoad_PreservesCameraState()
+    {
+        string filePath = Path.Combine(_tempDirectory, "camera_test.uptproj");
+        var vm = new UnitProgressTracker.Wpf.ViewModels.MainViewModel();
+
+        var expectedCamera = new CameraStateModel
+        {
+            PositionX = 10.5,
+            PositionY = 20.5,
+            PositionZ = 30.5,
+            TargetX = 1.0,
+            TargetY = 2.0,
+            TargetZ = 3.0,
+            UpX = 0,
+            UpY = 1,
+            UpZ = 0
+        };
+
+        vm.RequestGetCameraState = () => expectedCamera;
+
+        vm.Surfaces.Add(new SurfaceModel { SurfaceNumber = "SURF-1" });
+        bool saved = vm.SaveProjectInternal(filePath);
+        Assert.True(saved);
+
+        CameraStateModel? restoredCamera = null;
+        var vm2 = new UnitProgressTracker.Wpf.ViewModels.MainViewModel();
+        vm2.RequestSetCameraState = state => restoredCamera = state;
+
+        vm2.LoadProjectFromFile(filePath);
+
+        Assert.NotNull(restoredCamera);
+        Assert.Equal(10.5, restoredCamera.PositionX);
+        Assert.Equal(20.5, restoredCamera.PositionY);
+        Assert.Equal(30.5, restoredCamera.PositionZ);
     }
 }

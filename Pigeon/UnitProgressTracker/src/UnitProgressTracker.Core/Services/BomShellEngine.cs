@@ -215,13 +215,20 @@ public class BomShellEngine
                 continue;
             }
 
-            string? skidNum = ParseSkidNumber(row.Skid);
-            string? segmentFolder = ResolveSegmentFolder(row.Skid, row.Segment, unitConfig);
+            string skidNum = ParseSkidNumber(row.Skid) ?? "01";
+            string? segmentFolder = ResolveSegmentFolder(row.Skid, row.Segment ?? string.Empty, unitConfig);
 
-            if (skidNum == null || segmentFolder == null)
+            if (string.IsNullOrWhiteSpace(segmentFolder))
             {
-                skipped.Add((row, skidNum == null ? "unrecognized skid" : "unmatched segment"));
-                continue;
+                string cleanSeg = (row.Segment ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(cleanSeg) && cleanSeg != "<--")
+                {
+                    segmentFolder = Regex.IsMatch(cleanSeg, @"^\d{2}\b") ? cleanSeg : $"01 {cleanSeg}";
+                }
+                else
+                {
+                    segmentFolder = "01 GEN";
+                }
             }
 
             string assemblyFolder = SanitizeAssemblyFolderName(row.Description, row.ExtDescription);
@@ -251,12 +258,12 @@ public class BomShellEngine
 
             entries.Add(new ShellFolderEntry
             {
-                EntryKey = BuildEntryKey(partNumber, row.Skid, row.Segment, row.Description, row.ExtDescription),
+                EntryKey = BuildEntryKey(partNumber, row.Skid, row.Segment ?? string.Empty, row.Description, row.ExtDescription),
                 PartNumber = partNumber,
                 Quantity = row.Quantity,
                 Unit = row.Unit,
                 Skid = row.Skid,
-                Segment = row.Segment,
+                Segment = row.Segment ?? string.Empty,
                 Description = row.Description,
                 ExtDescription = row.ExtDescription,
                 SegmentFolder = segmentFolder,

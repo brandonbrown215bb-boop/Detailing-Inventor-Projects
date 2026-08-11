@@ -27,6 +27,13 @@ public partial class MainWindow : Window
         ViewModel.RequestSetSkidGrid = v => Viewport3D.SetShowSkidGrid(v);
         ViewModel.RequestSetOpacity = o => Viewport3D.SetGlobalOpacity(o);
         ViewModel.RequestSetSurfaceVisibility = (hidden, sn) => Viewport3D.SetSurfaceVisibility(hidden, sn);
+        ViewModel.RequestGetCameraState = () => Viewport3D.GetCameraState();
+        ViewModel.RequestSetCameraState = state => Viewport3D.SetCameraState(state);
+        ViewModel.RequestBrowseShellRootFolder = () =>
+        {
+            var dialog = new OpenFolderDialog { Title = "Choose shell export root folder" };
+            return dialog.ShowDialog() == true ? dialog.FolderName : null;
+        };
 
         Viewport3D.SurfacePicked += OnSurfacePickedIn3D;
         Viewport3D.SurfaceHovered += OnSurfaceHoveredIn3D;
@@ -273,5 +280,18 @@ public partial class MainWindow : Window
             ViewModel.SearchText = stateId;
             ViewModel.RebuildGroupedSurfaces();
         }
+    }
+
+    private void OnBomDataGridCellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            ViewModel.MarkDirty();
+            var currentRows = ViewModel.GetCurrentBomRows();
+            if (currentRows.Count > 0)
+            {
+                ViewModel.LoadBomRows(currentRows);
+            }
+        }), System.Windows.Threading.DispatcherPriority.Background);
     }
 }

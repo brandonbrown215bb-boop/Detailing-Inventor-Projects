@@ -26,8 +26,6 @@ public static class MarkdownExporter
     {
         if (project == null) throw new ArgumentNullException(nameof(project));
         
-        var statesList = (statusStates ?? StatusState.DefaultStates).ToList();
-        
         var activeSurfaces = project.Surfaces?.Select(kvp => new SurfaceModel
         {
             SurfaceNumber = kvp.Value.DisplayNumber ?? kvp.Key,
@@ -40,7 +38,7 @@ public static class MarkdownExporter
             GeometryFingerprint = kvp.Value.GeometryFingerprint ?? ""
         }).ToList() ?? new List<SurfaceModel>();
 
-        return GenerateAuditReport(project, activeSurfaces, statesList, options);
+        return GenerateAuditReport(project, activeSurfaces, statusStates, options);
     }
 
     public static string GenerateAuditReport(IEnumerable<SurfaceModel> surfaces, IEnumerable<StatusState> states)
@@ -60,7 +58,8 @@ public static class MarkdownExporter
     {
         options ??= new MarkdownExportOptions();
         var surfacesList = (activeSurfaces ?? Enumerable.Empty<SurfaceModel>()).ToList();
-        var statesList = (statusStates ?? StatusState.DefaultStates).ToList();
+        var effectiveStates = statusStates ?? (project?.StatusDefinitions != null && project.StatusDefinitions.Count > 0 ? project.StatusDefinitions : StatusState.DefaultStates);
+        var statesList = effectiveStates.ToList();
         var stateMap = statesList.ToDictionary(s => s.Id, s => s.Name, StringComparer.OrdinalIgnoreCase);
 
         var sb = new StringBuilder();
@@ -122,6 +121,18 @@ public static class MarkdownExporter
                 double pct = surfacesList.Count > 0 ? (double)count / surfacesList.Count * 100 : 0.0;
                 sb.AppendLine($"| {state.Name} | {count} | {pct:F1}% | {state.FillType} | `{state.ColorHex}` |");
             }
+
+            var knownStateIds = new HashSet<string>(statesList.Select(s => s.Id), StringComparer.OrdinalIgnoreCase);
+            var unmappedGroups = surfacesList
+                .Where(s => !knownStateIds.Contains(s.StateId ?? "current"))
+                .GroupBy(s => s.StateId ?? "unknown", StringComparer.OrdinalIgnoreCase);
+
+            foreach (var g in unmappedGroups)
+            {
+                int count = g.Count();
+                double pct = surfacesList.Count > 0 ? (double)count / surfacesList.Count * 100 : 0.0;
+                sb.AppendLine($"| Unknown State ({g.Key}) | {count} | {pct:F1}% | solid | `#94A3B8` |");
+            }
             sb.AppendLine();
         }
 
@@ -136,7 +147,10 @@ public static class MarkdownExporter
 
             foreach (var surf in surfacesList)
             {
-                string statusName = stateMap.GetValueOrDefault(surf.StateId ?? "current", surf.StateId ?? "current");
+                string statusName = stateMap.TryGetValue(surf.StateId ?? "current", out var resolvedName)
+                    ? resolvedName
+                    : $"Unknown State ({surf.StateId})";
+
                 int totalCheck = surf.Checklist?.Count ?? 0;
                 int doneCheck = surf.Checklist?.Values.Count(v => v) ?? 0;
                 string progress = totalCheck > 0 ? $"{doneCheck}/{totalCheck}" : "N/A";
@@ -156,7 +170,9 @@ public static class MarkdownExporter
                 sb.AppendLine("### Interactive Surface Checklists & Notes");
                 foreach (var surf in surfacesList)
                 {
-                    string statusName = stateMap.GetValueOrDefault(surf.StateId ?? "current", surf.StateId ?? "current");
+                    string statusName = stateMap.TryGetValue(surf.StateId ?? "current", out var resolvedName)
+                        ? resolvedName
+                        : $"Unknown State ({surf.StateId})";
                     string displayNum = !string.IsNullOrWhiteSpace(surf.DisplayNumber) ? surf.DisplayNumber : surf.SurfaceNumber;
 
                     sb.AppendLine($"#### Surface: {displayNum} (Part #: {surf.PartNumber})");

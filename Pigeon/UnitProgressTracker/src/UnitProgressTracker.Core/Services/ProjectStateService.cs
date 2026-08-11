@@ -151,4 +151,225 @@ public static class ProjectStateService
             project.UpdatedAt = DateTime.UtcNow;
         }
     }
+
+    public static void SyncChecklistTemplateToSurfaces(
+        ProjectStateModel project,
+        IEnumerable<string>? newTemplateItems,
+        bool resetExistingWork = false,
+        IEnumerable<SurfaceModel>? inMemorySurfaces = null)
+    {
+        if (project == null) throw new ArgumentNullException(nameof(project));
+
+        var cleanTemplate = (newTemplateItems ?? Enumerable.Empty<string>())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (project.Preferences == null)
+            project.Preferences = new DisplayPreferences();
+
+        project.Preferences.ChecklistTemplate = cleanTemplate;
+
+        if (project.Surfaces != null)
+        {
+            foreach (var record in project.Surfaces.Values)
+            {
+                if (record.Checklist == null || resetExistingWork)
+                {
+                    record.Checklist = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                foreach (var itemKey in cleanTemplate)
+                {
+                    if (!record.Checklist.ContainsKey(itemKey))
+                    {
+                        record.Checklist[itemKey] = false;
+                    }
+                }
+            }
+        }
+
+        if (inMemorySurfaces != null)
+        {
+            foreach (var surf in inMemorySurfaces)
+            {
+                if (surf.Checklist == null || resetExistingWork)
+                {
+                    surf.Checklist = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                foreach (var itemKey in cleanTemplate)
+                {
+                    if (!surf.Checklist.ContainsKey(itemKey))
+                    {
+                        surf.Checklist[itemKey] = false;
+                    }
+                }
+            }
+        }
+
+        project.UpdatedAt = DateTime.UtcNow;
+    }
+
+    public static ReplaceSurfaceResult ReplaceSurfaceInPlace(
+        ProjectStateModel project,
+        SurfaceModel existingSurface,
+        SurfaceModel replacementCandidate,
+        IEnumerable<SurfaceModel> activeSurfaces,
+        bool confirmRenumberTransfer = true)
+    {
+        if (project == null) throw new ArgumentNullException(nameof(project));
+        if (existingSurface == null) throw new ArgumentNullException(nameof(existingSurface));
+        if (replacementCandidate == null) throw new ArgumentNullException(nameof(replacementCandidate));
+
+        string targetKey = existingSurface.SurfaceNumber;
+        if (!project.Surfaces.TryGetValue(targetKey, out var targetRecord))
+        {
+            var match = project.Surfaces.FirstOrDefault(kv => string.Equals(kv.Value.DisplayNumber, targetKey, StringComparison.OrdinalIgnoreCase));
+            if (match.Key != null)
+            {
+                targetKey = match.Key;
+                targetRecord = match.Value;
+            }
+            else
+            {
+                return new ReplaceSurfaceResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Target surface '{targetKey}' not found in project state."
+                };
+            }
+        }
+
+        string oldDisplayNumber = targetRecord.DisplayNumber ?? existingSurface.EffectiveDisplayNumber;
+        string newDisplayNumber = replacementCandidate.EffectiveDisplayNumber;
+        string newFingerprint = GeometryFingerprinter.CalculateFingerprint(replacementCandidate);
+
+        bool isSameIdentity = string.Equals(oldDisplayNumber, newDisplayNumber, StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(targetKey, replacementCandidate.SurfaceNumber, StringComparison.OrdinalIgnoreCase);
+
+        if (isSameIdentity)
+        {
+            targetRecord.GeometryFingerprint = newFingerprint;
+            targetRecord.UpdatedAt = DateTime.UtcNow;
+
+            existingSurface.Boxes = replacementCandidate.Boxes ?? new List<GeometryBox>();
+            existingSurface.PartNumber = replacementCandidate.PartNumber;
+            existingSurface.SurfaceType = replacementCandidate.SurfaceType;
+            existingSurface.SurfaceUnitSide = replacementCandidate.SurfaceUnitSide;
+            existingSurface.ConfigurationKind = replacementCandidate.ConfigurationKind;
+            existingSurface.SkidNumber = replacementCandidate.SkidNumber;
+            existingSurface.SkidId = replacementCandidate.SkidId;
+            existingSurface.Openings = replacementCandidate.Openings ?? new List<OpeningModel>();
+            existingSurface.BulkheadChannels = replacementCandidate.BulkheadChannels ?? new List<GeometryBox>();
+            existingSurface.BulkheadHolePatterns = replacementCandidate.BulkheadHolePatterns ?? new List<BulkheadHolePatternModel>();
+            existingSurface.GeometryFingerprint = newFingerprint;
+            existingSurface.FilePath = replacementCandidate.FilePath;
+            existingSurface.RelativePath = replacementCandidate.RelativePath;
+            existingSurface.SourceType = replacementCandidate.SourceType;
+        }
+        else
+        {
+            // Retire old display number snapshot for audit lineage
+            project.Retired[oldDisplayNumber] = new RetiredSurfaceRecordModel
+            {
+                RetiredAt = DateTime.UtcNow,
+                SupersededBy = newDisplayNumber,
+                TransferType = "replace",
+                FileKey = targetKey,
+                GeometryFingerprint = targetRecord.GeometryFingerprint,
+                Snapshot = targetRecord.Clone()
+            };
+
+            var newRecord = new SurfaceRecordModel
+            {
+                DisplayNumber = newDisplayNumber,
+                GeometryFingerprint = newFingerprint,
+                StateId = targetRecord.StateId,
+                Notes = targetRecord.Notes,
+                Checklist = new Dictionary<string, bool>(targetRecord.Checklist, StringComparer.OrdinalIgnoreCase),
+                PreviousNumbers = new List<string>(targetRecord.PreviousNumbers),
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            if (!newRecord.PreviousNumbers.Contains(oldDisplayNumber, StringComparer.OrdinalIgnoreCase))
+            {
+                newRecord.PreviousNumbers.Add(oldDisplayNumber);
+            }
+
+            project.Surfaces.Remove(targetKey);
+            project.Surfaces[replacementCandidate.SurfaceNumber] = newRecord;
+
+            replacementCandidate.StateId = newRecord.StateId ?? "current";
+            replacementCandidate.Notes = newRecord.Notes;
+            replacementCandidate.Checklist = newRecord.Checklist;
+            replacementCandidate.PreviousNumbers = newRecord.PreviousNumbers;
+            replacementCandidate.DisplayNumber = newRecord.DisplayNumber;
+            replacementCandidate.GeometryFingerprint = newFingerprint;
+        }
+
+        // Recalculate intrusion flags across active surfaces
+        var allSurfaces = activeSurfaces
+            .Where(s => s != existingSurface &&
+                        !string.Equals(s.SurfaceNumber, existingSurface.SurfaceNumber, StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(s.SurfaceNumber, replacementCandidate.SurfaceNumber, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        allSurfaces.Add(isSameIdentity ? existingSurface : replacementCandidate);
+
+        var newlyDetectedIntrusions = GeometryIntrusionChecker.CheckIntrusions(allSurfaces);
+
+        if (project.IntrusionFlags == null)
+            project.IntrusionFlags = new List<GeometryIntrusionFlagModel>();
+
+        // Persist newly detected intrusion flags into project state until manually cleaned/overwritten
+        foreach (var newFlag in newlyDetectedIntrusions)
+        {
+            var existingFlag = project.IntrusionFlags.FirstOrDefault(f =>
+                string.Equals(f.SurfaceNumber, newFlag.SurfaceNumber, StringComparison.OrdinalIgnoreCase));
+
+            if (existingFlag != null)
+            {
+                existingFlag.AffectedSurfaceNumbers = newFlag.AffectedSurfaceNumbers;
+                existingFlag.Message = newFlag.Message;
+                existingFlag.Resolved = false;
+            }
+            else
+            {
+                project.IntrusionFlags.Add(newFlag);
+            }
+        }
+
+        bool intrusionDetected = newlyDetectedIntrusions.Any(f =>
+            string.Equals(f.SurfaceNumber, replacementCandidate.SurfaceNumber, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(f.SurfaceNumber, existingSurface.SurfaceNumber, StringComparison.OrdinalIgnoreCase) ||
+            f.AffectedSurfaceNumbers.Contains(replacementCandidate.SurfaceNumber, StringComparer.OrdinalIgnoreCase) ||
+            f.AffectedSurfaceNumbers.Contains(existingSurface.SurfaceNumber, StringComparer.OrdinalIgnoreCase));
+
+        project.UpdatedAt = DateTime.UtcNow;
+
+        return new ReplaceSurfaceResult
+        {
+            Success = true,
+            Renumbered = !isSameIdentity,
+            TrackingTransferred = true,
+            IntrusionDetected = intrusionDetected,
+            OldSurfaceNumber = oldDisplayNumber,
+            NewSurfaceNumber = newDisplayNumber,
+            IntrusionFlags = project.IntrusionFlags
+        };
+    }
 }
+
+public class ReplaceSurfaceResult
+{
+    public bool Success { get; set; }
+    public bool Renumbered { get; set; }
+    public bool TrackingTransferred { get; set; }
+    public bool IntrusionDetected { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string OldSurfaceNumber { get; set; } = string.Empty;
+    public string NewSurfaceNumber { get; set; } = string.Empty;
+    public List<GeometryIntrusionFlagModel> IntrusionFlags { get; set; } = new();
+}
+
