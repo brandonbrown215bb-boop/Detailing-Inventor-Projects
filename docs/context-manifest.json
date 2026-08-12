@@ -6,14 +6,14 @@
       "scope": [
         "src/**"
       ],
-      "verified_at_commit": "3c2ecdac70959b4cfc4a568a961778f1ef8f6c0d"
+      "verified_at_commit": "dccba911bba7df6ff22a24457cd5c337836c8f74"
     },
     {
       "path": "docs/architecture/unit_progress_tracker.md",
       "scope": [
         "Pigeon/UnitProgressTracker/src/**"
       ],
-      "verified_at_commit": "1ef64f8da50d760a714c84045c2afa53a774b29b"
+      "verified_at_commit": "dccba911bba7df6ff22a24457cd5c337836c8f74"
     }
   ]
 }

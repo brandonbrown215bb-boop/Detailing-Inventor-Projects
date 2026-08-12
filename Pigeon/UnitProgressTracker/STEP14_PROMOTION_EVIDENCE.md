@@ -21,6 +21,8 @@ from this directory. The current preparation run produced:
 - Publish output: `.artifacts/publish/win-x64/UnitProgressTracker.Wpf.exe`.
 - Publish inventory: **256 files, 153,268,354 bytes**.
 - Source formatting check: `git diff --check` passed.
+- Architecture note inspected and Agent Ground verified against remediation source
+  commit `dccba91`.
 
 The publish output is ignored build evidence, not a source deliverable. Copy the whole
 publish directory for the fresh-machine check; the executable is not a single-file app.
@@ -69,6 +71,4 @@ These are visible deferrals, not failed parity claims:
 
 - Complete and sign `STEP14_WORKSTATION_SMOKE.md` using the self-contained package.
 - Attach supported Inventor/Apprentice version and lifecycle results.
-- Commit the final source, inspect the refreshed architecture note, then run Agent
-  Ground `verify`; the note is intentionally unverified while behavior is uncommitted.
 - Review this matrix and explicitly approve promotion before moving Pigeon to root.

@@ -103,6 +103,5 @@ substituted by unit tests.
 See `docs/operations/validation.md` and
 `Pigeon/UnitProgressTracker/STEP14_WORKSTATION_SMOKE.md`.
 
-This note has been refreshed against the remediation working tree. Agent Ground
-verification remains intentionally pending until the source is committed; assigning a
-HEAD hash to uncommitted behavior would be false evidence.
+This note was refreshed and inspected against remediation source commit `dccba91`.
+The frontmatter verification marker is maintained by Agent Ground.
