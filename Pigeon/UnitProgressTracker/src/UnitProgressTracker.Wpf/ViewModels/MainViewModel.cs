@@ -86,6 +86,8 @@ public class MainViewModel : INotifyPropertyChanged
     private SurfaceModel? _selectedSurface;
     private ShellFolderEntry? _selectedBomEntry;
     private string _searchText = string.Empty;
+    private string? _selectedStatusFilterId;
+    private string _surfaceVisibilityFilter = "all";
     private string _shellRootPath = string.Empty;
     private int _selectedTabIndex = 0;
     private string _statusMessage = "Ready. Open a unit folder or project to begin.";
@@ -93,8 +95,6 @@ public class MainViewModel : INotifyPropertyChanged
     private string _selectedSegmentFilter = "All Segments";
     private bool _isCustomSqOnly;
     private bool _showMisplacedDetails;
-    private bool _wireframeVisible = true;
-    private double _globalOpacity = 1.0;
     private bool _isScanning;
     private double _scanProgress;
     private string _scanProgressLabel = string.Empty;
@@ -103,7 +103,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ProjectStateModel ProjectState { get; private set; } = new();
     public ObservableCollection<SurfaceModel> Surfaces { get; } = new();
     public ObservableCollection<SurfaceGroupViewModel> GroupedSurfaces { get; } = new();
-    public ObservableCollection<SurfaceModel> RemovedSurfaces { get; } = new();
+    public ObservableCollection<RetiredSurfaceViewModel> RemovedSurfaces { get; } = new();
     public ObservableCollection<StatusState> StatusStates { get; } = new();
     public ObservableCollection<ShellFolderEntry> BomEntries { get; } = new();
     public ObservableCollection<ShellFolderEntry> FilteredBomEntries { get; } = new();
@@ -123,11 +123,16 @@ public class MainViewModel : INotifyPropertyChanged
     public Action<string>? RequestHighlightSurface { get; set; }
     public Action<bool>? RequestSetWireframe { get; set; }
     public Action<bool>? RequestSetSkidGrid { get; set; }
+    public Action<bool>? RequestSetSkidLabels { get; set; }
     public Action<double>? RequestSetOpacity { get; set; }
     public Action<bool, string>? RequestSetSurfaceVisibility { get; set; }
     public Func<CameraStateModel>? RequestGetCameraState { get; set; }
     public Action<CameraStateModel>? RequestSetCameraState { get; set; }
     public Func<string?>? RequestBrowseShellRootFolder { get; set; }
+    public Func<SurfaceModel, SurfaceModel, bool?>? RequestConfirmRenumberTransfer { get; set; }
+    public Func<SurfaceModel, MissingSurfaceResolution?>? RequestResolveMissingSurface { get; set; }
+    public Func<RescanReconcileResult, bool>? RequestConfirmRescanApply { get; set; }
+    public Func<AddSurfacesProposal, GeometryScanResult, bool>? RequestConfirmAddSurfacesApply { get; set; }
 
     private bool _isOfflineMode;
     public bool IsOfflineMode
@@ -445,7 +450,43 @@ public class MainViewModel : INotifyPropertyChanged
     public string SearchText
     {
         get => _searchText;
-        set { _searchText = value; OnPropertyChanged(); FilterBomEntries(); }
+        set
+        {
+            _searchText = value;
+            OnPropertyChanged();
+            FilterBomEntries();
+            RebuildGroupedSurfaces();
+            RequestViewportRefresh?.Invoke();
+        }
+    }
+
+    public string? SelectedStatusFilterId
+    {
+        get => _selectedStatusFilterId;
+        private set
+        {
+            if (string.Equals(_selectedStatusFilterId, value, StringComparison.OrdinalIgnoreCase)) return;
+            _selectedStatusFilterId = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasStatusFilter));
+        }
+    }
+
+    public bool HasStatusFilter => !string.IsNullOrWhiteSpace(SelectedStatusFilterId);
+
+    public string SurfaceVisibilityFilter
+    {
+        get => _surfaceVisibilityFilter;
+        set
+        {
+            string normalized = value?.Trim().ToLowerInvariant() ?? "all";
+            if (normalized is not ("all" or "visible" or "hidden")) normalized = "all";
+            if (_surfaceVisibilityFilter == normalized) return;
+            _surfaceVisibilityFilter = normalized;
+            OnPropertyChanged();
+            RebuildGroupedSurfaces();
+            RequestViewportRefresh?.Invoke();
+        }
     }
 
     public string ShellRootPath
@@ -566,18 +607,66 @@ public class MainViewModel : INotifyPropertyChanged
     public int ActiveSurfacesCount => Surfaces.Count(s => !s.IsHidden);
     public int HiddenSurfacesCount => Surfaces.Count(s => s.IsHidden);
     public int RemovedSurfacesCount => RemovedSurfaces.Count;
+    public int FilteredSurfacesCount => GetFilteredSurfaces().Count;
+    public string FilteredSurfaceCountText => $"{FilteredSurfacesCount} shown";
+    public string FilteredEmptyStateMessage => FilteredSurfacesCount == 0
+        ? "No surfaces match the current filters."
+        : string.Empty;
 
-    public void RebuildGroupedSurfaces()
+    public IReadOnlyList<SurfaceModel> GetFilteredSurfaces()
     {
-        GroupedSurfaces.Clear();
-
         IEnumerable<SurfaceModel> query = Surfaces;
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
-            query = query.Where(s => s.SurfaceNumber.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-                                  || s.PartNumber.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-                                  || s.SurfaceUnitSide.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+            string term = SearchText.Trim();
+            query = query.Where(s => s.SurfaceNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                                  || s.EffectiveDisplayNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                                  || s.PartNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                                  || s.SurfaceUnitSide.Contains(term, StringComparison.OrdinalIgnoreCase)
+                                  || s.TypeTag.Contains(term, StringComparison.OrdinalIgnoreCase));
         }
+
+        if (HasStatusFilter)
+            query = query.Where(s => string.Equals(s.StateId, SelectedStatusFilterId, StringComparison.OrdinalIgnoreCase));
+
+        query = SurfaceVisibilityFilter switch
+        {
+            "visible" => query.Where(s => !s.IsHidden),
+            "hidden" => query.Where(s => s.IsHidden),
+            _ => query
+        };
+
+        query = SortMode switch
+        {
+            "skid" => query.OrderBy(s => s.SkidId).ThenBy(s => s.EffectiveDisplayNumber, StringComparer.OrdinalIgnoreCase),
+            "type" => query.OrderBy(s => s.TypeTag, StringComparer.OrdinalIgnoreCase).ThenBy(s => s.EffectiveDisplayNumber, StringComparer.OrdinalIgnoreCase),
+            "skid-type" => query.OrderBy(s => s.SkidId).ThenBy(s => s.TypeTag, StringComparer.OrdinalIgnoreCase).ThenBy(s => s.EffectiveDisplayNumber, StringComparer.OrdinalIgnoreCase),
+            _ => query
+        };
+
+        return query.ToList();
+    }
+
+    public void ToggleStatusFilter(string? statusId)
+    {
+        SelectedStatusFilterId = !string.IsNullOrWhiteSpace(statusId)
+            && !string.Equals(SelectedStatusFilterId, statusId, StringComparison.OrdinalIgnoreCase)
+                ? statusId
+                : null;
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+    }
+
+    public void RebuildGroupedSurfaces()
+    {
+        foreach (var existingGroup in GroupedSurfaces)
+            existingGroup.Detach();
+        GroupedSurfaces.Clear();
+
+        IReadOnlyList<SurfaceModel> query = GetFilteredSurfaces();
+
+        if (SelectedSurface != null && !query.Contains(SelectedSurface))
+            SelectedSurface = null;
 
         if (GroupMode == "skid")
         {
@@ -589,7 +678,7 @@ public class MainViewModel : INotifyPropertyChanged
                     GroupKey = $"Skid {g.Key}",
                     DisplayName = $"Skid {g.Key} ({g.Count()} surfaces)"
                 };
-                grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+                grpVM.GroupVisibilityToggled += HandleGroupVisibilityToggled;
 
                 foreach (var surf in g)
                     grpVM.Surfaces.Add(surf);
@@ -607,7 +696,7 @@ public class MainViewModel : INotifyPropertyChanged
                     GroupKey = g.Key,
                     DisplayName = $"{g.Key} ({g.Count()} surfaces)"
                 };
-                grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+                grpVM.GroupVisibilityToggled += HandleGroupVisibilityToggled;
 
                 foreach (var surf in g)
                     grpVM.Surfaces.Add(surf);
@@ -622,7 +711,7 @@ public class MainViewModel : INotifyPropertyChanged
                 GroupKey = "All Surfaces",
                 DisplayName = $"All Surfaces ({query.Count()})"
             };
-            grpVM.GroupVisibilityToggled += _ => RequestViewportRefresh?.Invoke();
+            grpVM.GroupVisibilityToggled += HandleGroupVisibilityToggled;
 
             foreach (var surf in query)
                 grpVM.Surfaces.Add(surf);
@@ -633,6 +722,18 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ActiveSurfacesCount));
         OnPropertyChanged(nameof(HiddenSurfacesCount));
         OnPropertyChanged(nameof(RemovedSurfacesCount));
+        OnPropertyChanged(nameof(FilteredSurfacesCount));
+        OnPropertyChanged(nameof(FilteredSurfaceCountText));
+        OnPropertyChanged(nameof(FilteredEmptyStateMessage));
+    }
+
+    private void HandleGroupVisibilityToggled(SurfaceGroupViewModel group)
+    {
+        foreach (var surface in group.Surfaces)
+            SyncSurfaceVisibilityRecord(surface);
+        MarkDirty();
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
     }
 
     public int SelectedTabIndex
@@ -680,24 +781,29 @@ public class MainViewModel : INotifyPropertyChanged
     // R5 — Wireframe toggle
     public bool WireframeVisible
     {
-        get => _wireframeVisible;
+        get => Preferences.ViewerOptions.WireframeVisible;
         set
         {
-            _wireframeVisible = value;
+            if (Preferences.ViewerOptions.WireframeVisible == value) return;
+            Preferences.ViewerOptions.WireframeVisible = value;
             OnPropertyChanged();
             RequestSetWireframe?.Invoke(value);
+            MarkDirty();
         }
     }
 
     // R5 — Global opacity
     public double GlobalOpacity
     {
-        get => _globalOpacity;
+        get => Preferences.ViewerOptions.SurfaceOpacity;
         set
         {
-            _globalOpacity = Math.Clamp(value, 0.1, 1.0);
+            double normalized = Math.Clamp(value, 0.1, 1.0);
+            if (Math.Abs(Preferences.ViewerOptions.SurfaceOpacity - normalized) < 0.0001) return;
+            Preferences.ViewerOptions.SurfaceOpacity = normalized;
             OnPropertyChanged();
-            RequestSetOpacity?.Invoke(_globalOpacity);
+            RequestSetOpacity?.Invoke(normalized);
+            MarkDirty();
         }
     }
 
@@ -760,6 +866,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand LinkPreviousSurfaceCommand { get; }
     public ICommand ReplaceFromIamCommand { get; }
     public ICommand RemoveSurfaceCommand { get; }
+    public ICommand RestoreSurfaceCommand { get; }
     public ICommand OpenOptionsDialogCommand { get; }
     public ICommand OpenRecentProjectsDialogCommand { get; }
     public ICommand OpenBomAddDialogCommand { get; }
@@ -809,6 +916,7 @@ public class MainViewModel : INotifyPropertyChanged
         LinkPreviousSurfaceCommand = new RelayCommand(p => ExecuteLinkPreviousSurface(p as string), _ => HasSelectedSurface);
         ReplaceFromIamCommand = new RelayCommand(_ => ExecuteReplaceFromIam(), _ => HasSelectedSurface);
         RemoveSurfaceCommand = new RelayCommand(_ => ExecuteRemoveSurface(), _ => HasSelectedSurface);
+        RestoreSurfaceCommand = new RelayCommand(p => ExecuteRestoreSurface(p as RetiredSurfaceViewModel), p => p is RetiredSurfaceViewModel);
         OpenOptionsDialogCommand = new RelayCommand(_ => ExecuteOpenOptionsDialog());
         OpenRecentProjectsDialogCommand = new RelayCommand(_ => ExecuteOpenRecentProjectsDialog());
         OpenBomAddDialogCommand = new RelayCommand(_ => ExecuteOpenBomAddDialog());
@@ -829,6 +937,48 @@ public class MainViewModel : INotifyPropertyChanged
 
     public void MarkDirty() => IsDirty = true;
     public void ClearDirty() => IsDirty = false;
+
+    public void UpdateCameraState(CameraStateModel camera)
+    {
+        ArgumentNullException.ThrowIfNull(camera);
+        if (CameraStatesEqual(ProjectState.Camera, camera)) return;
+        ProjectState.Camera = new CameraStateModel
+        {
+            PositionX = camera.PositionX,
+            PositionY = camera.PositionY,
+            PositionZ = camera.PositionZ,
+            TargetX = camera.TargetX,
+            TargetY = camera.TargetY,
+            TargetZ = camera.TargetZ,
+            UpX = camera.UpX,
+            UpY = camera.UpY,
+            UpZ = camera.UpZ
+        };
+        MarkDirty();
+    }
+
+    private static bool CameraStatesEqual(CameraStateModel left, CameraStateModel right)
+    {
+        const double tolerance = 0.0001;
+        return Math.Abs(left.PositionX - right.PositionX) < tolerance
+            && Math.Abs(left.PositionY - right.PositionY) < tolerance
+            && Math.Abs(left.PositionZ - right.PositionZ) < tolerance
+            && Math.Abs(left.TargetX - right.TargetX) < tolerance
+            && Math.Abs(left.TargetY - right.TargetY) < tolerance
+            && Math.Abs(left.TargetZ - right.TargetZ) < tolerance
+            && Math.Abs(left.UpX - right.UpX) < tolerance
+            && Math.Abs(left.UpY - right.UpY) < tolerance
+            && Math.Abs(left.UpZ - right.UpZ) < tolerance;
+    }
+
+    public void ApplyRuntimePreferences()
+    {
+        RequestSetWireframe?.Invoke(WireframeVisible);
+        RequestSetSkidGrid?.Invoke(ShowSkidGrid);
+        RequestSetSkidLabels?.Invoke(ShowSkidLabels);
+        RequestSetOpacity?.Invoke(GlobalOpacity);
+        RequestViewportRefresh?.Invoke();
+    }
 
     public void RefreshRecentProjects()
     {
@@ -894,13 +1044,7 @@ public class MainViewModel : INotifyPropertyChanged
             var currentBomRows = GetCurrentBomRows();
             if (currentBomRows.Count > 0)
             {
-                ProjectState.Bom = new BomImportResult
-                {
-                    SourceFilePath = ProjectState.Bom?.SourceFilePath ?? string.Empty,
-                    ImportedAt = ProjectState.Bom?.ImportedAt ?? DateTime.UtcNow,
-                    KeptRows = currentBomRows,
-                    AllRows = currentBomRows
-                };
+                ProjectState.Bom = BuildUpdatedBomResult(currentBomRows, ProjectState.Bom);
             }
             else
             {
@@ -926,29 +1070,21 @@ public class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            var project = ProjectSerializer.Load<ProjectStateModel>(filePath);
-            if (project == null)
+            var loadResult = ProjectSerializer.LoadProject(filePath);
+            if (!loadResult.Success || loadResult.Project == null)
             {
-                StatusMessage = "Error loading project: File is invalid or uses an unsupported project format (only Version 4 .uptproj files are supported).";
+                string category = loadResult.FailureKind is ProjectLoadFailureKind.LegacyPigeonVersion or
+                    ProjectLoadFailureKind.LegacyEsmundVersion or
+                    ProjectLoadFailureKind.NewerVersion or
+                    ProjectLoadFailureKind.UnsupportedFormat
+                    ? "unsupported project format"
+                    : "project validation";
+                StatusMessage = $"Project open failed ({category}): {loadResult.ActionableMessage} Last usable project preserved.";
                 return;
             }
+            var project = loadResult.Project;
 
-            ProjectState = project;
-            CurrentProjectPath = filePath;
-            if (!string.IsNullOrEmpty(project.SourceFolder))
-                CurrentFolderPath = project.SourceFolder;
-
-            IsOfflineMode = !string.IsNullOrWhiteSpace(project.SourceFolder) && !Directory.Exists(project.SourceFolder);
-
-            Surfaces.Clear();
-            StatusStates.Clear();
-            foreach (var state in project.StatusDefinitions.Count > 0
-                ? project.StatusDefinitions
-                : StatusStateService.GetDefaultStates())
-            {
-                StatusStates.Add(state);
-            }
-
+            var loadedSurfaces = new List<SurfaceModel>();
             foreach (var (key, rec) in project.Surfaces)
             {
                 var surf = project.Geometry.TryGetValue(key, out var savedGeometry)
@@ -967,12 +1103,40 @@ public class MainViewModel : INotifyPropertyChanged
                     ? new List<string>(rec.PreviousNumbers)
                     : new List<string>();
                 surf.GeometryFingerprint = rec.GeometryFingerprint ?? surf.GeometryFingerprint;
-                Surfaces.Add(surf);
+                loadedSurfaces.Add(surf);
             }
 
+            var loadedRetired = BuildRetiredSurfaceViewModels(project);
+
+            ShellFolderPlan? loadedBomPlan = null;
             if (project.Bom != null && project.Bom.KeptRows != null && project.Bom.KeptRows.Count > 0)
             {
-                LoadBomRows(project.Bom.KeptRows);
+                loadedBomPlan = new BomShellEngine().BuildPlan(project.Bom.KeptRows, ShellRootPath, project.UnitConfig);
+            }
+
+            ProjectState = project;
+            CurrentProjectPath = filePath;
+            if (!string.IsNullOrEmpty(project.SourceFolder))
+                CurrentFolderPath = project.SourceFolder;
+
+            IsOfflineMode = !string.IsNullOrWhiteSpace(project.SourceFolder) && !Directory.Exists(project.SourceFolder);
+
+            Surfaces.Clear();
+            foreach (var surface in loadedSurfaces) Surfaces.Add(surface);
+            RemovedSurfaces.Clear();
+            foreach (var retired in loadedRetired) RemovedSurfaces.Add(retired);
+
+            StatusStates.Clear();
+            foreach (var state in project.StatusDefinitions.Count > 0
+                ? project.StatusDefinitions
+                : StatusStateService.GetDefaultStates())
+            {
+                StatusStates.Add(state);
+            }
+
+            if (loadedBomPlan != null)
+            {
+                ApplyBomPlan(loadedBomPlan);
             }
             else
             {
@@ -986,12 +1150,9 @@ public class MainViewModel : INotifyPropertyChanged
             string modeText = IsOfflineMode ? " (Offline Mode)" : string.Empty;
             StatusMessage = $"Loaded project from {Path.GetFileName(filePath)}{modeText} ({Surfaces.Count} surfaces).";
 
-            if (project.Camera != null)
-            {
-                RequestSetCameraState?.Invoke(project.Camera);
-            }
-
-            RequestViewportRefresh?.Invoke();
+            ApplyRuntimePreferences();
+            RequestSetCameraState?.Invoke(project.Camera);
+            ClearDirty();
         }
         catch (Exception ex)
         {
@@ -1029,6 +1190,7 @@ public class MainViewModel : INotifyPropertyChanged
         if (!ConfirmUnsavedChanges()) return;
 
         Surfaces.Clear();
+        RemovedSurfaces.Clear();
         ProjectState = new ProjectStateModel();
         ClearBomState();
         CurrentFolderPath = null;
@@ -1148,26 +1310,93 @@ public class MainViewModel : INotifyPropertyChanged
                 ScanProgressVM.ReportProgress(p.Percent, ScanProgressLabel);
             });
 
-            var candidateSurfaces = await GeometryScanner.ScanIamFolderAsync(
+            var scanResult = await GeometryScanner.ScanIamFolderWithDiagnosticsAsync(
                 CurrentFolderPath,
                 progress,
                 token);
 
-            var reconcileResult = RescanReconciler.Reconcile(
-                Surfaces,
-                candidateSurfaces,
-                ProjectState.Preferences?.ChecklistTemplate);
-
-            Surfaces.Clear();
-            foreach (var surf in reconcileResult.ReconciledSurfaces)
+            if (scanResult.HasFatalFailure)
             {
-                Surfaces.Add(surf);
+                StatusMessage = scanResult.Summary;
+                ScanProgressVM.FailScan(scanResult.Summary);
+                return;
             }
 
-            ProjectState.IntrusionFlags = reconcileResult.IntrusionFlags;
+            if (scanResult.FailedFiles.Count > 0)
+            {
+                string failedIdentifiers = string.Join(", ", scanResult.FailedFiles.Take(3).Select(failure => failure.FileIdentifier));
+                StatusMessage = $"Rescan blocked: {scanResult.FailedFiles.Count} file(s) failed ({failedIdentifiers}). Active project state preserved; review or repair those files before applying missing-surface decisions.";
+                ScanProgressVM.FailScan($"{scanResult.FailedFiles.Count} file(s) failed");
+                return;
+            }
+
+            var reconcileResult = RescanReconciler.Reconcile(
+                Surfaces,
+                scanResult.AcceptedSurfaces,
+                ProjectState.Preferences?.ChecklistTemplate);
+
+            if (reconcileResult.Conflicts.Count > 0)
+            {
+                StatusMessage = $"Rescan blocked: {reconcileResult.Conflicts[0].Message} Active project state preserved.";
+                ScanProgressVM.FailScan(reconcileResult.Conflicts[0].Message);
+                return;
+            }
+
+            var decisions = new RescanReviewDecisions();
+            foreach (var renumber in reconcileResult.RenumberCandidates)
+            {
+                bool? confirmed = RequestConfirmRenumberTransfer?.Invoke(
+                    renumber.ExistingSurface,
+                    renumber.ScannedCandidate);
+                if (!confirmed.HasValue)
+                {
+                    StatusMessage = "Rescan review cancelled. Active project state preserved.";
+                    ScanProgressVM.FailScan("Review cancelled");
+                    return;
+                }
+
+                decisions.RenumberTransfers[renumber.ScannedCandidate.SurfaceNumber] = confirmed.Value;
+            }
+
+            var confirmedSources = reconcileResult.RenumberCandidates
+                .Where(candidate => decisions.RenumberTransfers[candidate.ScannedCandidate.SurfaceNumber])
+                .Select(candidate => candidate.ExistingSurface.SurfaceNumber)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var missing in reconcileResult.MissingSurfaces.Where(surface => !confirmedSources.Contains(surface.SurfaceNumber)))
+            {
+                var resolution = RequestResolveMissingSurface?.Invoke(missing);
+                if (!resolution.HasValue)
+                {
+                    StatusMessage = "Rescan review cancelled. Active project state preserved.";
+                    ScanProgressVM.FailScan("Review cancelled");
+                    return;
+                }
+
+                decisions.MissingSurfaceResolutions[missing.SurfaceNumber] = resolution.Value;
+            }
+
+            bool reviewRequired = Surfaces.Count > 0;
+            if (reviewRequired && RequestConfirmRescanApply?.Invoke(reconcileResult) != true)
+            {
+                StatusMessage = "Rescan changes were not applied. Active project state preserved.";
+                ScanProgressVM.FailScan("Apply not confirmed");
+                return;
+            }
+
+            var applyResult = ProjectStateService.ApplyRescanProposal(ProjectState, reconcileResult, decisions);
+            if (!applyResult.Success)
+            {
+                StatusMessage = $"Rescan blocked: {applyResult.ErrorMessage} Active project state preserved.";
+                ScanProgressVM.FailScan(applyResult.ErrorMessage ?? "Review failed");
+                return;
+            }
+
+            Surfaces.Clear();
+            foreach (var surf in applyResult.AppliedSurfaces) Surfaces.Add(surf);
 
             IsOfflineMode = false;
-            StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded ({reconcileResult.ExactMatches.Count} matched, {reconcileResult.NewSurfaces.Count} new, {reconcileResult.MissingSurfaces.Count} missing, {reconcileResult.IntrusionFlags.Count} intrusion flags).";
+            RebuildRemovedSurfaces();
+            StatusMessage = $"Async scan complete: {Surfaces.Count} surfaces loaded ({reconcileResult.ExactMatches.Count} matched, {reconcileResult.NewSurfaces.Count} new, {applyResult.ConfirmedRenumberCount} renumber transfers, {applyResult.RetiredMissingCount} retired, {scanResult.SkippedFiles.Count} skipped, {applyResult.IntrusionFlags.Count(flag => !flag.Resolved)} active intrusion flags).";
             ScanProgressVM.CompleteScan(Surfaces.Count);
             MarkDirty();
             RequestViewportRefresh?.Invoke();
@@ -1270,9 +1499,23 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (surface == null) return;
         surface.IsHidden = !surface.IsHidden;
+        SyncSurfaceVisibilityRecord(surface);
         MarkDirty();
         RequestSetSurfaceVisibility?.Invoke(surface.IsHidden, surface.SurfaceNumber);
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
         OnPropertyChanged(nameof(SelectedSurface));
+    }
+
+    private void SyncSurfaceVisibilityRecord(SurfaceModel surface)
+    {
+        if (string.IsNullOrWhiteSpace(surface.SurfaceNumber)) return;
+        if (!ProjectState.Surfaces.TryGetValue(surface.SurfaceNumber, out var record))
+        {
+            record = new SurfaceRecordModel();
+            ProjectState.Surfaces[surface.SurfaceNumber] = record;
+        }
+        record.Hidden = surface.IsHidden;
     }
 
     // -----------------------------------------------------------------------
@@ -1321,8 +1564,7 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 var importer = new ExcelBomImporter();
                 var result = importer.ImportBom(dialog.FileName);
-                ProjectState.Bom = result;
-                LoadBomRows(result.KeptRows);
+                LoadBomRows(result.KeptRows, result);
                 MarkDirty();
                 StatusMessage = $"Imported {result.KeptCount} kept BOM rows from {Path.GetFileName(dialog.FileName)} ({result.DroppedCount} hardware/factor rows dropped).";
             }
@@ -1352,7 +1594,7 @@ public class MainViewModel : INotifyPropertyChanged
 
                 if (ProjectState.Bom != null)
                 {
-                    LoadBomRows(ProjectState.Bom.KeptRows);
+                    LoadBomRows(ProjectState.Bom.KeptRows, ProjectState.Bom);
                 }
                 else if (BomEntries.Count > 0)
                 {
@@ -1452,11 +1694,34 @@ public class MainViewModel : INotifyPropertyChanged
         FilterBomEntries();
     }
 
-    public void LoadBomRows(IEnumerable<BomRow> rows)
+    public void LoadBomRows(IEnumerable<BomRow> rows, BomImportResult? provenance = null)
     {
         var rowList = (rows ?? Enumerable.Empty<BomRow>()).ToList();
         var engine = new BomShellEngine();
-        CurrentBomPlan = engine.BuildPlan(rowList, ShellRootPath, ProjectState.UnitConfig);
+        ApplyBomPlan(engine.BuildPlan(rowList, ShellRootPath, ProjectState.UnitConfig));
+
+        ProjectState.Bom = BuildUpdatedBomResult(rowList, provenance ?? ProjectState.Bom);
+
+        StatusMessage = $"Loaded BOM: {CurrentBomPlan!.Entries.Count} shell folders planned, {CurrentBomPlan.Misplaced.Count} misplaced coil lines.";
+    }
+
+    public bool ShowSkidLabels
+    {
+        get => Preferences.ViewerOptions.ShowSkidLabels;
+        set
+        {
+            if (Preferences.ViewerOptions.ShowSkidLabels == value) return;
+            Preferences.ViewerOptions.ShowSkidLabels = value;
+            OnPropertyChanged();
+            RequestSetSkidLabels?.Invoke(value);
+            RequestViewportRefresh?.Invoke();
+            MarkDirty();
+        }
+    }
+
+    private void ApplyBomPlan(ShellFolderPlan plan)
+    {
+        CurrentBomPlan = plan;
 
         BomEntries.Clear();
         foreach (var entry in CurrentBomPlan.Entries) BomEntries.Add(entry);
@@ -1469,15 +1734,33 @@ public class MainViewModel : INotifyPropertyChanged
 
         UpdateDropdownFilters();
         FilterBomEntries();
+    }
 
-        ProjectState.Bom = new BomImportResult
+    private static BomImportResult BuildUpdatedBomResult(IEnumerable<BomRow> rows, BomImportResult? provenance)
+    {
+        var keptRows = rows.ToList();
+        var droppedRows = provenance?.DroppedRows?.ToList() ?? new List<BomRow>();
+        var prefixCounts = keptRows
+            .GroupBy(row => GetBomPrefixKey(row.PartNumber), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+        return new BomImportResult
         {
-            KeptRows = rowList,
-            AllRows = rowList,
-            ImportedAt = DateTime.UtcNow
+            SourceFilePath = provenance?.SourceFilePath ?? string.Empty,
+            ImportedAt = provenance?.ImportedAt ?? DateTime.UtcNow,
+            KeptRows = keptRows,
+            DroppedRows = droppedRows,
+            AllRows = keptRows.Concat(droppedRows).ToList(),
+            KeptCountByPrefix = prefixCounts
         };
+    }
 
-        StatusMessage = $"Loaded BOM: {CurrentBomPlan.Entries.Count} shell folders planned, {CurrentBomPlan.Misplaced.Count} misplaced coil lines.";
+    private static string GetBomPrefixKey(string? partNumber)
+    {
+        string value = partNumber ?? string.Empty;
+        int dashIndex = value.IndexOf('-');
+        if (dashIndex > 0) return value[..(dashIndex + 1)].ToUpperInvariant();
+        return value.Length >= 4 ? value[..4].ToUpperInvariant() : value.ToUpperInvariant();
     }
 
     public void CreateShellFolders()
@@ -1576,10 +1859,16 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void ExecuteShowAllSurfaces()
     {
+        bool changed = false;
         foreach (var surf in Surfaces)
         {
+            if (!surf.IsHidden) continue;
             surf.IsHidden = false;
+            SyncSurfaceVisibilityRecord(surf);
+            changed = true;
         }
+        if (!changed) return;
+        MarkDirty();
         RebuildGroupedSurfaces();
         RequestViewportRefresh?.Invoke();
         StatusMessage = "Restored all hidden surfaces.";
@@ -1622,79 +1911,91 @@ public class MainViewModel : INotifyPropertyChanged
 
         if (dlg.ShowDialog() != true) return;
 
-        string pickedFile = dlg.FileName;
-        string rootFolder = Path.GetDirectoryName(pickedFile) ?? string.Empty;
+        try
+        {
+            string pickedFile = dlg.FileName;
+            string rootFolder = Path.GetDirectoryName(pickedFile) ?? string.Empty;
 
-        SurfaceModel? candidate = null;
-        if (pickedFile.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = GeometryScanner.ParseConfigJson(File.ReadAllText(pickedFile), pickedFile, rootFolder, "json");
-        }
-        else
-        {
-            candidate = await GeometryScanner.ScanIamFileAsync(pickedFile, rootFolder);
-            if (candidate == null)
+            SurfaceModel? candidate;
+            if (pickedFile.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
-                // Fallback for IAM files without sidecar JSON or embedded COM metadata
-                candidate = new SurfaceModel
-                {
-                    SurfaceNumber = Path.GetFileNameWithoutExtension(pickedFile),
-                    FilePath = pickedFile,
-                    RelativePath = !string.IsNullOrEmpty(rootFolder) ? Path.GetRelativePath(rootFolder, pickedFile) : pickedFile,
-                    SourceType = "iam",
-                    PartNumber = Path.GetFileNameWithoutExtension(pickedFile)
-                };
-            }
-        }
-
-        if (candidate == null)
-        {
-            StatusMessage = $"Replace failed: Could not read file {Path.GetFileName(pickedFile)}.";
-            return;
-        }
-
-        var result = ProjectStateService.ReplaceSurfaceInPlace(
-            ProjectState,
-            targetSurface,
-            candidate,
-            Surfaces);
-
-        if (!result.Success)
-        {
-            StatusMessage = $"Replace failed: {result.ErrorMessage}";
-            return;
-        }
-
-        if (result.Renumbered)
-        {
-            int idx = Surfaces.IndexOf(targetSurface);
-            if (idx >= 0)
-            {
-                Surfaces[idx] = candidate;
+                candidate = GeometryScanner.ParseConfigJson(File.ReadAllText(pickedFile), pickedFile, rootFolder, "json");
             }
             else
             {
-                Surfaces.Remove(targetSurface);
-                Surfaces.Add(candidate);
+                candidate = await GeometryScanner.ScanIamFileAsync(pickedFile, rootFolder);
             }
-            SelectedSurface = candidate;
-        }
-        else
-        {
-            OnPropertyChanged(nameof(SelectedSurface));
-        }
 
-        RebuildGroupedSurfaces();
-        RequestViewportRefresh?.Invoke();
-        MarkDirty();
+            if (candidate == null || candidate.Boxes.Count == 0)
+            {
+                StatusMessage = $"Replace failed: {Path.GetFileName(pickedFile)} did not produce valid surface geometry. Active project state preserved.";
+                return;
+            }
 
-        if (result.IntrusionDetected)
-        {
-            StatusMessage = $"Replaced {result.OldSurfaceNumber} -> {result.NewSurfaceNumber} (Warning: Geometry intrusion detected).";
+            var result = ProjectStateService.ReplaceSurfaceInPlace(
+                ProjectState,
+                targetSurface,
+                candidate,
+                Surfaces);
+
+            if (result.RequiresRenumberConfirmation)
+            {
+                bool? confirmed = RequestConfirmRenumberTransfer?.Invoke(targetSurface, candidate);
+                if (confirmed != true)
+                {
+                    StatusMessage = "Replace cancelled. Tracking and geometry were left unchanged.";
+                    return;
+                }
+
+                result = ProjectStateService.ReplaceSurfaceInPlace(
+                    ProjectState,
+                    targetSurface,
+                    candidate,
+                    Surfaces,
+                    confirmRenumberTransfer: true);
+            }
+
+            if (!result.Success)
+            {
+                StatusMessage = $"Replace failed: {result.ErrorMessage}";
+                return;
+            }
+
+            if (result.Renumbered)
+            {
+                int idx = Surfaces.IndexOf(targetSurface);
+                if (idx >= 0)
+                {
+                    Surfaces[idx] = candidate;
+                }
+                else
+                {
+                    Surfaces.Remove(targetSurface);
+                    Surfaces.Add(candidate);
+                }
+                SelectedSurface = candidate;
+            }
+            else
+            {
+                OnPropertyChanged(nameof(SelectedSurface));
+            }
+
+            RebuildGroupedSurfaces();
+            RequestViewportRefresh?.Invoke();
+            MarkDirty();
+
+            if (result.IntrusionDetected)
+            {
+                StatusMessage = $"Replaced {result.OldSurfaceNumber} -> {result.NewSurfaceNumber} (Warning: Geometry intrusion detected).";
+            }
+            else
+            {
+                StatusMessage = $"Successfully replaced surface {result.OldSurfaceNumber} -> {result.NewSurfaceNumber}.";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            StatusMessage = $"Successfully replaced surface {result.OldSurfaceNumber} -> {result.NewSurfaceNumber}.";
+            StatusMessage = $"Replace failed: {ex.Message}. Active project state preserved.";
         }
     }
 
@@ -1702,11 +2003,17 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (SelectedSurface == null) return;
         var target = SelectedSurface;
-        SelectedSurface = null;
 
+        var result = ProjectStateService.RetireSurface(ProjectState, target, Surfaces, "removed");
+        if (!result.Success)
+        {
+            StatusMessage = $"Remove failed: {result.ErrorMessage} Active project state preserved.";
+            return;
+        }
+
+        SelectedSurface = null;
         Surfaces.Remove(target);
-        if (!RemovedSurfaces.Contains(target))
-            RemovedSurfaces.Add(target);
+        RebuildRemovedSurfaces();
 
         RebuildGroupedSurfaces();
         RequestViewportRefresh?.Invoke();
@@ -1714,24 +2021,79 @@ public class MainViewModel : INotifyPropertyChanged
         StatusMessage = $"Removed surface {target.SurfaceNumber} to Retired section.";
     }
 
+    private void ExecuteRestoreSurface(RetiredSurfaceViewModel? retired)
+    {
+        if (retired == null) return;
+
+        var result = ProjectStateService.RestoreSurface(ProjectState, retired.RetiredKey, Surfaces);
+        if (!result.Success || result.RestoredSurface == null)
+        {
+            StatusMessage = $"Restore failed: {result.ErrorMessage} Retired history was preserved.";
+            return;
+        }
+
+        Surfaces.Add(result.RestoredSurface);
+        RebuildRemovedSurfaces();
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+        MarkDirty();
+        StatusMessage = $"Restored surface {result.RestoredSurface.EffectiveDisplayNumber} with its tracking and geometry.";
+    }
+
     private void ExecuteOpenOptionsDialog()
     {
-        var vm = new OptionsViewModel(Preferences, StatusStates);
+        var vm = new OptionsViewModel(
+            Preferences,
+            StatusStates,
+            AppSettingsService.LoadSettings().ThemeOptions);
         var dlg = new OptionsDialog(vm)
         {
             Owner = System.Windows.Application.Current.MainWindow
         };
         if (dlg.ShowDialog() == true)
         {
-            StatusStates.Clear();
-            foreach (var s in vm.StatusStates) StatusStates.Add(s);
-
-            RebuildGroupedSurfaces();
-            RequestSetSkidGrid?.Invoke(ShowSkidGrid);
-            RequestViewportRefresh?.Invoke();
-            MarkDirty();
-            StatusMessage = "Saved options and display preferences.";
+            ApplyOptions(vm);
         }
+    }
+
+    public void ApplyOptions(OptionsViewModel options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.PrepareForSave();
+        ProjectState.Preferences = options.Preferences.Clone();
+
+        ProjectStateService.SyncChecklistTemplateToSurfaces(
+            ProjectState,
+            options.ChecklistTemplate,
+            resetExistingWork: false,
+            inMemorySurfaces: Surfaces);
+
+        StatusStates.Clear();
+        foreach (var state in options.StatusStates)
+            StatusStates.Add(new StatusState(state.Id, state.Name, state.ColorHex, state.FillType));
+
+        var appSettings = AppSettingsService.LoadSettings();
+        appSettings.ThemeOptions = options.ApplicationThemeOptions.Clone();
+        AppSettingsService.SaveSettings(appSettings);
+        UnitProgressTracker.Wpf.Services.ThemeManager.Instance.ApplyTheme(appSettings.ThemeOptions);
+
+        OnPropertyChanged(nameof(Preferences));
+        OnPropertyChanged(nameof(GroupMode));
+        OnPropertyChanged(nameof(NameMode));
+        OnPropertyChanged(nameof(SortMode));
+        OnPropertyChanged(nameof(ShowTypeTag));
+        OnPropertyChanged(nameof(ShowSkidTag));
+        OnPropertyChanged(nameof(ShowSideTag));
+        OnPropertyChanged(nameof(ShowSkidGrid));
+        OnPropertyChanged(nameof(ShowSkidLabels));
+        OnPropertyChanged(nameof(ShowLegend));
+        OnPropertyChanged(nameof(ShowHoverTooltip));
+        OnPropertyChanged(nameof(WireframeVisible));
+        OnPropertyChanged(nameof(GlobalOpacity));
+        RebuildGroupedSurfaces();
+        ApplyRuntimePreferences();
+        MarkDirty();
+        StatusMessage = "Saved options and display preferences.";
     }
 
     private void ExecuteOpenRecentProjectsDialog()
@@ -1835,8 +2197,92 @@ public class MainViewModel : INotifyPropertyChanged
         };
         if (dlg.ShowDialog() == true)
         {
-            await LoadFolderAsync(dlg.FolderName);
+            var token = ScanProgressVM.StartNewScan();
+            IsScanning = true;
+            try
+            {
+                var progress = new Progress<ProgressReport>(report =>
+                {
+                    ScanProgress = report.Percent;
+                    ScanProgressLabel = report.Total > 0
+                        ? $"Scanning {report.Scanned}/{report.Total} — {report.CurrentFile}"
+                        : report.StatusMessage;
+                    ScanProgressVM.ReportProgress(report.Percent, ScanProgressLabel);
+                });
+
+                var scanResult = await GeometryScanner.ScanIamFolderWithDiagnosticsAsync(dlg.FolderName, progress, token);
+                ApplyAddSurfaceCandidates(scanResult);
+            }
+            catch (OperationCanceledException)
+            {
+                StatusMessage = "Add surfaces cancelled. Active project state preserved.";
+                ScanProgressVM.FailScan("Cancelled by user");
+            }
+            finally
+            {
+                IsScanning = false;
+                ScanProgressLabel = string.Empty;
+            }
         }
+    }
+
+    public bool ApplyAddSurfaceCandidates(GeometryScanResult scanResult, bool? confirmedForTest = null)
+    {
+        if (scanResult == null) throw new ArgumentNullException(nameof(scanResult));
+        if (scanResult.HasFatalFailure)
+        {
+            StatusMessage = scanResult.Summary;
+            ScanProgressVM.FailScan(scanResult.Summary);
+            return false;
+        }
+
+        var proposal = ProjectStateService.BuildAddSurfacesProposal(ProjectState, Surfaces, scanResult.AcceptedSurfaces);
+        bool confirmed = confirmedForTest ?? RequestConfirmAddSurfacesApply?.Invoke(proposal, scanResult) == true;
+        if (!confirmed)
+        {
+            StatusMessage = $"Add surfaces review was not applied. {scanResult.Summary} Active project state preserved.";
+            ScanProgressVM.FailScan("Add review not applied");
+            return false;
+        }
+
+        var applyResult = ProjectStateService.ApplyAddSurfacesProposal(ProjectState, proposal, Surfaces);
+        if (!applyResult.Success)
+        {
+            StatusMessage = $"Add surfaces failed: {applyResult.ErrorMessage} Active project state preserved.";
+            ScanProgressVM.FailScan(applyResult.ErrorMessage ?? "Add failed");
+            return false;
+        }
+
+        foreach (var surface in applyResult.AddedSurfaces) Surfaces.Add(surface);
+        RebuildGroupedSurfaces();
+        RequestViewportRefresh?.Invoke();
+        MarkDirty();
+        ScanProgressVM.CompleteScan(applyResult.AddedSurfaces.Count);
+        int unresolvedIntrusions = applyResult.IntrusionFlags.Count(flag => !flag.Resolved);
+        StatusMessage = $"Added {applyResult.AddedSurfaces.Count} surface(s); {proposal.Issues.Count + scanResult.SkippedFiles.Count} skipped, {scanResult.FailedFiles.Count} failed, {unresolvedIntrusions} active intrusion warning(s). Existing project state and path were preserved.";
+        return true;
+    }
+
+    private void RebuildRemovedSurfaces()
+    {
+        RemovedSurfaces.Clear();
+        foreach (var retired in BuildRetiredSurfaceViewModels(ProjectState)) RemovedSurfaces.Add(retired);
+        OnPropertyChanged(nameof(RemovedSurfacesCount));
+    }
+
+    private static List<RetiredSurfaceViewModel> BuildRetiredSurfaceViewModels(ProjectStateModel project)
+    {
+        return project.Retired
+            .Where(entry => !entry.Value.RestoredAt.HasValue &&
+                            (string.Equals(entry.Value.TransferType, "removed", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(entry.Value.TransferType, "missing-unnecessary", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(entry.Value.TransferType, "missing", StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(entry => entry.Value.RetiredAt)
+            .Select(entry => new RetiredSurfaceViewModel(
+                entry.Key,
+                entry.Value,
+                !string.IsNullOrWhiteSpace(entry.Value.FileKey) && project.Geometry.ContainsKey(entry.Value.FileKey)))
+            .ToList();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -1845,6 +2291,26 @@ public class MainViewModel : INotifyPropertyChanged
 
     // Public surface so MainWindow can notify after directly mutating a model property
     public void OnPropertyChangedPublic(string propertyName) => OnPropertyChanged(propertyName);
+}
+
+public sealed class RetiredSurfaceViewModel
+{
+    public RetiredSurfaceViewModel(string retiredKey, RetiredSurfaceRecordModel record, bool hasLegacyGeometry = false)
+    {
+        RetiredKey = retiredKey;
+        FileKey = record.FileKey ?? retiredKey;
+        DisplayNumber = record.Snapshot?.DisplayNumber ?? record.GeometrySnapshot?.EffectiveDisplayNumber ?? retiredKey;
+        Reason = record.TransferType;
+        RetiredAt = record.RetiredAt;
+        CanRestore = record.GeometrySnapshot?.Boxes?.Count > 0 || hasLegacyGeometry;
+    }
+
+    public string RetiredKey { get; }
+    public string FileKey { get; }
+    public string DisplayNumber { get; }
+    public string Reason { get; }
+    public DateTime RetiredAt { get; }
+    public bool CanRestore { get; }
 }
 
 // Helper VM for the checklist ItemsControl binding

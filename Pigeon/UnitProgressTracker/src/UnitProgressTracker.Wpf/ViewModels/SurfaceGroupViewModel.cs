@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -13,7 +14,7 @@ public class SurfaceGroupViewModel : INotifyPropertyChanged
     private string _groupKey = string.Empty;
     private string _displayName = string.Empty;
     private bool _isExpanded = true;
-    private bool _isGroupVisible = true;
+    private bool? _isGroupVisible = true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -35,7 +36,7 @@ public class SurfaceGroupViewModel : INotifyPropertyChanged
         set { _isExpanded = value; OnPropertyChanged(); }
     }
 
-    public bool IsGroupVisible
+    public bool? IsGroupVisible
     {
         get => _isGroupVisible;
         set { _isGroupVisible = value; OnPropertyChanged(); }
@@ -45,7 +46,12 @@ public class SurfaceGroupViewModel : INotifyPropertyChanged
 
     public int SurfaceCount => Surfaces.Count;
 
-    public string ToggleButtonText => IsGroupVisible ? "👁 Hide All" : "👁 Show All";
+    public string ToggleButtonText => IsGroupVisible switch
+    {
+        true => "Hide All",
+        false => "Show All",
+        null => "Mixed - Show All"
+    };
 
     public ICommand ToggleGroupVisibilityCommand { get; }
 
@@ -53,19 +59,69 @@ public class SurfaceGroupViewModel : INotifyPropertyChanged
 
     public SurfaceGroupViewModel()
     {
+        Surfaces.CollectionChanged += OnSurfacesCollectionChanged;
         ToggleGroupVisibilityCommand = new RelayCommand(_ =>
         {
-            IsGroupVisible = !IsGroupVisible;
-            bool hideTarget = !IsGroupVisible;
+            bool hideTarget = IsGroupVisible == true;
 
             foreach (var surface in Surfaces)
             {
                 surface.IsHidden = hideTarget;
             }
 
-            OnPropertyChanged(nameof(ToggleButtonText));
+            RefreshVisibilityState();
             GroupVisibilityToggled?.Invoke(this);
         });
+    }
+
+    private void OnSurfacesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+        {
+            foreach (SurfaceModel surface in e.OldItems)
+                surface.PropertyChanged -= OnSurfacePropertyChanged;
+        }
+
+        if (e.NewItems != null)
+        {
+            foreach (SurfaceModel surface in e.NewItems)
+                surface.PropertyChanged += OnSurfacePropertyChanged;
+        }
+
+        OnPropertyChanged(nameof(SurfaceCount));
+        RefreshVisibilityState();
+    }
+
+    private void OnSurfacePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SurfaceModel.IsHidden))
+            RefreshVisibilityState();
+    }
+
+    private void RefreshVisibilityState()
+    {
+        bool? state = Surfaces.Count == 0
+            ? true
+            : Surfaces.All(surface => !surface.IsHidden)
+                ? true
+                : Surfaces.All(surface => surface.IsHidden)
+                    ? false
+                    : null;
+
+        if (_isGroupVisible != state)
+        {
+            _isGroupVisible = state;
+            OnPropertyChanged(nameof(IsGroupVisible));
+        }
+
+        OnPropertyChanged(nameof(ToggleButtonText));
+    }
+
+    public void Detach()
+    {
+        Surfaces.CollectionChanged -= OnSurfacesCollectionChanged;
+        foreach (var surface in Surfaces)
+            surface.PropertyChanged -= OnSurfacePropertyChanged;
     }
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)

@@ -146,6 +146,104 @@ public class Step3RescanTrackingTests : IDisposable
     }
 
     [Fact]
+    public void GeometryIntrusionChecker_HiddenSurfacesStillParticipate_AndCleanScanResolvesFlag()
+    {
+        var visible = new SurfaceModel
+        {
+            SurfaceNumber = "VISIBLE",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 10, 10) }
+        };
+        var hidden = new SurfaceModel
+        {
+            SurfaceNumber = "HIDDEN",
+            IsHidden = true,
+            Boxes = new List<GeometryBox> { new(5, 5, 5, 10, 10, 10) }
+        };
+
+        var detected = GeometryIntrusionChecker.CheckIntrusions(new[] { visible, hidden });
+        var resolved = GeometryIntrusionChecker.ReconcileFlags(detected, Array.Empty<GeometryIntrusionFlagModel>());
+
+        Assert.Contains(detected, flag => flag.SurfaceNumber == "VISIBLE" && flag.AffectedSurfaceNumbers.Contains("HIDDEN"));
+        Assert.All(resolved, flag => Assert.True(flag.Resolved));
+    }
+
+    [Fact]
+    public void ApplyRescanProposal_RequiresEveryDecision_ThenTransfersOnlyConfirmedTracking()
+    {
+        var existing = new SurfaceModel
+        {
+            SurfaceNumber = "OLD",
+            StateId = "built",
+            Notes = "keep me",
+            Checklist = new Dictionary<string, bool> { ["Checked"] = true },
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 10, 10) }
+        };
+        existing.GeometryFingerprint = GeometryFingerprinter.CalculateFingerprint(existing);
+        var candidate = new SurfaceModel
+        {
+            SurfaceNumber = "NEW",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 10, 10) }
+        };
+        var project = new ProjectStateModel();
+        project.Surfaces["OLD"] = new SurfaceRecordModel { DisplayNumber = "OLD", StateId = "built" };
+        project.Geometry["OLD"] = existing;
+        var proposal = RescanReconciler.Reconcile(new[] { existing }, new[] { candidate });
+
+        var rejected = ProjectStateService.ApplyRescanProposal(project, proposal, new RescanReviewDecisions());
+        Assert.False(rejected.Success);
+        Assert.True(project.Surfaces.ContainsKey("OLD"));
+        Assert.Empty(project.Retired);
+
+        var decisions = new RescanReviewDecisions();
+        decisions.RenumberTransfers["NEW"] = true;
+        var applied = ProjectStateService.ApplyRescanProposal(project, proposal, decisions);
+
+        Assert.True(applied.Success);
+        Assert.Equal("built", candidate.StateId);
+        Assert.Equal("keep me", candidate.Notes);
+        Assert.True(candidate.Checklist["Checked"]);
+        Assert.True(project.Surfaces.ContainsKey("NEW"));
+        Assert.False(project.Surfaces.ContainsKey("OLD"));
+        Assert.Equal("NEW", project.Retired["OLD"].SupersededBy);
+    }
+
+    [Fact]
+    public void ApplyRescanProposal_MissingSurfaceMustBeReviewedBeforeRetirement()
+    {
+        var missing = new SurfaceModel
+        {
+            SurfaceNumber = "MISSING",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 10, 10) }
+        };
+        var project = new ProjectStateModel();
+        project.Surfaces["MISSING"] = new SurfaceRecordModel { DisplayNumber = "MISSING" };
+        var proposal = RescanReconciler.Reconcile(new[] { missing }, Array.Empty<SurfaceModel>());
+
+        var decisions = new RescanReviewDecisions();
+        decisions.MissingSurfaceResolutions["MISSING"] = MissingSurfaceResolution.MarkUnnecessary;
+        var applied = ProjectStateService.ApplyRescanProposal(project, proposal, decisions);
+
+        Assert.True(applied.Success);
+        Assert.Empty(project.Surfaces);
+        Assert.Equal("missing-unnecessary", project.Retired["MISSING"].TransferType);
+    }
+
+    [Fact]
+    public void RescanReconciler_DuplicateScannedIdentity_IsAConflict()
+    {
+        var scanned = new[]
+        {
+            new SurfaceModel { SurfaceNumber = "DUP" },
+            new SurfaceModel { SurfaceNumber = "dup" }
+        };
+
+        var proposal = RescanReconciler.Reconcile(Array.Empty<SurfaceModel>(), scanned);
+
+        Assert.Single(proposal.Conflicts);
+        Assert.Empty(proposal.ReconciledSurfaces);
+    }
+
+    [Fact]
     public void FullIntegration_Scan_Edit_Rescan_Save_Reopen_PreservesTracking()
     {
         string projectPath = Path.Combine(_tempDirectory, "integration_rescan.uptproj");

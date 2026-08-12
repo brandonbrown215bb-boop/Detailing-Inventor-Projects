@@ -60,6 +60,11 @@ public class ProjectSerializerTests : IDisposable
 
         var updatedModel = new ProjectStateModel { Version = ProjectStateModel.CurrentVersion, SourceFolder = "Updated" };
         updatedModel.Surfaces["SURF-2002"] = new SurfaceRecordModel { DisplayNumber = "2002", StateId = "done" };
+        updatedModel.Geometry["SURF-2002"] = new SurfaceModel
+        {
+            SurfaceNumber = "SURF-2002",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+        };
 
         ProjectSerializer.SaveAtomic(filePath, updatedModel);
 
@@ -106,6 +111,11 @@ public class ProjectSerializerTests : IDisposable
             }
         };
         original.Surfaces["SURF-1001"] = surf;
+        original.Geometry["SURF-1001"] = new SurfaceModel
+        {
+            SurfaceNumber = "SURF-1001",
+            Boxes = new List<GeometryBox> { new(10, 20, 30, 100, 200, 50) }
+        };
 
         var retired = new RetiredSurfaceRecordModel
         {
@@ -253,6 +263,23 @@ public class ProjectSerializerTests : IDisposable
     }
 
     [Fact]
+    public void MainViewModel_NullRequiredProjectGraph_DoesNotReplaceCurrentProject()
+    {
+        string filePath = Path.Combine(_tempDirectory, "null-graph.uptproj");
+        File.WriteAllText(filePath,
+            "{\"format\":\"Pigeon.UnitProgressTracker.Project\",\"version\":4,\"geometry\":null,\"surfaces\":{},\"retired\":{},\"statusDefinitions\":[],\"intrusionFlags\":[],\"camera\":{},\"preferences\":{\"checklistTemplate\":[]}}");
+        var vm = new UnitProgressTracker.Wpf.ViewModels.MainViewModel();
+        vm.Surfaces.Add(new SurfaceModel { SurfaceNumber = "CURRENT" });
+        var originalProject = vm.ProjectState;
+
+        vm.LoadProjectFromFile(filePath);
+
+        Assert.Same(originalProject, vm.ProjectState);
+        Assert.Single(vm.Surfaces);
+        Assert.Equal("CURRENT", vm.Surfaces[0].SurfaceNumber);
+    }
+
+    [Fact]
     public void MainViewModel_LoadProject_OfflineMode_RestoresGeometryAndSetsOfflineFlag()
     {
         string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "v4-complete-project.uptproj");
@@ -266,6 +293,22 @@ public class ProjectSerializerTests : IDisposable
         Assert.NotEmpty(vm.Surfaces);
         Assert.Equal("SURF-1001", vm.Surfaces[0].SurfaceNumber);
         Assert.NotEmpty(vm.Surfaces[0].Boxes);
+    }
+
+    [Fact]
+    public void MainViewModel_LoadProject_RebuildsViewportBeforeRestoringCamera()
+    {
+        string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "v4-complete-project.uptproj");
+        var calls = new List<string>();
+        var vm = new UnitProgressTracker.Wpf.ViewModels.MainViewModel
+        {
+            RequestViewportRefresh = () => calls.Add("viewport"),
+            RequestSetCameraState = _ => calls.Add("camera")
+        };
+
+        vm.LoadProjectFromFile(fixturePath);
+
+        Assert.Equal(new[] { "viewport", "camera" }, calls);
     }
 
     [Fact]
@@ -289,7 +332,11 @@ public class ProjectSerializerTests : IDisposable
 
         vm.RequestGetCameraState = () => expectedCamera;
 
-        vm.Surfaces.Add(new SurfaceModel { SurfaceNumber = "SURF-1" });
+        vm.Surfaces.Add(new SurfaceModel
+        {
+            SurfaceNumber = "SURF-1",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+        });
         bool saved = vm.SaveProjectInternal(filePath);
         Assert.True(saved);
 

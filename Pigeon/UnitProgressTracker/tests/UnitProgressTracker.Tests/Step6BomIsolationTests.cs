@@ -65,6 +65,49 @@ public class Step6BomIsolationTests
     }
 
     [Fact]
+    public void ManualBomEdits_PreserveImportProvenanceAndDroppedRows()
+    {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"step6_provenance_{Guid.NewGuid():N}.uptproj");
+        var importedAt = new DateTime(2026, 8, 1, 12, 30, 0, DateTimeKind.Utc);
+        try
+        {
+            var provenance = new BomImportResult
+            {
+                SourceFilePath = @"C:\BOMs\original.xlsx",
+                ImportedAt = importedAt,
+                KeptRows = new List<BomRow>
+                {
+                    new BomRow { PartNumber = "391-1001", Skid = "1 [FR-MB]", Segment = "MB", Description = "Panel" }
+                },
+                DroppedRows = new List<BomRow>
+                {
+                    new BomRow { PartNumber = "091-1001", Description = "Hardware" }
+                }
+            };
+            provenance.AllRows = provenance.KeptRows.Concat(provenance.DroppedRows).ToList();
+
+            var vm = new MainViewModel();
+            vm.LoadBomRows(provenance.KeptRows, provenance);
+            vm.ExecuteAddBomRow();
+            Assert.True(vm.SaveProjectInternal(tempFile));
+
+            var reopened = new MainViewModel();
+            reopened.LoadProjectFromFile(tempFile);
+
+            Assert.NotNull(reopened.ProjectState.Bom);
+            Assert.Equal(@"C:\BOMs\original.xlsx", reopened.ProjectState.Bom.SourceFilePath);
+            Assert.Equal(importedAt, reopened.ProjectState.Bom.ImportedAt);
+            Assert.Single(reopened.ProjectState.Bom.DroppedRows);
+            Assert.Equal("091-1001", reopened.ProjectState.Bom.DroppedRows[0].PartNumber);
+            Assert.Equal(3, reopened.ProjectState.Bom.AllRows.Count);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
     public void ProjectSwitching_ClearsBOMState_WhenLoadingProjectWithNoBOM()
     {
         string projectWithBom = Path.Combine(Path.GetTempPath(), $"proj_bom_{Guid.NewGuid():N}.uptproj");

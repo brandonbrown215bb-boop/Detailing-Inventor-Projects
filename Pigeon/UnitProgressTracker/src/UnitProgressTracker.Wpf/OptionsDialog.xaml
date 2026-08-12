@@ -67,8 +67,8 @@
                 </Grid>
             </TabItem>
 
-            <!-- Tab 1: 3D View & FPS & Sticker Customization -->
-            <TabItem Header="3D View &amp; Stickers">
+            <!-- Sticker styling and FPS controls remain deferred to post-promotion work. -->
+            <TabItem Header="3D View">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
                         <TextBlock Text="Viewport Options" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
@@ -77,7 +77,7 @@
                         <CheckBox Content="Show 3D Skid Ground Labels" IsChecked="{Binding Preferences.ViewerOptions.ShowSkidLabels, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
                         <CheckBox Content="Show Interactive Status Legend" IsChecked="{Binding Preferences.ViewerOptions.ShowLegend, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
                         <CheckBox Content="Show Surface Hover Info Tooltip" IsChecked="{Binding Preferences.ViewerOptions.ShowHoverTooltip, Mode=TwoWay}" Foreground="White" Margin="0,0,0,8" />
-                        <CheckBox Content="Enable FPS Movement Controls (WASD, Space/Shift)" IsChecked="{Binding Preferences.ViewerOptions.FpsControlsEnabled, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" />
+                        <CheckBox Content="Show Surface Wireframe" IsChecked="{Binding Preferences.ViewerOptions.WireframeVisible, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" />
 
                         <TextBlock Text="Default Surface Opacity" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
                         <DockPanel Margin="0,0,0,16">
@@ -85,45 +85,6 @@
                             <Slider Minimum="0.1" Maximum="1.0" Value="{Binding Preferences.ViewerOptions.SurfaceOpacity, Mode=TwoWay}" VerticalAlignment="Center" />
                         </DockPanel>
 
-                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
-
-                        <TextBlock Text="3D Sticker Label Styling" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
-
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Font Family" Foreground="#94A3B8" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.FontFamily, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
-                        </Grid>
-
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Text Color Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.TextColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
-                        </Grid>
-
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Background Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.BackgroundColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
-                        </Grid>
-
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Border Hex" Foreground="#94A3B8" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1" Text="{Binding Preferences.StickerOptions.BorderColorHex, Mode=TwoWay}" Padding="4" Background="#0F172A" Foreground="White" BorderBrush="#334155" />
-                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
@@ -134,38 +95,16 @@
                     <StackPanel Margin="16">
                         <TextBlock Text="System Theme &amp; Color Palette" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
 
-                        <CheckBox Content="Auto-Sync with Windows System Theme" IsChecked="{Binding Preferences.ThemeOptions.AutoSyncWithSystemTheme, Mode=TwoWay}" Foreground="White" Margin="0,0,0,12" ToolTip="Automatically switch between Dark, Light, and Windows High Contrast modes based on Windows OS settings." />
+                        <CheckBox Content="Auto-Sync with Windows System Theme" IsChecked="{Binding ApplicationThemeOptions.AutoSyncWithSystemTheme, Mode=TwoWay}" Foreground="White" Margin="0,0,0,12" ToolTip="Automatically switch between Dark, Light, and Windows High Contrast modes based on Windows OS settings." />
 
                         <TextBlock Text="Theme Preset Override" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
-                        <ComboBox SelectedValue="{Binding Preferences.ThemeOptions.ThemeName, Mode=TwoWay}" SelectedValuePath="Tag" Margin="0,0,0,12" Padding="6,4" Background="#0F172A" Foreground="White">
+                        <ComboBox SelectedValue="{Binding ApplicationThemeOptions.ThemeName, Mode=TwoWay}" SelectedValuePath="Tag" Margin="0,0,0,12" Padding="6,4" Background="#0F172A" Foreground="White">
                             <ComboBoxItem Content="Dark Slate (Default)" Tag="Dark" />
                             <ComboBoxItem Content="Light Slate" Tag="Light" />
                             <ComboBoxItem Content="High Contrast" Tag="HighContrast" />
                         </ComboBox>
 
-                        <CheckBox Content="Enable High Contrast Accessibility Override" IsChecked="{Binding Preferences.ThemeOptions.HighContrastOverride, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" ToolTip="Force high-contrast black/yellow/cyan palette for maximum legibility (WCAG AAA)." />
-
-                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
-
-                        <TextBlock Text="Accessibility &amp; UI Scaling" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
-
-                        <CheckBox Content="High Visibility Keyboard Focus Borders (2px Outline)" IsChecked="{Binding Preferences.ThemeOptions.HighVisibilityFocus, Mode=TwoWay}" Foreground="White" Margin="0,0,0,12" ToolTip="Display a prominent 2px high-contrast outline around controls focused via Tab key." />
-
-                        <TextBlock Text="UI Font Scale (100% to 150%)" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
-                        <DockPanel Margin="0,0,0,16">
-                            <TextBlock Text="{Binding Preferences.ThemeOptions.UiFontScale, StringFormat='{}{0:P0}'}" Width="45" Foreground="#38BDF8" FontWeight="Bold" VerticalAlignment="Center" DockPanel.Dock="Right" />
-                            <Slider Minimum="1.0" Maximum="1.5" SmallChange="0.05" LargeChange="0.1" Value="{Binding Preferences.ThemeOptions.UiFontScale, Mode=TwoWay}" VerticalAlignment="Center" />
-                        </DockPanel>
-
-                        <Border Height="1" Background="#334155" Margin="0,0,0,16" />
-
-                        <TextBlock Text="Custom Palette Colors" FontWeight="Bold" Foreground="#F8FAFC" Margin="0,0,0,12" />
-
-                        <TextBlock Text="Accent Color Hex" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Preferences.ThemeOptions.AccentColorHex, Mode=TwoWay}" Padding="6,4" Background="#0F172A" Foreground="White" BorderBrush="#334155" Margin="0,0,0,12" />
-
-                        <TextBlock Text="Panel Background Hex" Foreground="#94A3B8" FontSize="11" Margin="0,0,0,4" />
-                        <TextBox Text="{Binding Preferences.ThemeOptions.PanelBackgroundHex, Mode=TwoWay}" Padding="6,4" Background="#0F172A" Foreground="White" BorderBrush="#334155" Margin="0,0,0,16" />
+                        <CheckBox Content="Enable High Contrast Accessibility Override" IsChecked="{Binding ApplicationThemeOptions.HighContrastOverride, Mode=TwoWay}" Foreground="White" Margin="0,0,0,16" ToolTip="Force the high-contrast palette for maximum legibility." />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

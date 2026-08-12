@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using UnitProgressTracker.Core.Models;
 using UnitProgressTracker.Core.Services;
+using UnitProgressTracker.Wpf.ViewModels;
 using Xunit;
 
 namespace UnitProgressTracker.Tests;
@@ -112,6 +113,11 @@ public class Step5ChecklistTemplateTests
                     ["Safety Seal"] = false
                 }
             };
+            project.Geometry["SURF-201"] = new SurfaceModel
+            {
+                SurfaceNumber = "SURF-201",
+                Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+            };
 
             ProjectSerializer.SaveAtomic(tempFile, project);
             var reloaded = ProjectSerializer.Load<ProjectStateModel>(tempFile);
@@ -142,5 +148,17 @@ public class Step5ChecklistTemplateTests
         Assert.Equal(2, project.Preferences.ChecklistTemplate.Count);
         Assert.Equal("item a", project.Preferences.ChecklistTemplate[0]);
         Assert.Equal("Item B", project.Preferences.ChecklistTemplate[1]);
+    }
+
+    [Fact]
+    public void OptionsChecklistTemplate_RejectsCaseOnlyDuplicates()
+    {
+        var preferences = new DisplayPreferences { ChecklistTemplate = new List<string> { "QA Check" } };
+        var vm = new OptionsViewModel(preferences, StatusStateService.GetDefaultStates());
+
+        vm.AddChecklistTemplateItemCommand.Execute("  qa check  ");
+
+        Assert.Single(vm.ChecklistTemplate);
+        Assert.Equal("QA Check", vm.ChecklistTemplate[0]);
     }
 }

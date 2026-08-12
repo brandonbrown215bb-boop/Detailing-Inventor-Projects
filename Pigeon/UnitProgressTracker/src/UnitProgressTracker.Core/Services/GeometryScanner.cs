@@ -85,12 +85,41 @@ public class GeometryScanner
         IProgress<ProgressReport>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        var result = await ScanIamFolderWithDiagnosticsAsync(folderPath, progress, cancellationToken);
+        return result.AcceptedSurfaces;
+    }
+
+    public static async Task<GeometryScanResult> ScanIamFolderWithDiagnosticsAsync(
+        string folderPath,
+        IProgress<ProgressReport>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
-            return new List<SurfaceModel>();
+        {
+            return new GeometryScanResult
+            {
+                FatalFailureKind = ScanFailureKind.InaccessibleFolder,
+                Summary = "The selected scan folder is missing or inaccessible. Active project state was preserved."
+            };
+        }
 
-        var allFilePaths = GetScannableFiles(folderPath);
+        string[] allFilePaths;
+        try
+        {
+            allFilePaths = GetScannableFiles(folderPath);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            return new GeometryScanResult
+            {
+                FatalFailureKind = ScanFailureKind.InaccessibleFolder,
+                Summary = "The selected scan folder could not be enumerated. Check access and try again. Active project state was preserved."
+            };
+        }
 
-        var result = new List<SurfaceModel>();
+        var accepted = new List<SurfaceModel>();
+        var failed = new List<ScanFileDiagnostic>();
+        var skipped = new List<ScanFileDiagnostic>();
         var seenNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int total = allFilePaths.Length;
 
@@ -100,7 +129,6 @@ public class GeometryScanner
 
             string file = allFilePaths[i];
             string fileName = Path.GetFileName(file);
-
             progress?.Report(new ProgressReport(
                 Scanned: i,
                 Total: total,
@@ -108,14 +136,60 @@ public class GeometryScanner
                 StatusMessage: $"Scanning {i + 1} of {total}: {fileName}"
             ));
 
-            SurfaceModel? model = file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                ? await Task.Run(() => ScanJsonFile(file, folderPath), cancellationToken)
-                : await ScanIamFileAsync(file, folderPath, cancellationToken);
-
-            if (model != null && seenNumbers.Add(model.SurfaceNumber))
+            SurfaceModel? model = null;
+            ScanFileDiagnostic? failure = null;
+            try
             {
-                result.Add(model);
+                if (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    (model, failure) = await Task.Run(() => ScanJsonFileWithDiagnostic(file, folderPath), cancellationToken);
+                }
+                else
+                {
+                    model = await ScanIamFileAsync(file, folderPath, cancellationToken);
+                    if (model == null)
+                    {
+                        failure = new ScanFileDiagnostic
+                        {
+                            FileIdentifier = fileName,
+                            Kind = ScanFailureKind.InventorComFailure,
+                            Message = $"{fileName}: Inventor/Apprentice did not return readable DOCUMENT_CONFIG_JSON geometry."
+                        };
+                    }
+                }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                failure = new ScanFileDiagnostic
+                {
+                    FileIdentifier = fileName,
+                    Kind = ScanFailureKind.FileReadFailure,
+                    Message = $"{fileName}: the file could not be read."
+                };
+            }
+
+            if (failure != null)
+            {
+                failed.Add(failure);
+                continue;
+            }
+
+            if (model != null && !seenNumbers.Add(model.SurfaceNumber))
+            {
+                skipped.Add(new ScanFileDiagnostic
+                {
+                    FileIdentifier = fileName,
+                    Kind = ScanFailureKind.DuplicateIdentity,
+                    Message = $"{fileName}: duplicate surface identity '{model.SurfaceNumber}' was skipped for review."
+                });
+                continue;
+            }
+
+            if (model != null) accepted.Add(model);
         }
 
         progress?.Report(new ProgressReport(
@@ -125,8 +199,15 @@ public class GeometryScanner
             StatusMessage: "Scan complete."
         ));
 
-        result.Sort((a, b) => string.Compare(a.SurfaceNumber, b.SurfaceNumber, StringComparison.OrdinalIgnoreCase));
-        return result;
+        accepted.Sort((a, b) => string.Compare(a.SurfaceNumber, b.SurfaceNumber, StringComparison.OrdinalIgnoreCase));
+        return new GeometryScanResult
+        {
+            AcceptedSurfaces = accepted,
+            FailedFiles = failed,
+            SkippedFiles = skipped,
+            DiscoveredFileCount = total,
+            Summary = $"Scan reviewed {total} files: {accepted.Count} accepted, {skipped.Count} skipped, {failed.Count} failed."
+        };
     }
 
     public static Task<SurfaceModel?> ScanIamFileAsync(
@@ -174,6 +255,58 @@ public class GeometryScanner
         {
             return null;
         }
+    }
+
+    private static (SurfaceModel? Model, ScanFileDiagnostic? Failure) ScanJsonFileWithDiagnostic(string jsonPath, string rootFolder)
+    {
+        string fileName = Path.GetFileName(jsonPath);
+        string text;
+        try
+        {
+            text = File.ReadAllText(jsonPath);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            return (null, new ScanFileDiagnostic
+            {
+                FileIdentifier = fileName,
+                Kind = ScanFailureKind.FileReadFailure,
+                Message = $"{fileName}: the JSON file could not be read."
+            });
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            if (!document.RootElement.TryGetProperty("configuration", out _))
+            {
+                return (null, new ScanFileDiagnostic
+                {
+                    FileIdentifier = fileName,
+                    Kind = ScanFailureKind.MissingGeometry,
+                    Message = $"{fileName}: required configuration geometry is missing."
+                });
+            }
+        }
+        catch (JsonException)
+        {
+            return (null, new ScanFileDiagnostic
+            {
+                FileIdentifier = fileName,
+                Kind = ScanFailureKind.JsonParseFailure,
+                Message = $"{fileName}: invalid JSON could not be parsed."
+            });
+        }
+
+        var model = ParseConfigJson(text, jsonPath, rootFolder, "json");
+        return model != null
+            ? (model, null)
+            : (null, new ScanFileDiagnostic
+            {
+                FileIdentifier = fileName,
+                Kind = ScanFailureKind.MissingGeometry,
+                Message = $"{fileName}: no valid renderable geometry was found."
+            });
     }
 
     public static SurfaceModel? ParseConfigJson(string jsonText, string filePath, string rootFolder, string sourceType)

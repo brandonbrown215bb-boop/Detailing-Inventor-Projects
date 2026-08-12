@@ -25,6 +25,7 @@ public class Surface3DViewport : Grid
 
     // Skid floor grid markers
     private readonly List<Visual3D> _skidFloorVisuals = new();
+    private readonly List<Visual3D> _skidLabelVisuals = new();
 
     // Map surface numbers to original models for hover lookup
     private readonly Dictionary<string, SurfaceModel> _surfaceModels = new(StringComparer.OrdinalIgnoreCase);
@@ -35,9 +36,12 @@ public class Surface3DViewport : Grid
     // State mirrors
     private bool _wireframeVisible = true;
     private bool _showSkidGrid = true;
+    private bool _showSkidLabels = true;
     private bool _showBulkheadChannels = true;
     private double _globalOpacity = 1.0;
     private StickerOptions _stickerOptions = new();
+    private ProjectionCamera? _observedCamera;
+    private bool _suppressCameraNotifications;
 
     public void SetShowBulkheadChannels(bool show)
     {
@@ -46,6 +50,7 @@ public class Surface3DViewport : Grid
 
     public event Action<string>? SurfacePicked;
     public event Action<SurfaceModel?, Point>? SurfaceHovered;
+    public event Action<CameraStateModel>? CameraStateChanged;
 
     public Surface3DViewport()
     {
@@ -66,6 +71,7 @@ public class Surface3DViewport : Grid
         Children.Add(_helixViewport);
         _helixViewport.MouseDown += OnViewportMouseDown;
         _helixViewport.MouseMove += OnViewportMouseMove;
+        Loaded += (_, _) => ObserveCamera();
     }
 
     // -----------------------------------------------------------------------
@@ -100,12 +106,37 @@ public class Surface3DViewport : Grid
     public void SetCameraState(CameraStateModel? state)
     {
         if (state == null || _helixViewport.Camera is not ProjectionCamera cam) return;
-        cam.Position = new Point3D(state.PositionX, state.PositionY, state.PositionZ);
-        cam.LookDirection = new Vector3D(
-            state.TargetX - state.PositionX,
-            state.TargetY - state.PositionY,
-            state.TargetZ - state.PositionZ);
-        cam.UpDirection = new Vector3D(state.UpX, state.UpY, state.UpZ);
+        ObserveCamera();
+        _suppressCameraNotifications = true;
+        try
+        {
+            cam.Position = new Point3D(state.PositionX, state.PositionY, state.PositionZ);
+            cam.LookDirection = new Vector3D(
+                state.TargetX - state.PositionX,
+                state.TargetY - state.PositionY,
+                state.TargetZ - state.PositionZ);
+            cam.UpDirection = new Vector3D(state.UpX, state.UpY, state.UpZ);
+        }
+        finally
+        {
+            _suppressCameraNotifications = false;
+        }
+    }
+
+    public void FitView() => _helixViewport.ZoomExtents(500);
+
+    private void ObserveCamera()
+    {
+        if (_helixViewport.Camera is not ProjectionCamera camera || ReferenceEquals(_observedCamera, camera)) return;
+        if (_observedCamera != null) _observedCamera.Changed -= OnObservedCameraChanged;
+        _observedCamera = camera;
+        _observedCamera.Changed += OnObservedCameraChanged;
+    }
+
+    private void OnObservedCameraChanged(object? sender, EventArgs e)
+    {
+        if (!_suppressCameraNotifications)
+            CameraStateChanged?.Invoke(GetCameraState());
     }
 
     public void LoadSurfaces(IEnumerable<SurfaceModel> surfaces, Func<string, string> getStatusColorHex)
@@ -231,13 +262,12 @@ public class Surface3DViewport : Grid
                     FontWeight = FontWeights.Bold,
                     DepthOffset = 0.1
                 };
-                _skidFloorVisuals.Add(skidLabel);
+                _skidLabelVisuals.Add(skidLabel);
 
                 if (_showSkidGrid)
-                {
                     _helixViewport.Children.Add(floorFrame);
+                if (_showSkidLabels)
                     _helixViewport.Children.Add(skidLabel);
-                }
             }
 
             _helixViewport.ModelUpDirection = new Vector3D(0, 1, 0);
@@ -245,7 +275,6 @@ public class Surface3DViewport : Grid
             {
                 camera.UpDirection = new Vector3D(0, 1, 0);
             }
-            _helixViewport.ZoomExtents(totalBounds, 500);
         }
     }
 
@@ -291,6 +320,23 @@ public class Surface3DViewport : Grid
             else
             {
                 _helixViewport.Children.Remove(v);
+            }
+        }
+    }
+
+    public void SetShowSkidLabels(bool visible)
+    {
+        _showSkidLabels = visible;
+        foreach (var label in _skidLabelVisuals)
+        {
+            if (visible)
+            {
+                if (!_helixViewport.Children.Contains(label))
+                    _helixViewport.Children.Add(label);
+            }
+            else
+            {
+                _helixViewport.Children.Remove(label);
             }
         }
     }
@@ -345,10 +391,13 @@ public class Surface3DViewport : Grid
             _helixViewport.Children.Remove(wg);
         foreach (var sfv in _skidFloorVisuals)
             _helixViewport.Children.Remove(sfv);
+        foreach (var label in _skidLabelVisuals)
+            _helixViewport.Children.Remove(label);
 
         _surfaceVisuals.Clear();
         _wireframeGroups.Clear();
         _skidFloorVisuals.Clear();
+        _skidLabelVisuals.Clear();
         _surfaceModels.Clear();
         _highlightedSurfaceNumber = null;
     }

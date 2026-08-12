@@ -151,7 +151,12 @@ public class M2EmpiricalChallengeTests : IDisposable
     {
         string projectPath = Path.Combine(_tempDir, "test_dirty.uptproj");
         var vm = new MainViewModel();
-        var surf = new SurfaceModel { SurfaceNumber = "SURF-1001", StateId = "current" };
+        var surf = new SurfaceModel
+        {
+            SurfaceNumber = "SURF-1001",
+            StateId = "current",
+            Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+        };
         vm.Surfaces.Add(surf);
         vm.SelectedSurface = surf;
         vm.UpdateSelectedSurfaceStatus("built");

@@ -90,6 +90,7 @@ public class StatusStateEditorViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelectedState));
             Validate();
+            CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -112,6 +113,8 @@ public class StatusStateEditorViewModel : INotifyPropertyChanged
 
     public ICommand AddStateCommand { get; }
     public ICommand DeleteStateCommand { get; }
+    public ICommand MoveStateUpCommand { get; }
+    public ICommand MoveStateDownCommand { get; }
     public ICommand SelectColorSwatchCommand { get; }
     public ICommand ResetDefaultsCommand { get; }
     public ICommand SaveCommand { get; }
@@ -134,6 +137,8 @@ public class StatusStateEditorViewModel : INotifyPropertyChanged
 
         AddStateCommand = new RelayCommand(_ => ExecuteAddState());
         DeleteStateCommand = new RelayCommand(_ => ExecuteDeleteState(), _ => HasSelectedState && States.Count > 1);
+        MoveStateUpCommand = new RelayCommand(_ => ExecuteMoveState(-1), _ => SelectedState != null && States.IndexOf(SelectedState) > 0);
+        MoveStateDownCommand = new RelayCommand(_ => ExecuteMoveState(1), _ => SelectedState != null && States.IndexOf(SelectedState) < States.Count - 1);
         SelectColorSwatchCommand = new RelayCommand(color => ExecuteSelectColorSwatch(color as string));
         ResetDefaultsCommand = new RelayCommand(_ => ExecuteResetDefaults());
         SaveCommand = new RelayCommand(_ => ExecuteSave(), _ => !HasError);
@@ -153,6 +158,18 @@ public class StatusStateEditorViewModel : INotifyPropertyChanged
         int idx = States.IndexOf(SelectedState);
         States.Remove(SelectedState);
         SelectedState = States.Count > 0 ? States[Math.Min(idx, States.Count - 1)] : null;
+    }
+
+    private void ExecuteMoveState(int offset)
+    {
+        if (SelectedState == null) return;
+        int oldIndex = States.IndexOf(SelectedState);
+        int newIndex = oldIndex + offset;
+        if (oldIndex < 0 || newIndex < 0 || newIndex >= States.Count) return;
+
+        States.Move(oldIndex, newIndex);
+        OnPropertyChanged(nameof(SelectedState));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     private void ExecuteSelectColorSwatch(string? colorHex)

@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Input;
-using UnitProgressTracker.Wpf.Services;
 using UnitProgressTracker.Wpf.ViewModels;
 
 namespace UnitProgressTracker.Wpf;
@@ -41,14 +40,7 @@ public partial class OptionsDialog : Window
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.Preferences.ChecklistTemplate.Clear();
-        foreach (var item in ViewModel.ChecklistTemplate)
-        {
-            ViewModel.Preferences.ChecklistTemplate.Add(item);
-        }
-
-        ThemeManager.Instance.ApplyTheme(ViewModel.Preferences.ThemeOptions);
-
+        ViewModel.PrepareForSave();
         DialogResult = true;
         Close();
     }
