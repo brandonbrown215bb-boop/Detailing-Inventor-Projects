@@ -9,4 +9,5 @@ public class AppSettings
     public string? LastOpenedProject { get; set; }
     public double AutoSaveIntervalMinutes { get; set; } = 5.0;
     public bool AutoSaveEnabled { get; set; } = true;
+    public ThemeOptions ThemeOptions { get; set; } = new();
 }

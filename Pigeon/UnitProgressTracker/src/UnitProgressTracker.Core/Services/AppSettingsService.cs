@@ -47,6 +47,7 @@ public static class AppSettingsService
                 {
                     int max = settings.MaxRecentProjects > 0 ? settings.MaxRecentProjects : 10;
                     settings.MaxRecentProjects = max;
+                    settings.ThemeOptions ??= new ThemeOptions();
                     settings.RecentProjects = settings.RecentProjects
                         .Where(p => !string.IsNullOrWhiteSpace(p))
                         .Select(p => Path.GetFullPath(p))

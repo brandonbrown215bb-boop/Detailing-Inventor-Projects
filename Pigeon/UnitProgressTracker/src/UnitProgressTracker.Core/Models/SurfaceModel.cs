@@ -1,9 +1,15 @@
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace UnitProgressTracker.Core.Models;
 
-public class SurfaceModel
+public class SurfaceModel : INotifyPropertyChanged
 {
+    private bool _isHidden;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public string SurfaceNumber { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public string RelativePath { get; set; } = string.Empty;
@@ -21,7 +27,16 @@ public class SurfaceModel
     }
     public string StateId { get; set; } = "current";
     public string Notes { get; set; } = string.Empty;
-    public bool IsHidden { get; set; }
+    public bool IsHidden
+    {
+        get => _isHidden;
+        set
+        {
+            if (_isHidden == value) return;
+            _isHidden = value;
+            OnPropertyChanged();
+        }
+    }
     public Dictionary<string, bool> Checklist { get; set; } = new();
     public List<GeometryBox> Boxes { get; set; } = new();
     public JobContextModel? JobContext { get; set; }
@@ -53,5 +68,10 @@ public class SurfaceModel
             string suffix = dashIndex >= 0 ? num[(dashIndex + 1)..] : num;
             return suffix.Length <= 4 ? suffix.PadLeft(4, '0') : suffix[^4..];
         }
+    }
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

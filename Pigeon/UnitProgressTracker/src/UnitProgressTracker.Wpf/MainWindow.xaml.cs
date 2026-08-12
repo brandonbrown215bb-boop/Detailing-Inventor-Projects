@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using UnitProgressTracker.Core.Models;
+using UnitProgressTracker.Core.Services;
 using UnitProgressTracker.Wpf.ViewModels;
 
 namespace UnitProgressTracker.Wpf;
@@ -25,10 +27,63 @@ public partial class MainWindow : Window
         ViewModel.RequestHighlightSurface = sn => Viewport3D.HighlightSurface(sn);
         ViewModel.RequestSetWireframe = v => Viewport3D.SetWireframeVisible(v);
         ViewModel.RequestSetSkidGrid = v => Viewport3D.SetShowSkidGrid(v);
+        ViewModel.RequestSetSkidLabels = v => Viewport3D.SetShowSkidLabels(v);
         ViewModel.RequestSetOpacity = o => Viewport3D.SetGlobalOpacity(o);
         ViewModel.RequestSetSurfaceVisibility = (hidden, sn) => Viewport3D.SetSurfaceVisibility(hidden, sn);
         ViewModel.RequestGetCameraState = () => Viewport3D.GetCameraState();
         ViewModel.RequestSetCameraState = state => Viewport3D.SetCameraState(state);
+        ViewModel.RequestConfirmRenumberTransfer = (existing, candidate) =>
+        {
+            var answer = MessageBox.Show(
+                $"The scanned geometry appears to replace '{existing.EffectiveDisplayNumber}' with '{candidate.EffectiveDisplayNumber}'.\n\nTransfer status, checklist, notes, visibility, and history to the new number?",
+                "Confirm tracking transfer",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+            return answer switch
+            {
+                MessageBoxResult.Yes => true,
+                MessageBoxResult.No => false,
+                _ => null
+            };
+        };
+        ViewModel.RequestResolveMissingSurface = surface =>
+        {
+            var answer = MessageBox.Show(
+                $"Surface '{surface.EffectiveDisplayNumber}' was not found by the rescan.\n\nYes: keep it active as an override.\nNo: mark it unnecessary and retire it.\nCancel: keep it pending for a later replacement.",
+                "Review missing surface",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+            return answer switch
+            {
+                MessageBoxResult.Yes => MissingSurfaceResolution.OverrideMissing,
+                MessageBoxResult.No => MissingSurfaceResolution.MarkUnnecessary,
+                _ => MissingSurfaceResolution.KeepPendingForReplacement
+            };
+        };
+        ViewModel.RequestConfirmRescanApply = proposal =>
+            MessageBox.Show(
+                $"Apply this reviewed rescan?\n\n{proposal.ExactMatches.Count} exact matches\n{proposal.NewSurfaces.Count} new surfaces\n{proposal.RenumberCandidates.Count} possible renumbers\n{proposal.MissingSurfaces.Count} missing surfaces",
+                "Apply rescan",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) == MessageBoxResult.Yes;
+        ViewModel.RequestConfirmAddSurfacesApply = (proposal, scan) =>
+        {
+            var diagnosticLines = scan.FailedFiles
+                .Concat(scan.SkippedFiles)
+                .Select(diagnostic => $"• {diagnostic.FileIdentifier}: {diagnostic.Message}")
+                .Concat(proposal.Issues.Select(issue => $"• {issue.SurfaceIdentifier}: {issue.Message}"))
+                .Take(8)
+                .ToList();
+            string diagnostics = diagnosticLines.Count == 0
+                ? string.Empty
+                : $"\n\nReview details:\n{string.Join("\n", diagnosticLines)}";
+
+            return MessageBox.Show(
+                $"Apply this add-surfaces review?\n\n{proposal.AcceptedSurfaces.Count} accepted\n{proposal.Issues.Count + scan.SkippedFiles.Count} skipped/conflicted\n{scan.FailedFiles.Count} failed\n{proposal.IntrusionFlags.Count(flag => !flag.Resolved)} active geometry warnings{diagnostics}\n\nExisting tracking, BOM, project path, and retired history will remain intact.",
+                "Apply added surfaces",
+                MessageBoxButton.YesNo,
+                scan.FailedFiles.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Question) == MessageBoxResult.Yes;
+        };
         ViewModel.RequestBrowseShellRootFolder = () =>
         {
             var dialog = new OpenFolderDialog { Title = "Choose shell export root folder" };
@@ -37,6 +92,8 @@ public partial class MainWindow : Window
 
         Viewport3D.SurfacePicked += OnSurfacePickedIn3D;
         Viewport3D.SurfaceHovered += OnSurfaceHoveredIn3D;
+        Viewport3D.CameraStateChanged += ViewModel.UpdateCameraState;
+        ViewModel.ApplyRuntimePreferences();
     }
 
     private void OnWindowClosing(object? sender, CancelEventArgs e)
@@ -79,7 +136,9 @@ public partial class MainWindow : Window
 
     private void Refresh3DViewport()
     {
-        Viewport3D.LoadSurfaces(ViewModel.Surfaces, ViewModel.GetStatusColor);
+        CameraStateModel camera = Viewport3D.GetCameraState();
+        Viewport3D.LoadSurfaces(ViewModel.GetFilteredSurfaces(), ViewModel.GetStatusColor);
+        Viewport3D.SetCameraState(camera);
         ViewModel.RebuildGroupedSurfaces();
     }
 
@@ -93,6 +152,7 @@ public partial class MainWindow : Window
         {
             await ViewModel.LoadFolderAsync(dialog.FolderName);
             Refresh3DViewport();
+            Viewport3D.FitView();
         }
     }
 
@@ -195,6 +255,7 @@ public partial class MainWindow : Window
         ViewModel.StatusMessage = "Loaded demo 3D surfaces and BOM shell data.";
         ViewModel.MarkDirty();
         Refresh3DViewport();
+        Viewport3D.FitView();
     }
 
     private void OnSurfacesTabClick(object sender, RoutedEventArgs e) => ViewModel.SelectedTabIndex = 0;
@@ -226,9 +287,9 @@ public partial class MainWindow : Window
 
     private void OnCreateShellFoldersClick(object sender, RoutedEventArgs e) => ViewModel.CreateShellFolders();
 
-    private void OnFitViewClick(object sender, RoutedEventArgs e) => Refresh3DViewport();
+    private void OnFitViewClick(object sender, RoutedEventArgs e) => Viewport3D.FitView();
 
-    private void OnResetCameraClick(object sender, RoutedEventArgs e) => Refresh3DViewport();
+    private void OnResetCameraClick(object sender, RoutedEventArgs e) => Viewport3D.FitView();
 
     private void OnStatusSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -277,8 +338,7 @@ public partial class MainWindow : Window
     {
         if (sender is Button btn && btn.Tag is string stateId)
         {
-            ViewModel.SearchText = stateId;
-            ViewModel.RebuildGroupedSurfaces();
+            ViewModel.ToggleStatusFilter(stateId);
         }
     }
 

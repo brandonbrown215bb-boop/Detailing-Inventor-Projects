@@ -111,13 +111,14 @@
                                     <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" DockPanel.Dock="Left" Width="180" Margin="0,0,6,0" Padding="4" Background="{DynamicResource InputBgBrush}" Foreground="{DynamicResource TextMainBrush}" BorderBrush="{DynamicResource BorderBrush}" />
                                     <Button Content="Show All" Command="{Binding ShowAllSurfacesCommand}" DockPanel.Dock="Right" Padding="6,2" FontSize="11" />
                                     <Border Background="{DynamicResource AccentBrush}" CornerRadius="10" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding ActiveSurfacesCount}" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" />
+                                        <TextBlock Text="{Binding FilteredSurfaceCountText}" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" />
                                     </Border>
                                 </DockPanel>
 
                                 <!-- List Controls Toolbar -->
                                 <Grid Margin="0,4,0,0">
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
@@ -139,7 +140,22 @@
                                         </ComboBox>
                                     </DockPanel>
 
-                                    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <DockPanel Grid.Row="1" Margin="0,0,0,4">
+                                        <TextBlock Text="Names:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <ComboBox SelectedValue="{Binding NameMode, Mode=TwoWay}" SelectedValuePath="Tag" Width="75" Margin="0,0,10,0" FontSize="10">
+                                            <ComboBoxItem Content="Both" Tag="both" />
+                                            <ComboBoxItem Content="Long" Tag="long" />
+                                            <ComboBoxItem Content="Short" Tag="short" />
+                                        </ComboBox>
+                                        <TextBlock Text="Visibility:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <ComboBox SelectedValue="{Binding SurfaceVisibilityFilter, Mode=TwoWay}" SelectedValuePath="Tag" Width="80" FontSize="10">
+                                            <ComboBoxItem Content="All" Tag="all" />
+                                            <ComboBoxItem Content="Visible" Tag="visible" />
+                                            <ComboBoxItem Content="Hidden" Tag="hidden" />
+                                        </ComboBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
                                         <CheckBox Content="Type" IsChecked="{Binding ShowTypeTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,8,0" />
                                         <CheckBox Content="Skid" IsChecked="{Binding ShowSkidTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,8,0" />
                                         <CheckBox Content="Side" IsChecked="{Binding ShowSideTag, Mode=TwoWay}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
@@ -179,14 +195,35 @@
                                                                 </Border.Style>
 
                                                                 <DockPanel>
-                                                                    <Border DockPanel.Dock="Left" Background="{DynamicResource InputBgBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="3" Padding="4,2" Margin="0,0,6,0">
+                                                                    <Border x:Name="ShortNameBadge" DockPanel.Dock="Left" Background="{DynamicResource InputBgBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="3" Padding="4,2" Margin="0,0,6,0">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding DataContext.NameMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="long">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
                                                                         <TextBlock Text="{Binding ShortLabel}" Foreground="{DynamicResource BadgeTextBrush}" FontFamily="Consolas" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
                                                                     </Border>
 
                                                                     <Button DockPanel.Dock="Right" Content="{Binding IsHidden, Converter={StaticResource BoolToVisibilityTextConverter}}" Command="{Binding DataContext.ToggleSurfaceVisibilityCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Margin="4,0,0,0" Padding="4,1" FontSize="10" ToolTip="Toggle Surface Visibility" />
 
                                                                     <StackPanel VerticalAlignment="Center">
-                                                                        <TextBlock Text="{Binding EffectiveDisplayNumber}" Foreground="{DynamicResource TextMainBrush}" FontWeight="SemiBold" FontSize="12" />
+                                                                        <TextBlock Text="{Binding EffectiveDisplayNumber}" Foreground="{DynamicResource TextMainBrush}" FontWeight="SemiBold" FontSize="12">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding DataContext.NameMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="short">
+                                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
 
                                                                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                                                             <Border Visibility="{Binding DataContext.ShowSkidTag, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}" Background="{DynamicResource AccentBrush}" CornerRadius="2" Padding="3,1" Margin="0,0,4,0">
@@ -211,6 +248,10 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <TextBlock Text="{Binding FilteredEmptyStateMessage}"
+                                           Visibility="{Binding FilteredEmptyStateMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                                           Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                                           HorizontalAlignment="Center" Margin="12,24" />
 
                                 <!-- Collapsible Removed Surfaces Section -->
                                 <Expander Header="{Binding RemovedSurfacesCount, StringFormat='Removed Surfaces ({0})'}" Margin="0,8,0,0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextMutedBrush}">
@@ -219,7 +260,17 @@
                                             <DataTemplate>
                                                 <Border Padding="6,4" Margin="2" Background="{DynamicResource InputBgBrush}" CornerRadius="4">
                                                     <DockPanel>
-                                                        <TextBlock Text="{Binding SurfaceNumber}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextDecorations="Strikethrough" />
+                                                        <Button DockPanel.Dock="Right"
+                                                                Content="Restore"
+                                                                Command="{Binding DataContext.RestoreSurfaceCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                IsEnabled="{Binding CanRestore}"
+                                                                Padding="6,2"
+                                                                Margin="8,0,0,0" />
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding DisplayNumber}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextDecorations="Strikethrough" />
+                                                            <TextBlock Text="{Binding Reason}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" />
+                                                        </StackPanel>
                                                     </DockPanel>
                                                 </Border>
                                             </DataTemplate>

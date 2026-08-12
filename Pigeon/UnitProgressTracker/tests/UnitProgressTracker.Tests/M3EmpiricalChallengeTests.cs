@@ -28,9 +28,9 @@ public class M3EmpiricalChallengeTests
 
         surface.IsHidden = true;
 
-        // Document empirical result: SurfaceModel does not implement INotifyPropertyChanged
-        Assert.False(eventFired);
-        Assert.False(surface is System.ComponentModel.INotifyPropertyChanged);
+        // Step 12 remediation: bound visibility consumers receive the change.
+        Assert.True(eventFired);
+        Assert.True(surface is System.ComponentModel.INotifyPropertyChanged);
     }
 
     [Fact]
@@ -161,6 +161,11 @@ public class M3EmpiricalChallengeTests
                 Notes = "Checklist serialization test"
             };
             project.Surfaces["391-SURF-04"] = record;
+            project.Geometry["391-SURF-04"] = new SurfaceModel
+            {
+                SurfaceNumber = "391-SURF-04",
+                Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+            };
 
             ProjectSerializer.SaveAtomic(tempFile, project);
             var reloaded = ProjectSerializer.Load<ProjectStateModel>(tempFile);
@@ -189,8 +194,18 @@ public class M3EmpiricalChallengeTests
         try
         {
             var vm = new MainViewModel();
-            var surf1 = new SurfaceModel { SurfaceNumber = "391-SURF-V1", IsHidden = false };
-            var surf2 = new SurfaceModel { SurfaceNumber = "391-SURF-V2", IsHidden = true };
+            var surf1 = new SurfaceModel
+            {
+                SurfaceNumber = "391-SURF-V1",
+                IsHidden = false,
+                Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+            };
+            var surf2 = new SurfaceModel
+            {
+                SurfaceNumber = "391-SURF-V2",
+                IsHidden = true,
+                Boxes = new List<GeometryBox> { new(20, 0, 0, 10, 2, 8) }
+            };
             vm.Surfaces.Add(surf1);
             vm.Surfaces.Add(surf2);
 

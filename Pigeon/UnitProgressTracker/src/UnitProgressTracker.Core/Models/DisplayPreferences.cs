@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace UnitProgressTracker.Core.Models;
 
@@ -47,6 +48,9 @@ public class DisplayPreferences
     public ListDisplayOptions ListDisplay { get; set; } = new();
     public ViewerOptions ViewerOptions { get; set; } = new();
     public StickerOptions StickerOptions { get; set; } = new();
+    // Theme/accessibility belongs to AppSettings. Keep this compatibility shim out
+    // of the portable project payload so older callers do not leak user settings.
+    [JsonIgnore]
     public ThemeOptions ThemeOptions { get; set; } = new();
     public List<string> ChecklistTemplate { get; set; } = new()
     {
@@ -54,5 +58,50 @@ public class DisplayPreferences
         "Verified material",
         "Verified openings",
         "Paperwork complete"
+    };
+
+    public DisplayPreferences Clone() => new()
+    {
+        ListDisplay = new ListDisplayOptions
+        {
+            GroupMode = ListDisplay.GroupMode,
+            NameMode = ListDisplay.NameMode,
+            SortMode = ListDisplay.SortMode,
+            ShowTypeTag = ListDisplay.ShowTypeTag,
+            ShowSkidTag = ListDisplay.ShowSkidTag,
+            ShowSideTag = ListDisplay.ShowSideTag
+        },
+        ViewerOptions = new ViewerOptions
+        {
+            ShowGrid = ViewerOptions.ShowGrid,
+            ShowSkidLabels = ViewerOptions.ShowSkidLabels,
+            ShowLegend = ViewerOptions.ShowLegend,
+            ShowHoverTooltip = ViewerOptions.ShowHoverTooltip,
+            FpsControlsEnabled = ViewerOptions.FpsControlsEnabled,
+            SurfaceOpacity = ViewerOptions.SurfaceOpacity,
+            WireframeVisible = ViewerOptions.WireframeVisible
+        },
+        StickerOptions = new StickerOptions
+        {
+            FontFamily = StickerOptions.FontFamily,
+            TextColorHex = StickerOptions.TextColorHex,
+            BackgroundColorHex = StickerOptions.BackgroundColorHex,
+            BorderColorHex = StickerOptions.BorderColorHex
+        },
+        ChecklistTemplate = new List<string>(ChecklistTemplate)
+    };
+}
+
+public static class ThemeOptionsExtensions
+{
+    public static ThemeOptions Clone(this ThemeOptions options) => new()
+    {
+        ThemeName = options.ThemeName,
+        AccentColorHex = options.AccentColorHex,
+        PanelBackgroundHex = options.PanelBackgroundHex,
+        AutoSyncWithSystemTheme = options.AutoSyncWithSystemTheme,
+        UiFontScale = options.UiFontScale,
+        HighVisibilityFocus = options.HighVisibilityFocus,
+        HighContrastOverride = options.HighContrastOverride
     };
 }

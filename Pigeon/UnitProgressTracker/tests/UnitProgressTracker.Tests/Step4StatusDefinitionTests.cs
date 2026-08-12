@@ -33,6 +33,11 @@ public class Step4StatusDefinitionTests
                 StateId = "custom-qc-hold",
                 Notes = "Awaiting paint inspection"
             };
+            project.Geometry["SURF-1001"] = new SurfaceModel
+            {
+                SurfaceNumber = "SURF-1001",
+                Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 2, 8) }
+            };
 
             ProjectSerializer.SaveAtomic(tempFile, project);
 
@@ -101,5 +106,22 @@ public class Step4StatusDefinitionTests
         Assert.True(deleted);
         Assert.Equal("current", fallbackId);
         Assert.Null(states.FirstOrDefault(s => s.Id == "temp-stage"));
+    }
+
+    [Fact]
+    public void StatusEditor_ReordersStates_AndReturnsTheVisibleOrder()
+    {
+        var vm = new StatusStateEditorViewModel(new[]
+        {
+            new StatusState("first", "First", "#111111"),
+            new StatusState("second", "Second", "#222222"),
+            new StatusState("third", "Third", "#333333")
+        });
+        vm.SelectedState = vm.States[2];
+
+        vm.MoveStateUpCommand.Execute(null);
+        vm.MoveStateUpCommand.Execute(null);
+
+        Assert.Equal(new[] { "third", "first", "second" }, vm.GetResultStates().Select(state => state.Id));
     }
 }

@@ -1,5 +1,6 @@
 using System.Windows;
 using UnitProgressTracker.Core.Models;
+using UnitProgressTracker.Core.Services;
 using UnitProgressTracker.Wpf.Services;
 
 namespace UnitProgressTracker.Wpf
@@ -12,7 +13,7 @@ namespace UnitProgressTracker.Wpf
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-            ThemeManager.Instance.Initialize(new ThemeOptions());
+            ThemeManager.Instance.Initialize(AppSettingsService.LoadSettings().ThemeOptions);
         }
     }
 }

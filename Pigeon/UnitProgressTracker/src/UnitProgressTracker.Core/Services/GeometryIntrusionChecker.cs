@@ -12,7 +12,7 @@ public static class GeometryIntrusionChecker
     public static List<GeometryIntrusionFlagModel> CheckIntrusions(IEnumerable<SurfaceModel> surfaces)
     {
         var flags = new List<GeometryIntrusionFlagModel>();
-        var surfaceList = surfaces.Where(s => s != null && !s.IsHidden && s.Boxes.Count > 0).ToList();
+        var surfaceList = surfaces.Where(s => s != null && s.Boxes.Count > 0).ToList();
 
         for (int i = 0; i < surfaceList.Count; i++)
         {
@@ -43,6 +43,42 @@ public static class GeometryIntrusionChecker
         }
 
         return flags;
+    }
+
+    public static List<GeometryIntrusionFlagModel> ReconcileFlags(
+        IEnumerable<GeometryIntrusionFlagModel>? existingFlags,
+        IEnumerable<GeometryIntrusionFlagModel>? detectedFlags)
+    {
+        var detectedBySurface = (detectedFlags ?? Enumerable.Empty<GeometryIntrusionFlagModel>())
+            .GroupBy(flag => flag.SurfaceNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+
+        var reconciled = new List<GeometryIntrusionFlagModel>();
+        foreach (var existing in existingFlags ?? Enumerable.Empty<GeometryIntrusionFlagModel>())
+        {
+            if (detectedBySurface.Remove(existing.SurfaceNumber, out var detected))
+            {
+                reconciled.Add(CloneFlag(detected, resolved: false));
+            }
+            else
+            {
+                reconciled.Add(CloneFlag(existing, resolved: true));
+            }
+        }
+
+        reconciled.AddRange(detectedBySurface.Values.Select(flag => CloneFlag(flag, resolved: false)));
+        return reconciled;
+    }
+
+    private static GeometryIntrusionFlagModel CloneFlag(GeometryIntrusionFlagModel source, bool resolved)
+    {
+        return new GeometryIntrusionFlagModel
+        {
+            SurfaceNumber = source.SurfaceNumber,
+            AffectedSurfaceNumbers = new List<string>(source.AffectedSurfaceNumbers ?? new List<string>()),
+            Message = source.Message,
+            Resolved = resolved
+        };
     }
 
     private static bool SurfacesOverlapVolumetrically(SurfaceModel s1, SurfaceModel s2)

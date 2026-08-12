@@ -90,7 +90,8 @@ public class Step7ReplaceSurfaceTests
             project,
             existingSurface,
             replacementCandidate,
-            new[] { replacementCandidate });
+            new[] { existingSurface },
+            confirmRenumberTransfer: true);
 
         Assert.True(result.Success);
         Assert.True(result.Renumbered);
@@ -184,7 +185,8 @@ public class Step7ReplaceSurfaceTests
             project,
             topSurface,
             bottomReplacementCandidate,
-            activeSurfaces);
+            activeSurfaces,
+            confirmRenumberTransfer: true);
 
         Assert.True(result.Success);
         Assert.True(result.IntrusionDetected);
@@ -207,10 +209,26 @@ public class Step7ReplaceSurfaceTests
                 Notes = "Original note"
             };
 
-            var existingSurface = new SurfaceModel { SurfaceNumber = "SURF-1001", DisplayNumber = "SURF-1001" };
-            var replacementCandidate = new SurfaceModel { SurfaceNumber = "SURF-1002", DisplayNumber = "SURF-1002" };
+            var existingSurface = new SurfaceModel
+            {
+                SurfaceNumber = "SURF-1001",
+                DisplayNumber = "SURF-1001",
+                Boxes = new List<GeometryBox> { new GeometryBox(0, 0, 0, 10, 10, 10) }
+            };
+            var replacementCandidate = new SurfaceModel
+            {
+                SurfaceNumber = "SURF-1002",
+                DisplayNumber = "SURF-1002",
+                Boxes = new List<GeometryBox> { new GeometryBox(20, 0, 0, 10, 10, 10) }
+            };
 
-            ProjectStateService.ReplaceSurfaceInPlace(project, existingSurface, replacementCandidate, new[] { replacementCandidate });
+            var result = ProjectStateService.ReplaceSurfaceInPlace(
+                project,
+                existingSurface,
+                replacementCandidate,
+                new[] { existingSurface },
+                confirmRenumberTransfer: true);
+            Assert.True(result.Success);
 
             ProjectSerializer.SaveAtomic(tempFile, project);
             var reloaded = ProjectSerializer.Load<ProjectStateModel>(tempFile);
@@ -226,5 +244,59 @@ public class Step7ReplaceSurfaceTests
         {
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
+    }
+
+    [Fact]
+    public void ReplaceSurface_RenumberWithoutConfirmation_PreservesProject()
+    {
+        var project = new ProjectStateModel();
+        project.Surfaces["OLD"] = new SurfaceRecordModel { DisplayNumber = "OLD", StateId = "built" };
+        var existing = new SurfaceModel
+        {
+            SurfaceNumber = "OLD",
+            StateId = "built",
+            Boxes = new List<GeometryBox> { new GeometryBox(0, 0, 0, 10, 10, 10) }
+        };
+        var candidate = new SurfaceModel
+        {
+            SurfaceNumber = "NEW",
+            Boxes = new List<GeometryBox> { new GeometryBox(20, 0, 0, 10, 10, 10) }
+        };
+
+        var result = ProjectStateService.ReplaceSurfaceInPlace(project, existing, candidate, new[] { existing });
+
+        Assert.False(result.Success);
+        Assert.True(result.RequiresRenumberConfirmation);
+        Assert.True(project.Surfaces.ContainsKey("OLD"));
+        Assert.False(project.Surfaces.ContainsKey("NEW"));
+        Assert.Empty(project.Retired);
+    }
+
+    [Fact]
+    public void ReplaceSurface_InvalidGeometryOrDuplicateIdentity_PreservesProject()
+    {
+        var project = new ProjectStateModel();
+        project.Surfaces["OLD"] = new SurfaceRecordModel { DisplayNumber = "OLD" };
+        project.Surfaces["TAKEN"] = new SurfaceRecordModel { DisplayNumber = "TAKEN" };
+        var existing = new SurfaceModel { SurfaceNumber = "OLD", Boxes = new List<GeometryBox> { new(0, 0, 0, 10, 10, 10) } };
+        var taken = new SurfaceModel { SurfaceNumber = "TAKEN", Boxes = new List<GeometryBox> { new(20, 0, 0, 10, 10, 10) } };
+
+        var invalid = ProjectStateService.ReplaceSurfaceInPlace(
+            project,
+            existing,
+            new SurfaceModel { SurfaceNumber = "NEW" },
+            new[] { existing, taken },
+            confirmRenumberTransfer: true);
+        var duplicate = ProjectStateService.ReplaceSurfaceInPlace(
+            project,
+            existing,
+            new SurfaceModel { SurfaceNumber = "TAKEN", Boxes = new List<GeometryBox> { new(40, 0, 0, 10, 10, 10) } },
+            new[] { existing, taken },
+            confirmRenumberTransfer: true);
+
+        Assert.False(invalid.Success);
+        Assert.False(duplicate.Success);
+        Assert.Equal(2, project.Surfaces.Count);
+        Assert.Empty(project.Retired);
     }
 }
