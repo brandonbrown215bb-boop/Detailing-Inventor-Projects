@@ -1,0 +1,32 @@
+{
+  "name": "file-grid",
+  "version": "1.0.0",
+  "description": "Visual grid organizer with folder drop targets",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "icon": "node scripts/generate-icon.mjs",
+    "shortcut": "powershell -ExecutionPolicy Bypass -File scripts/Create-DesktopShortcut.ps1",
+    "package:zip": "powershell -ExecutionPolicy Bypass -File scripts/package-electron-zip.ps1"
+  },
+  "dependencies": {
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-vite": "^2.3.0",
+    "png-to-ico": "^2.1.8",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  }
+}

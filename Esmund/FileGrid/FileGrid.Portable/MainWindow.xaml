@@ -1,0 +1,27 @@
+<Window x:Class="FileGrid.Portable.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:FileGrid.Portable.Views"
+        Title="File Grid" Height="800" Width="1280" Background="#141414">
+  <DockPanel>
+    <ToolBarTray DockPanel.Dock="Top" Background="#141414">
+      <ToolBar>
+        <TextBlock Text="Layout" VerticalAlignment="Center" Margin="4,0,4,0" Foreground="#ccc" />
+        <ComboBox x:Name="LayoutCombo" Width="160" SelectionChanged="LayoutCombo_SelectionChanged" />
+        <Button Content="New layout" Click="NewLayout_Click" />
+        <Button Content="Delete layout" Click="DeleteLayout_Click" />
+        <Separator />
+        <Button Content="+ Folder box" Click="AddBox_Click" />
+        <Button x:Name="DropFolderBtn" Content="Drop folders here" AllowDrop="True"
+                PreviewDragOver="DropFolderBtn_DragOver" Drop="DropFolderBtn_Drop" />
+        <Button x:Name="ConnectBtn" Content="Connect boxes" Click="Connect_Click" />
+        <Button Content="Settings" Click="Settings_Click" />
+        <Separator />
+        <Button Content="Open folder" Click="OpenFolder_Click" />
+        <Button Content="Remove box" Click="RemoveBox_Click" />
+        <Button Content="Remove string" Click="RemoveLink_Click" />
+      </ToolBar>
+    </ToolBarTray>
+    <views:GridSurface x:Name="Grid" />
+  </DockPanel>
+</Window>

@@ -1,0 +1,18 @@
+<Window x:Class="FileGrid.Portable.Views.ConflictWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Name already in use" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize" ShowInTaskbar="False">
+  <StackPanel Margin="16" MaxWidth="520">
+    <TextBlock x:Name="Headline" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8" />
+    <TextBlock x:Name="IncomingInfo" TextWrapping="Wrap" Margin="0,0,0,4" />
+    <TextBlock x:Name="ExistingInfo" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <CheckBox x:Name="ApplyAll" Content="Do this for all conflicts in this drop" Margin="0,0,0,12" />
+    <WrapPanel>
+      <Button Content="Replace" Width="90" Margin="0,0,8,8" Click="Replace_Click" />
+      <Button Content="Keep both" Width="90" Margin="0,0,8,8" IsDefault="True" Click="KeepBoth_Click" />
+      <Button Content="Skip this file" Width="90" Margin="0,0,8,8" Click="Skip_Click" />
+      <Button Content="Cancel operation" Width="110" Margin="0,0,8,8" Click="Cancel_Click" />
+    </WrapPanel>
+  </StackPanel>
+</Window>

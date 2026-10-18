@@ -1,0 +1,8 @@
+node_modules
+out
+dist
+*.log
+.DS_Store
+FileGrid.Portable/bin/
+FileGrid.Portable/obj/
+FileGrid.Portable/publish/
