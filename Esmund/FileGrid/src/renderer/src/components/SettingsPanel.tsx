@@ -90,6 +90,60 @@ export function SettingsPanel({
         </section>
 
         <section className="settings-section">
+          <h3>Folder drop</h3>
+          <p className="settings-note">
+            Click the drop button on the toolbar to switch between Drop Folder and Drop Tree. Tree
+            drops lay out parent → child downward and add strings between each folder and its
+            subfolders.
+          </p>
+          <label>
+            Tree depth (levels under root)
+            <input
+              type="number"
+              min={0}
+              max={15}
+              value={local.folderTreeMaxDepth}
+              onChange={(e) =>
+                patch({ folderTreeMaxDepth: Math.min(15, Math.max(0, Number(e.target.value) || 0)) })
+              }
+            />
+          </label>
+          <p className="settings-note">
+            The dropped folder is depth 0. A value of 7 also includes subfolders up to seven levels
+            below that root. Use 0 for root only.
+          </p>
+          <label>
+            Max boxes per tree drop
+            <input
+              type="number"
+              min={20}
+              max={800}
+              value={local.folderTreeMaxBoxes}
+              onChange={(e) =>
+                patch({
+                  folderTreeMaxBoxes: Math.min(800, Math.max(20, Number(e.target.value) || 20))
+                })
+              }
+            />
+          </label>
+          <label>
+            Exclude folder names (one per line)
+            <textarea
+              rows={5}
+              value={local.folderTreeExcludeNames.join('\n')}
+              onChange={(e) =>
+                patch({
+                  folderTreeExcludeNames: e.target.value
+                    .split(/\r?\n/)
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                })
+              }
+            />
+          </label>
+        </section>
+
+        <section className="settings-section">
           <h3>Canvas</h3>
           <label>
             Zoom controls

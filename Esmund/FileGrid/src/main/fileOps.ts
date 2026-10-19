@@ -20,6 +20,15 @@ export async function isDirectory(p: string): Promise<boolean> {
   }
 }
 
+export async function isFile(p: string): Promise<boolean> {
+  try {
+    const s = await stat(p)
+    return s.isFile()
+  } catch {
+    return false
+  }
+}
+
 async function destExists(dest: string): Promise<boolean> {
   try {
     await stat(dest)

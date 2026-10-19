@@ -1,10 +1,26 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AppSettings, ConflictChoice, LayoutState, MoveConflictPayload, MoveResult } from '../shared/types'
+import type {
+  AppSettings,
+  ConflictChoice,
+  FolderTreeEntry,
+  LayoutState,
+  MoveConflictPayload,
+  MoveResult
+} from '../shared/types'
 
 export interface FileGridApi {
   pickFolder: () => Promise<string | null>
+  pickFile: () => Promise<string | null>
   openFolder: (folderPath: string) => Promise<void>
   pathIsDirectory: (filePath: string) => Promise<boolean>
+  pathIsFile: (filePath: string) => Promise<boolean>
+  folderDropBlocked: (folderPath: string) => Promise<boolean>
+  scanFolderTree: (
+    rootPath: string,
+    maxDepth: number,
+    excludeNames: string[],
+    maxBoxes: number
+  ) => Promise<FolderTreeEntry[]>
   movePaths: (targetFolder: string, paths: string[]) => Promise<MoveResult[]>
   onMoveConflict: (handler: (payload: MoveConflictPayload) => void) => () => void
   resolveMoveConflict: (id: string, choice: ConflictChoice, applyToAll: boolean) => void
@@ -22,8 +38,13 @@ export interface FileGridApi {
 
 const api: FileGridApi = {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  pickFile: () => ipcRenderer.invoke('pick-file'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   pathIsDirectory: (filePath) => ipcRenderer.invoke('path-is-directory', filePath),
+  pathIsFile: (filePath) => ipcRenderer.invoke('path-is-file', filePath),
+  folderDropBlocked: (folderPath) => ipcRenderer.invoke('folder-drop-blocked', folderPath),
+  scanFolderTree: (rootPath, maxDepth, excludeNames, maxBoxes) =>
+    ipcRenderer.invoke('scan-folder-tree', rootPath, maxDepth, excludeNames, maxBoxes),
   movePaths: (targetFolder, paths) => ipcRenderer.invoke('move-paths', targetFolder, paths),
   onMoveConflict: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, payload: MoveConflictPayload) => handler(payload)

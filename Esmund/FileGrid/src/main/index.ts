@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { loadAppIcon } from './appIcon'
-import { moveIntoFolder, isDirectory, MoveAbortedError } from './fileOps'
+import { isBlockedDropRoot, scanFolderTree } from './folderTree'
+import { moveIntoFolder, isDirectory, isFile, MoveAbortedError } from './fileOps'
 import { createConflictResolver, setMainWindow } from './moveConflicts'
 import {
   defaultLayout,
@@ -67,11 +68,36 @@ ipcMain.handle('pick-folder', async () => {
   return filePaths[0]
 })
 
+ipcMain.handle('pick-file', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openFile']
+  })
+  if (canceled || !filePaths[0]) return null
+  return filePaths[0]
+})
+
 ipcMain.handle('open-folder', async (_e, folderPath: string) => {
   await shell.openPath(folderPath)
 })
 
 ipcMain.handle('path-is-directory', async (_e, filePath: string) => isDirectory(filePath))
+
+ipcMain.handle('path-is-file', async (_e, filePath: string) => isFile(filePath))
+
+ipcMain.handle('folder-drop-blocked', async (_e, folderPath: string) =>
+  isBlockedDropRoot(folderPath)
+)
+
+ipcMain.handle(
+  'scan-folder-tree',
+  async (
+    _e,
+    rootPath: string,
+    maxDepth: number,
+    excludeNames: string[],
+    maxBoxes: number
+  ) => scanFolderTree(rootPath, maxDepth, excludeNames, maxBoxes)
+)
 
 ipcMain.handle('move-paths', async (_e, targetFolder: string, paths: string[]): Promise<MoveResult[]> => {
   const resolveConflict = createConflictResolver()

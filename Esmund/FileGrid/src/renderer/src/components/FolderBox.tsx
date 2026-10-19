@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AppSettings, GridBox } from '../../../shared/types'
+import { boxPathExists } from '../boxPathUtils'
 import type { ViewTransform } from '../gridMath'
 import { gridRectToScreen } from '../gridMath'
 
@@ -16,7 +17,9 @@ interface Props {
   onDragStart: (e: React.PointerEvent) => void
   onResizeStart: (e: React.PointerEvent) => void
   onDropPaths: (paths: string[]) => void
+  onOpenBox: () => void
   onContextMenu: (e: React.MouseEvent) => void
+  shouldSuppressContextMenu?: () => boolean
 }
 
 export function FolderBox({
@@ -32,9 +35,22 @@ export function FolderBox({
   onDragStart,
   onResizeStart,
   onDropPaths,
-  onContextMenu
+  onOpenBox,
+  onContextMenu,
+  shouldSuppressContextMenu
 }: Props) {
   const [dragOver, setDragOver] = useState(false)
+  const [pathMissing, setPathMissing] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void boxPathExists(box).then((ok) => {
+      if (!cancelled) setPathMissing(!ok)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [box.folderPath, box.kind])
   const { left, top, width, height } = gridRectToScreen(
     box.gx,
     box.gy,
@@ -58,7 +74,7 @@ export function FolderBox({
     if (e.shiftKey) {
       e.stopPropagation()
       e.preventDefault()
-      void window.fileGrid.openFolder(box.folderPath)
+      onOpenBox()
       return true
     }
     return false
@@ -66,7 +82,7 @@ export function FolderBox({
 
   return (
     <div
-      className={`box ${selected ? 'selected' : ''} ${dragOver ? 'drag-over' : ''} ${titleOnly ? 'box-title-only' : ''} ${linkFrom ? 'link-from' : ''} ${linking ? 'linking-mode' : ''}`}
+      className={`box ${box.kind === 'file' ? 'box-file' : 'box-folder'} ${selected ? 'selected' : ''} ${dragOver ? 'drag-over' : ''} ${titleOnly ? 'box-title-only' : ''} ${linkFrom ? 'link-from' : ''} ${linking ? 'linking-mode' : ''} ${pathMissing ? 'box-missing-path' : ''}`}
       style={{
         left,
         top,
@@ -81,6 +97,7 @@ export function FolderBox({
         ['--box-pad-x' as string]: `${padX}px`
       }}
       onPointerDown={(e) => {
+        if (e.button !== 0) return
         if (openIfShift(e)) return
         if (linking) {
           e.stopPropagation()
@@ -92,12 +109,14 @@ export function FolderBox({
         onSelect()
       }}
       onDragOver={(e) => {
+        if (box.kind === 'file') return
         e.preventDefault()
         e.stopPropagation()
         setDragOver(true)
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
+        if (box.kind === 'file') return
         e.preventDefault()
         e.stopPropagation()
         setDragOver(false)
@@ -109,6 +128,7 @@ export function FolderBox({
       onContextMenu={(e) => {
         e.preventDefault()
         e.stopPropagation()
+        if (shouldSuppressContextMenu?.()) return
         onContextMenu(e)
       }}
     >
@@ -116,6 +136,7 @@ export function FolderBox({
         className="box-header"
         title={titleOnly ? box.folderPath : undefined}
         onPointerDown={(e) => {
+          if (e.button !== 0) return
           if (openIfShift(e)) return
           if (linking) {
             e.stopPropagation()
@@ -134,9 +155,20 @@ export function FolderBox({
           {box.folderPath}
         </div>
       )}
+      {box.kind === 'file' && (
+        <div className="box-file-badge" aria-hidden title="File shortcut">
+          <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+            <path
+              fill="currentColor"
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2 5 5h-5V4zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"
+            />
+          </svg>
+        </div>
+      )}
       <div
         className="resize-handle"
         onPointerDown={(e) => {
+          if (e.button !== 0) return
           e.stopPropagation()
           onResizeStart(e)
         }}

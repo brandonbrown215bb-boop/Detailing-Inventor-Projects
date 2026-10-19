@@ -5,12 +5,15 @@ import {
   type AppSettings,
   type ToolbarAlign,
   type ToolbarDock,
-  type ZoomInputMode
+  type FolderDropMode,
+  type ZoomInputMode,
+  DEFAULT_FOLDER_TREE_EXCLUDES
 } from '../shared/types'
 
 const TOOLBAR_DOCKS: ToolbarDock[] = ['top', 'bottom', 'left', 'right']
 const TOOLBAR_ALIGNS: ToolbarAlign[] = ['start', 'center', 'end']
 const ZOOM_INPUTS: ZoomInputMode[] = ['wheel', 'keys', 'both']
+const FOLDER_DROP_MODES: FolderDropMode[] = ['boxes', 'tree']
 
 const SETTINGS_FILE = 'settings.json'
 
@@ -29,6 +32,15 @@ function mergeSettings(raw: Partial<AppSettings>): AppSettings {
     ? raw.toolbarAlign!
     : DEFAULT_APP_SETTINGS.toolbarAlign
 
+  const folderDropMode = FOLDER_DROP_MODES.includes(raw.folderDropMode as FolderDropMode)
+    ? raw.folderDropMode!
+    : DEFAULT_APP_SETTINGS.folderDropMode
+  const excludeRaw = raw.folderTreeExcludeNames
+  const folderTreeExcludeNames =
+    Array.isArray(excludeRaw) && excludeRaw.every((x) => typeof x === 'string')
+      ? excludeRaw.map((s) => s.trim()).filter(Boolean)
+      : DEFAULT_APP_SETTINGS.folderTreeExcludeNames
+
   return {
     ...DEFAULT_APP_SETTINGS,
     ...raw,
@@ -37,7 +49,22 @@ function mergeSettings(raw: Partial<AppSettings>): AppSettings {
     gridOpacity: clamp(raw.gridOpacity ?? DEFAULT_APP_SETTINGS.gridOpacity, 0.05, 1),
     toolbarDock,
     toolbarAlign,
-    zoomInput
+    zoomInput,
+    folderDropMode,
+    folderTreeMaxDepth: clamp(
+      raw.folderTreeMaxDepth ?? DEFAULT_APP_SETTINGS.folderTreeMaxDepth,
+      0,
+      15
+    ),
+    folderTreeExcludeNames:
+      folderTreeExcludeNames.length > 0
+        ? folderTreeExcludeNames
+        : [...DEFAULT_FOLDER_TREE_EXCLUDES],
+    folderTreeMaxBoxes: clamp(
+      raw.folderTreeMaxBoxes ?? DEFAULT_APP_SETTINGS.folderTreeMaxBoxes,
+      20,
+      800
+    )
   }
 }
 

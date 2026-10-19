@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { v4 as uuid } from 'uuid'
 import type { AppSettings, BoxLink, GridBox, LayoutState, MoveConflictPayload } from '../../shared/types'
-import { DEFAULT_APP_SETTINGS } from '../../shared/types'
+import { DEFAULT_APP_SETTINGS, DEFAULT_HOME_VIEW } from '../../shared/types'
+import { boxPathExists } from './boxPathUtils'
 import { ConflictModal } from './components/ConflictModal'
 import { ConfirmModal } from './components/ConfirmModal'
+import { FileDropButton } from './components/FileDropButton'
 import { FolderDropButton } from './components/FolderDropButton'
 import { GridViewport } from './components/GridViewport'
 import { NamePromptModal } from './components/NamePromptModal'
 import { SettingsPanel } from './components/SettingsPanel'
+import { RelinkFolderModal } from './components/RelinkFolderModal'
 import { ToolbarShell } from './components/ToolbarShell'
+import { copyTextToClipboard } from './clipboard'
 import { hexToRgba } from './colorUtils'
 import { usePersistLayout } from './hooks/usePersistLayout'
 import { DEFAULT_LINK_LINE_STYLE, LINK_LINE_STYLE_OPTIONS } from '../../shared/linkLineStyle'
+import { isTypingContext } from './keyboard'
+import { layoutSimpleTree, treeExtent } from './folderTreeLayout'
 import { normalizeLayout } from './layoutUtils'
 
 const BOX_COLORS = ['#3d5a80', '#5c4d7d', '#4a6741', '#8b4513', '#2f6f6f', '#6b3a3a', '#555555']
@@ -37,6 +43,11 @@ export default function App() {
   const [linking, setLinking] = useState(false)
   const [linkFromId, setLinkFromId] = useState<string | null>(null)
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
+  const [relinkModal, setRelinkModal] = useState<{
+    boxId: string
+    retryMovePaths?: string[]
+  } | null>(null)
+  const [selectedFolderMissing, setSelectedFolderMissing] = useState(false)
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -183,6 +194,7 @@ export default function App() {
     const start = layout.boxes.length
     const newBoxes: GridBox[] = folders.map((folder, i) => ({
       id: uuid(),
+      kind: 'folder',
       title: basename(folder),
       color: BOX_COLORS[(start + i) % BOX_COLORS.length],
       folderPath: folder,
@@ -196,10 +208,121 @@ export default function App() {
     showToast(`Added ${newBoxes.length} folder box(es)`)
   }
 
+  const addTreesFromPaths = async (roots: string[]) => {
+    if (!layout || roots.length === 0) return
+    let originGx = 2
+    let originGy = 2
+    const start = layout.boxes.length
+    const newBoxes: GridBox[] = []
+    const newLinks: BoxLink[] = []
+    let capped = false
+
+    for (const root of roots) {
+      if (await window.fileGrid.folderDropBlocked(root)) {
+        showToast('Cannot build a tree from that location')
+        continue
+      }
+      const entries = await window.fileGrid.scanFolderTree(
+        root,
+        settings.folderTreeMaxDepth,
+        settings.folderTreeExcludeNames,
+        settings.folderTreeMaxBoxes
+      )
+      if (!entries.length) {
+        showToast('No folders found under that path')
+        continue
+      }
+      if (entries.length >= settings.folderTreeMaxBoxes) capped = true
+
+      const { laidOut, edges } = layoutSimpleTree(entries, originGx, originGy)
+      const pathToId = new Map<string, string>()
+      for (const { entry, placement } of laidOut) {
+        const id = uuid()
+        pathToId.set(entry.path, id)
+        newBoxes.push({
+          id,
+          kind: 'folder',
+          title: basename(entry.path),
+          color: BOX_COLORS[(start + newBoxes.length) % BOX_COLORS.length],
+          folderPath: entry.path,
+          ...placement
+        })
+      }
+      for (const { parentPath, childPath } of edges) {
+        const fromBoxId = pathToId.get(parentPath)
+        const toBoxId = pathToId.get(childPath)
+        if (!fromBoxId || !toBoxId) continue
+        newLinks.push({
+          id: uuid(),
+          fromBoxId,
+          toBoxId,
+          color: DEFAULT_LINK_COLOR,
+          thickness: DEFAULT_LINK_THICKNESS,
+          lineStyle: DEFAULT_LINK_LINE_STYLE
+        })
+      }
+      const extent = treeExtent(laidOut)
+      originGy += extent.height + 3
+    }
+
+    if (!newBoxes.length) return
+    updateLayout((prev) => ({
+      ...prev,
+      boxes: [...prev.boxes, ...newBoxes],
+      links: [...prev.links, ...newLinks]
+    }))
+    setSelectedId(newBoxes[newBoxes.length - 1].id)
+    const linkNote = newLinks.length ? `, ${newLinks.length} strings` : ''
+    if (capped) {
+      showToast(`Added ${newBoxes.length} boxes${linkNote} (scan cap ${settings.folderTreeMaxBoxes})`)
+    } else {
+      showToast(`Added ${newBoxes.length} boxes from tree${linkNote}`)
+    }
+  }
+
+  const handleFoldersDropped = (folders: string[]) => {
+    if (settings.folderDropMode === 'tree') {
+      void addTreesFromPaths(folders)
+      return
+    }
+    addBoxesFromPaths(folders)
+  }
+
+  const toggleFolderDropMode = () => {
+    const next = settings.folderDropMode === 'boxes' ? 'tree' : 'boxes'
+    void persistSettings({ ...settings, folderDropMode: next })
+    showToast(next === 'tree' ? 'Drop Tree mode' : 'Drop Folder mode')
+  }
+
   const addBox = async () => {
     const folder = await window.fileGrid.pickFolder()
     if (!folder) return
     addBoxesFromPaths([folder])
+  }
+
+  const addFilesFromPaths = (files: string[]) => {
+    if (!layout || files.length === 0) return
+    const start = layout.boxes.length
+    const newBoxes: GridBox[] = files.map((filePath, i) => ({
+      id: uuid(),
+      kind: 'file',
+      title: basename(filePath),
+      color: BOX_COLORS[(start + i) % BOX_COLORS.length],
+      folderPath: filePath,
+      gx: 2 + (i % 4) * 2,
+      gy: 2 + Math.floor(i / 4) * 2,
+      gw: 2,
+      gh: 2
+    }))
+    updateLayout((prev) => ({ ...prev, boxes: [...prev.boxes, ...newBoxes] }))
+    setSelectedId(newBoxes[newBoxes.length - 1].id)
+    showToast(`Added ${newBoxes.length} file box(es)`)
+  }
+
+  const addFileBox = async () => {
+    const filePath = await window.fileGrid.pickFile()
+    if (!filePath) return
+    addFilesFromPaths([filePath])
   }
 
   const handleLinkPick = (boxId: string) => {
@@ -234,6 +357,19 @@ export default function App() {
 
   const selected = layout?.boxes.find((b) => b.id === selectedId) ?? null
   const selectedLink = layout?.links.find((l) => l.id === selectedLinkId) ?? null
+  const relinkTarget = relinkModal
+    ? layout?.boxes.find((b) => b.id === relinkModal.boxId) ?? null
+    : null
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedFolderMissing(false)
+      return
+    }
+    void boxPathExists(selected).then((ok) => {
+      setSelectedFolderMissing(!ok)
+    })
+  }, [selected?.id, selected?.folderPath, selected?.kind])
 
   const patchLink = (linkId: string, patch: Partial<BoxLink>) => {
     updateLayout((prev) => ({
@@ -264,6 +400,41 @@ export default function App() {
     removeLink(selectedLinkId)
   }, [selectedLinkId, removeLink])
 
+  const adjustBoxDrawOrder = useCallback(
+    (mode: 'nudge' | 'front' | 'back', direction?: 1 | -1) => {
+      if (!selectedId) return
+      let toastMsg: string | null = null
+      updateLayout((prev) => {
+        const idx = prev.boxes.findIndex((b) => b.id === selectedId)
+        if (idx < 0) return prev
+        if (mode === 'front' && idx === prev.boxes.length - 1) return prev
+        if (mode === 'back' && idx === 0) return prev
+        const boxes = [...prev.boxes]
+        const [item] = boxes.splice(idx, 1)
+        if (mode === 'front') {
+          boxes.push(item)
+          toastMsg = 'To front'
+        } else if (mode === 'back') {
+          boxes.unshift(item)
+          toastMsg = 'To back'
+        } else {
+          const target = idx + (direction ?? 1)
+          if (target < 0 || target >= prev.boxes.length) return prev
+          boxes.splice(target, 0, item)
+          toastMsg = (direction ?? 1) > 0 ? 'Forward' : 'Back'
+        }
+        return { ...prev, boxes }
+      })
+      if (toastMsg) showToast(toastMsg)
+    },
+    [selectedId, updateLayout]
+  )
+
+  const goHomeView = () => {
+    updateLayout((prev) => ({ ...prev, view: { ...DEFAULT_HOME_VIEW } }))
+    showToast('Home view')
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && linking) {
@@ -276,10 +447,19 @@ export default function App() {
         e.preventDefault()
         removeSelectedLink()
       }
+      if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        if (isTypingContext(e.target)) return
+        e.preventDefault()
+        if (e.ctrlKey) {
+          adjustBoxDrawOrder(e.key === 'ArrowUp' ? 'front' : 'back')
+        } else {
+          adjustBoxDrawOrder('nudge', e.key === 'ArrowUp' ? 1 : -1)
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [linking, selectedLinkId, removeSelectedLink])
+  }, [linking, selectedLinkId, removeSelectedLink, selectedId, adjustBoxDrawOrder])
 
   const patchBox = (boxId: string, patch: Partial<GridBox>) => {
     updateLayout((prev) => ({
@@ -306,7 +486,56 @@ export default function App() {
     [updateLayout]
   )
 
-  const onMovePaths = async (box: GridBox, paths: string[]) => {
+  const copyFolderPath = async (path: string) => {
+    const ok = await copyTextToClipboard(path)
+    showToast(ok ? 'Path copied' : 'Could not copy path')
+  }
+
+  const applyFolderRelink = (boxId: string, newPath: string) => {
+    const box = layout?.boxes.find((b) => b.id === boxId)
+    patchBox(boxId, {
+      folderPath: newPath,
+      title: box?.title ? box.title : basename(newPath)
+    })
+    showToast(box?.kind === 'file' ? 'File linked' : 'Folder linked')
+  }
+
+  const promptRelinkFolder = async (boxId: string) => {
+    const box = layout?.boxes.find((b) => b.id === boxId)
+    if (!box) return
+    if (box.kind === 'file') {
+      const filePath = await window.fileGrid.pickFile()
+      if (!filePath) return
+      if (!(await window.fileGrid.pathIsFile(filePath))) {
+        showToast('Not a valid file')
+        return
+      }
+      applyFolderRelink(boxId, filePath)
+      return
+    }
+    const folder = await window.fileGrid.pickFolder()
+    if (!folder) return
+    if (!(await window.fileGrid.pathIsDirectory(folder))) {
+      showToast('Not a valid folder')
+      return
+    }
+    applyFolderRelink(boxId, folder)
+  }
+
+  const openBoxTarget = async (box: GridBox) => {
+    if (!(await boxPathExists(box))) {
+      setRelinkModal({ boxId: box.id })
+      return
+    }
+    await window.fileGrid.openFolder(box.folderPath)
+  }
+
+  const runMovePaths = async (box: GridBox, paths: string[]) => {
+    if (box.kind === 'file') return
+    if (!(await window.fileGrid.pathIsDirectory(box.folderPath))) {
+      setRelinkModal({ boxId: box.id, retryMovePaths: paths })
+      return
+    }
     const results = await window.fileGrid.movePaths(box.folderPath, paths)
     if (results.some((r) => r.aborted)) {
       const done = results.filter((r) => r.ok && !r.skipped).length
@@ -327,6 +556,21 @@ export default function App() {
     if (renamed.length) parts.push(`${renamed.length} renamed (kept both)`)
     if (skipped.length) parts.push(`${skipped.length} skipped`)
     showToast(`${parts.join(', ')} → ${box.title}`)
+  }
+
+  const onMovePaths = (box: GridBox, paths: string[]) => void runMovePaths(box, paths)
+
+  const confirmRelink = (newPath: string) => {
+    if (!relinkModal) return
+    const { boxId, retryMovePaths } = relinkModal
+    applyFolderRelink(boxId, newPath)
+    setRelinkModal(null)
+    if (retryMovePaths?.length) {
+      const box = layout?.boxes.find((b) => b.id === boxId)
+      if (box) {
+        void runMovePaths({ ...box, folderPath: newPath }, retryMovePaths)
+      }
+    }
   }
 
   if (!layout) {
@@ -360,7 +604,16 @@ export default function App() {
         <button type="button" onClick={openNewLayoutPrompt}>New</button>
         <button type="button" onClick={() => setDeleteLayoutOpen(true)}>Delete</button>
         <button type="button" className="primary" onClick={() => void addBox()}>+ Folder</button>
-        <FolderDropButton onFoldersDropped={addBoxesFromPaths} />
+        <button type="button" onClick={() => void addFileBox()}>+ File</button>
+        <FileDropButton onFilesDropped={addFilesFromPaths} />
+        <FolderDropButton
+          mode={settings.folderDropMode}
+          onModeToggle={toggleFolderDropMode}
+          onFoldersDropped={handleFoldersDropped}
+        />
+        <button type="button" onClick={goHomeView} title="Reset pan and zoom">
+          Home
+        </button>
         <button
           type="button"
           className={linking ? 'primary' : ''}
@@ -392,8 +645,24 @@ export default function App() {
                 onChange={(e) => patchSelected({ color: e.target.value })}
               />
             </label>
-            <button type="button" onClick={() => void window.fileGrid.openFolder(selected.folderPath)}>
-              Open folder
+            <button type="button" onClick={() => void openBoxTarget(selected)}>
+              {selected.kind === 'file' ? 'Open file' : 'Open folder'}
+            </button>
+            <button type="button" onClick={() => adjustBoxDrawOrder('front')} title="Ctrl+↑">
+              To front
+            </button>
+            <button type="button" onClick={() => adjustBoxDrawOrder('back')} title="Ctrl+↓">
+              To back
+            </button>
+            <button type="button" onClick={() => void copyFolderPath(selected.folderPath)}>
+              Copy path
+            </button>
+            <button type="button" onClick={() => void promptRelinkFolder(selected.id)}>
+              {selectedFolderMissing
+                ? 'Relink…'
+                : selected.kind === 'file'
+                  ? 'Change file…'
+                  : 'Change folder…'}
             </button>
             <button
               type="button"
@@ -474,6 +743,9 @@ export default function App() {
         onRemoveBox={removeBox}
         onPatchLink={patchLink}
         onRemoveLink={removeLink}
+        onCopyPath={(path) => void copyFolderPath(path)}
+        onRelinkFolder={(boxId) => void promptRelinkFolder(boxId)}
+        onOpenBox={(box) => void openBoxTarget(box)}
       />
   )
 
@@ -520,6 +792,20 @@ export default function App() {
           confirmLabel="Create"
           onConfirm={(name) => void confirmNewLayout(name)}
           onCancel={() => setNewLayoutOpen(false)}
+        />
+      )}
+      {relinkTarget && relinkModal && (
+        <RelinkFolderModal
+          box={relinkTarget}
+          message={
+            relinkTarget.kind === 'file'
+              ? `This shortcut’s file is missing or moved. Choose the file on disk.`
+              : relinkModal.retryMovePaths?.length
+                ? `This box’s folder is missing. Choose where it moved to, then the drop will be retried.`
+                : `This box’s folder is missing or moved. Choose its folder on disk.`
+          }
+          onRelink={confirmRelink}
+          onCancel={() => setRelinkModal(null)}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AppSettings, BoxLink, GridBox, LayoutState } from '../../../shared/types'
+import { boxPathExists } from '../boxPathUtils'
 import { isTypingContext } from '../keyboard'
 import { screenToGrid } from '../gridMath'
 import { BoxLinksLayer } from './BoxLinksLayer'
@@ -24,6 +25,9 @@ interface Props {
   onRemoveBox: (boxId: string) => void
   onPatchLink: (linkId: string, patch: Partial<BoxLink>) => void
   onRemoveLink: (linkId: string) => void
+  onCopyPath: (path: string) => void
+  onRelinkFolder: (boxId: string) => void
+  onOpenBox: (box: GridBox) => void
 }
 
 export function GridViewport({
@@ -42,7 +46,10 @@ export function GridViewport({
   onPatchBox,
   onRemoveBox,
   onPatchLink,
-  onRemoveLink
+  onRemoveLink,
+  onCopyPath,
+  onRelinkFolder,
+  onOpenBox
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const [quickEdit, setQuickEdit] = useState<
@@ -60,6 +67,7 @@ export function GridViewport({
     pointerGx: number
     pointerGy: number
   } | null>(null)
+  const suppressBoxContextMenu = useRef(false)
   const resizeBox = useRef<{
     id: string
     startGw: number
@@ -98,6 +106,15 @@ export function GridViewport({
     quickEdit?.kind === 'box' ? boxes.find((b) => b.id === quickEdit.id) ?? null : null
   const quickEditLink =
     quickEdit?.kind === 'link' ? links.find((l) => l.id === quickEdit.id) ?? null : null
+  const [quickEditPathMissing, setQuickEditPathMissing] = useState(false)
+
+  useEffect(() => {
+    if (!quickEditBox) {
+      setQuickEditPathMissing(false)
+      return
+    }
+    void boxPathExists(quickEditBox).then((ok) => setQuickEditPathMissing(!ok))
+  }, [quickEditBox?.id, quickEditBox?.folderPath, quickEditBox?.kind])
 
   const setView = useCallback(
     (patch: Partial<LayoutState['view']>) => {
@@ -215,10 +232,12 @@ export function GridViewport({
 
   const startPan = (e: React.PointerEvent) => {
     const onEmpty = !(e.target as HTMLElement).closest('.box')
+    const middleOrRight = e.button === 1 || e.button === 2
     const wantPan =
-      e.button === 1 || e.button === 2 || (e.button === 0 && (spaceHeld || e.altKey))
-    if (wantPan && onEmpty) {
+      middleOrRight || (e.button === 0 && (spaceHeld || e.altKey))
+    if (wantPan && (onEmpty || middleOrRight)) {
       e.preventDefault()
+      suppressBoxContextMenu.current = false
       setPanning(true)
       panStart.current = { x: e.clientX, y: e.clientY, panX: view.panX, panY: view.panY }
       viewportRef.current?.setPointerCapture(e.pointerId)
@@ -237,6 +256,9 @@ export function GridViewport({
     if (panning) {
       const dx = e.clientX - panStart.current.x
       const dy = e.clientY - panStart.current.y
+      if (Math.abs(dx) + Math.abs(dy) > 4) {
+        suppressBoxContextMenu.current = true
+      }
       setView({
         panX: panStart.current.panX + dx,
         panY: panStart.current.panY + dy
@@ -338,7 +360,9 @@ export function GridViewport({
             onDragStart={(e) => startBoxDrag(box, e)}
             onResizeStart={(e) => startResize(box, e)}
             onDropPaths={(paths) => onMovePaths(box, paths)}
+            onOpenBox={() => onOpenBox(box)}
             onContextMenu={(e) => handleBoxContextMenu(box.id, e)}
+            shouldSuppressContextMenu={() => suppressBoxContextMenu.current}
           />
         ))}
       </div>
@@ -347,8 +371,11 @@ export function GridViewport({
           menu={quickEdit}
           box={quickEditBox}
           link={quickEditLink}
+          pathMissing={quickEditPathMissing}
           onPatchBox={onPatchBox}
           onPatchLink={onPatchLink}
+          onCopyPath={onCopyPath}
+          onRelinkFolder={onRelinkFolder}
           onClose={closeQuickEdit}
         />
       )}

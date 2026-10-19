@@ -10,12 +10,25 @@ interface Props {
   menu: MenuState
   box: GridBox | null
   link: BoxLink | null
+  pathMissing: boolean
   onPatchBox: (id: string, patch: Partial<GridBox>) => void
   onPatchLink: (id: string, patch: Partial<BoxLink>) => void
+  onCopyPath: (path: string) => void
+  onRelinkFolder: (boxId: string) => void
   onClose: () => void
 }
 
-export function CanvasQuickEdit({ menu, box, link, onPatchBox, onPatchLink, onClose }: Props) {
+export function CanvasQuickEdit({
+  menu,
+  box,
+  link,
+  pathMissing,
+  onPatchBox,
+  onPatchLink,
+  onCopyPath,
+  onRelinkFolder,
+  onClose
+}: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -77,6 +90,19 @@ export function CanvasQuickEdit({ menu, box, link, onPatchBox, onPatchLink, onCl
             onChange={(e) => onPatchBox(box.id, { color: e.target.value })}
           />
         </label>
+        <div className="canvas-quick-edit-actions">
+          <button type="button" onClick={() => onCopyPath(box.folderPath)}>Copy path</button>
+          <button type="button" onClick={() => onRelinkFolder(box.id)}>
+            {pathMissing
+              ? 'Relink…'
+              : box.kind === 'file'
+                ? 'Change file…'
+                : 'Change folder…'}
+          </button>
+        </div>
+        {pathMissing && (
+          <p className="canvas-quick-edit-warn">Linked folder is missing on disk.</p>
+        )}
         <p className="canvas-quick-edit-hint">Ctrl+right-click deletes box</p>
       </div>
     )

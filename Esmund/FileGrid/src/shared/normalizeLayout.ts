@@ -3,8 +3,13 @@ import {
   migrateLineStyleFromSchemaV1,
   normalizeLinkLineStyle
 } from './linkLineStyle'
-import type { BoxLink, LayoutState } from './types'
+import type { BoxKind, BoxLink, GridBox, LayoutState } from './types'
 import { LAYOUT_SCHEMA_VERSION } from './types'
+
+function normalizeBox(box: GridBox): GridBox {
+  const kind: BoxKind = box.kind === 'file' ? 'file' : 'folder'
+  return { ...box, kind }
+}
 
 function normalizeLink(link: BoxLink): BoxLink {
   return {
@@ -29,9 +34,12 @@ export function normalizeLayout(layout: LayoutState): LayoutState {
     links = links.map((l) => normalizeLink({ lineStyle: DEFAULT_LINK_LINE_STYLE, ...l }))
   }
 
+  const boxes = (layout.boxes ?? []).map((b) => normalizeBox({ kind: 'folder', ...b }))
+
   return {
     ...layout,
     schemaVersion: LAYOUT_SCHEMA_VERSION,
-    links
+    links,
+    boxes
   }
 }

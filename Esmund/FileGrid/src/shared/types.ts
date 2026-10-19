@@ -1,7 +1,11 @@
+export type BoxKind = 'folder' | 'file'
+
 export interface GridBox {
   id: string
+  kind: BoxKind
   title: string
   color: string
+  /** Folder path or file path depending on {@link BoxKind}. */
   folderPath: string
   /** Top-left corner in grid units */
   gx: number
@@ -43,6 +47,8 @@ export interface LayoutState {
   links: BoxLink[]
 }
 
+export const DEFAULT_HOME_VIEW: LayoutState['view'] = { panX: 80, panY: 80, zoom: 1 }
+
 export type ToolbarDock = 'top' | 'bottom' | 'left' | 'right'
 
 /** Along-edge alignment: start/center/end maps to left/middle/right or top/middle/bottom by dock. */
@@ -50,6 +56,21 @@ export type ToolbarAlign = 'start' | 'center' | 'end'
 
 /** How the canvas zoom level is adjusted. */
 export type ZoomInputMode = 'wheel' | 'keys' | 'both'
+
+export type FolderDropMode = 'boxes' | 'tree'
+
+export interface FolderTreeEntry {
+  path: string
+  /** 0 = dropped root, 1 = first level of children, etc. */
+  depth: number
+}
+
+export const DEFAULT_FOLDER_TREE_EXCLUDES = [
+  'OldVersions',
+  '$Recycle.Bin',
+  '.git',
+  'node_modules'
+]
 
 export interface AppSettings {
   textScale: number
@@ -63,6 +84,13 @@ export interface AppSettings {
   toolbarDock: ToolbarDock
   toolbarAlign: ToolbarAlign
   zoomInput: ZoomInputMode
+  /** Click the drop button to toggle; persisted here. */
+  folderDropMode: FolderDropMode
+  /** Max folder depth when {@link folderDropMode} is `tree` (0 = root only). */
+  folderTreeMaxDepth: number
+  folderTreeExcludeNames: string[]
+  /** Stop scanning and cap boxes created in one tree drop. */
+  folderTreeMaxBoxes: number
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -76,7 +104,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   fontColor: '#f2f2f2',
   toolbarDock: 'top',
   toolbarAlign: 'start',
-  zoomInput: 'wheel'
+  zoomInput: 'wheel',
+  folderDropMode: 'boxes',
+  folderTreeMaxDepth: 7,
+  folderTreeExcludeNames: [...DEFAULT_FOLDER_TREE_EXCLUDES],
+  folderTreeMaxBoxes: 250
 }
 
 export interface FileCompareSide {
