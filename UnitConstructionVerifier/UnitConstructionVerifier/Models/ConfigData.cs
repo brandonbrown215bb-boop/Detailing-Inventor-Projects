@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace UnitConstructionVerifier.Models
@@ -46,6 +47,39 @@ namespace UnitConstructionVerifier.Models
             return false;
         }
 
+        /// <summary>The unit side this surface sits on (Top, Left, Right, Front, Rear, Bottom), or null.</summary>
+        public string? GetUnitSide()
+        {
+            if (string.IsNullOrEmpty(SurfaceId)) return null;
+            foreach (var surface in UnitSurfaceList)
+            {
+                if (string.Equals(surface.Id, SurfaceId, StringComparison.OrdinalIgnoreCase))
+                    return string.IsNullOrWhiteSpace(surface.UnitSide) ? null : surface.UnitSide;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// True when this base has an upturned lip (UTL): its own unitBase geometry, or its skid's entry in
+        /// unitBaseList, carries an upturnedLipHeight. Matched the perimeter angle type on 89 of 90 ISG bases.
+        /// </summary>
+        public bool HasUpturnedLip()
+        {
+            if (UnitBase?.UnitBaseGeometryList.Any(g => g.UpturnedLipHeight > 0) == true) return true;
+            return UnitBaseList.Any(b => b.UpturnedLipHeight > 0 &&
+                                         !string.IsNullOrEmpty(SkidId) &&
+                                         string.Equals(b.SkidId, SkidId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        [JsonProperty("unitType")]
+        public string? UnitType { get; set; }                            // Indoor / Outdoor
+
+        [JsonProperty("unitConstructionType")]
+        public string? UnitConstructionType { get; set; }                // Standard / IBC
+
+        [JsonProperty("unitBase")]
+        public UnitBaseConfig? UnitBase { get; set; }
+
         [JsonProperty("skidID")]
         public string? SkidId { get; set; }
 
@@ -72,6 +106,12 @@ namespace UnitConstructionVerifier.Models
 
         [JsonProperty("structuralMaterialType")]
         public string? StructuralMaterialType { get; set; }
+
+        [JsonProperty("formedChannelMaterialType")]
+        public string? FormedChannelMaterialType { get; set; }
+
+        [JsonProperty("formedChannelMaterialGauge")]
+        public double? FormedChannelMaterialGauge { get; set; }
 
         [JsonProperty("surfaceSegmentList")]
         public List<SurfaceSegment> SurfaceSegmentList { get; set; } = new();
@@ -108,6 +148,9 @@ namespace UnitConstructionVerifier.Models
 
         [JsonProperty("housingStyle")]
         public string? HousingStyle { get; set; }
+
+        [JsonProperty("bulkheadList")]
+        public List<Bulkhead> BulkheadList { get; set; } = new();
 
         [JsonProperty("insulationType")]
         public string? InsulationType { get; set; }
@@ -204,6 +247,53 @@ namespace UnitConstructionVerifier.Models
         public GeometryItem? Geometry { get; set; }
     }
 
+    /// <summary>The <c>unitBase</c> object of a UnitBase surface configuration.</summary>
+    public sealed class UnitBaseConfig
+    {
+        [JsonProperty("unitBaseType")]
+        public string? UnitBaseType { get; set; }                        // A36
+
+        [JsonProperty("unitBaseMaterialType")]
+        public string? UnitBaseMaterialType { get; set; }                // StructuralSteel / StructuralAluminum
+
+        [JsonProperty("unitBaseGeometryList")]
+        public List<UnitBaseGeometry> UnitBaseGeometryList { get; set; } = new();
+    }
+
+    public sealed class UnitBaseGeometry
+    {
+        [JsonProperty("hasSubFloor")]
+        public bool? HasSubFloor { get; set; }
+
+        [JsonProperty("subFloorMaterialType")]
+        public string? SubFloorMaterialType { get; set; }
+
+        [JsonProperty("subFloorMaterialGauge")]
+        public double? SubFloorMaterialGauge { get; set; }
+
+        /// <summary>Upturned lip (UTL) height; present (e.g. 2.0) only when this base has an upturned lip.</summary>
+        [JsonProperty("upturnedLipHeight")]
+        public double? UpturnedLipHeight { get; set; }
+    }
+
+    public sealed class Bulkhead
+    {
+        [JsonProperty("partInfo")]
+        public BulkheadPartInfo? PartInfo { get; set; }
+    }
+
+    public sealed class BulkheadPartInfo
+    {
+        [JsonProperty("mapicsItemData")]
+        public MapicsItemData? MapicsItemData { get; set; }
+    }
+
+    public sealed class MapicsItemData
+    {
+        [JsonProperty("extendedDescription1")]
+        public string? ExtendedDescription1 { get; set; }
+    }
+
     public sealed class InsulationEntry
     {
         [JsonProperty("id")]
@@ -281,6 +371,21 @@ namespace UnitConstructionVerifier.Models
         public double? CurbSupportAngleFlange    { get; set; }
         public double? CurbSupportAngleThickness { get; set; }
 
+        /// <summary>
+        /// Every engineering constant by type name (e.g. <c>UnitBase_PerimeterAngle_MaterialType</c>),
+        /// as invariant-culture strings. Supplies part material standards.
+        /// </summary>
+        public Dictionary<string, string> Constants { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         public bool HasCurbRest => CurbSupportAngleHeight.HasValue && CurbSupportAngleHeight > 0;
+
+        /// <summary>Returns the constant formatted for gauge/material fields ("16", "STL GALV"), or empty.</summary>
+        public string Constant(string type)
+        {
+            if (!Constants.TryGetValue(type, out string value) || string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double d)
+                ? d.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)
+                : value.Trim();
+        }
     }
 }

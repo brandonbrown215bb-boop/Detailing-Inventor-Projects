@@ -46,6 +46,10 @@ namespace UnitConstructionVerifier.Models
         public string ChannelSkinMaterial       { get; set; } = string.Empty;
         public string TrimSkinGauge             { get; set; } = string.Empty;
         public string TrimSkinMaterial          { get; set; } = string.Empty;
+        public string RoofCapGauge              { get; set; } = string.Empty; // roof caps / corner caps: engineering gauge
+        public string RoofCapMaterial           { get; set; } = string.Empty; //   ... in the wall exterior material
+        public string RoofAccessoryGauge        { get; set; } = string.Empty; // seal-off / super angle / peaked split cover
+        public string RoofAccessoryMaterial     { get; set; } = string.Empty;
         public string InsulationThicknessAndMaterial { get; set; } = string.Empty;
         public string ThermalBreak              { get; set; } = string.Empty;
 
@@ -117,6 +121,10 @@ namespace UnitConstructionVerifier.Models
         // Perimeter Angle details
         public string PerimeterAngleGauge       { get; set; } = string.Empty;
         public string PerimeterAngleMaterial    { get; set; } = string.Empty;
+        public string DrainSupportAngleGauge    { get; set; } = string.Empty; // floor drain support angles (079, 1.5x1.5 / 2x2)
+        public string DrainSupportAngleMaterial { get; set; } = string.Empty;
+        public string FloorAttachmentAngleGauge    { get; set; } = string.Empty; // aluminum floor attachment angles (079, 2.5x1)
+        public string FloorAttachmentAngleMaterial { get; set; } = string.Empty;
 
         public string SourceSurfaceIam          { get; set; } = string.Empty;
 

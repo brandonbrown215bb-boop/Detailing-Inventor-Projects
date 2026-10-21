@@ -10,20 +10,27 @@ The tool divides parts into two main verification areas: **Roof/Wall Casing** (C
 
 The classification categories, expectation sources, and checked parameters are summarized below:
 
-| Part Type | Category | Stock Number Mapping / Legacy Description Fallback | Checked Parameter | Expected Spec Source |
-| :--- | :--- | :--- | :--- | :--- |
-| **Liner** | Casing | Maps to `Liner`; OR description contains `"liner"` | Gauge & Material | Selected row's `InteriorGaugeAndMaterial` |
-| **Trim** | Casing | Maps to `Trim`; OR description contains `"roof corner cap"`, `"roof cap"`, or `"sq part - trim"` | Gauge & Material | Selected row's `TrimGaugeAndMaterial` (Roofs) or `ExteriorGaugeAndMaterial` (Walls) |
-| **Misc Trim** | Casing | Maps to `Misc Trim`; OR description contains `"peaked roof split cover"` / `"roof seal-off angle"`; OR Model is `"091-30119-007"` / `"091-30117-076"` | Display only (no mismatch verification) | None |
-| **Split Cover** | Casing | Maps to `Split Cover` | Display only (no mismatch verification) | None |
-| **Channel (Casing)** | Casing | Maps to `Channel`; OR description starts with `"C:SC"` | Gauge & Material | Selected row's `ChannelGaugeAndMaterial` |
-| **Skin** | Casing | Maps to `Skin`; OR description contains `"skin"`, `"panel"`, or `"post"` | Gauge & Material | Selected row's `ExteriorGaugeAndMaterial` |
-| **Sub-Floor Sheet** | Base | Maps to `Sub-Floor`; OR Model is `"091-30117-080"`; OR description contains `"SUBFLOOR"` | Gauge & Material | Selected row's `SubFloorGaugeAndMaterial` |
-| **Floor Sheet** | Base | Maps to `Floor Sheet`; OR description contains `"floor"` or `"deck"` | Gauge & Material | Selected row's `FloorGaugeAndMaterial` |
-| **Structural Channel** | Base | Maps to `Structural Channel` (includes structural channels & structural angles); OR description starts with `"CHN:STRUCT"` | Material | Mapped from selected row's `BaseMaterial` (`STL C CHNL` if steel base, `ALM C CHNL` if aluminum base) |
-| **Formed Channel** | Base | Maps to `Formed Channel`; OR description contains `"Channel, Formed"` | Gauge & Material | Selected row's `FormedChannelMaterial` |
-| **Perimeter Angle** | Base | Maps to `Perimeter Angle`; OR description contains `"perimeter angle"`, `"angle, perimeter"`, or both `"perimeter"` and `"angle"` | Gauge & Material | Selected row's `PerimeterAngleGaugeAndMaterial` |
-| **Base Accessory** | Base | Maps to `Base Accessory` | Ignored | Ignored during main structural/formed channel verification |
+| Part Type | Category | Identified by (stock number, then description keyword) | Expected Gauge & Material |
+| :--- | :--- | :--- | :--- |
+| **Skin** | Casing | `091-30117-081/083/177`; "skin", "panel", "post" | The surface's own side in the config (roofs: Top; walls: their side) |
+| **Liner** | Casing | `091-30117-082/084`; "liner" | The surface's own side's liner |
+| **Channel** | Casing | `091-30117-064/065/085/086` and others; "C:SC" | Standard parts (`064/065/085/086`): 16 GA `STL GALV2/3/4` by panel thickness. Sloped outdoor roof channels (`068/069/070`), brackets (`046/077/078`) and `048`: plain 16 GA `STL GALV`. The config's `formedChannelMaterialType` is not used, so an Outdoor-configured unit with standard roof channels is flagged |
+| **Roof Cap** | Casing (roof) | `091-30117-001/058/074`; "roof corner cap", "roof cap" | `Roof_RoofCap_MaterialGauge_Default` (16) in the **wall exterior** material; 20 GA when that is `ALM EMB` |
+| **Roof Accessory** | Casing (roof) | `091-30117-022/076`, `091-30119-007`; "roof super angle", "peaked roof split cover", "roof seal-off angle" | `Roof_RoofSealOffAngle_*` engineering defaults (16 GA STL GALV) |
+| **Tiering Angle** | Casing (roof) | `091-30117-057`; "tiering angle" | 14 GA STL GALV |
+| **Attachment Angle** | Casing (wall) | `091-30117-049/053`; "attachment angle", "angle, formed" | 16 GA in the liner material |
+| **Seal-Off Angle** | Casing (wall) | `091-30119-006`; "seal-off angle" | The wall's exterior skin gauge and material |
+| **Wall Corner Cap / Liner** | Casing (wall) | `091-30117-072` / `073` | 16 GA (cap: 20 ALM EMB, 14 ALM SHT) in the skin / liner material |
+| **Trim** | Casing | `091-30117-011/195/196`; remaining roof/wall trim keywords | Row trim (roofs: roof cap values) or exterior skin |
+| **Misc Trim / Split Cover** | Casing | `091-30117-075/087/089`; "misc trim" | Display only |
+| **Floor Sheet** | Base | `091-30117-056/124`; "floor", "deck" | `defaultConstructionOptions_FloorMaterialGauge/Type` |
+| **Sub-Floor** | Base | `091-30117-080/061/062`; "subfloor", "sub-floor", "sub floor" | `unitBase.unitBaseGeometryList[].subFloorMaterialGauge/Type` |
+| **Perimeter Angle** | Base | `091-30117-054/055`; "perimeter angle" | Base with an upturned lip (UTL): 10 GA `ALM SHT` (aluminum floor), 10 GA in the floor's stainless code, e.g. `SST304D` (stainless floor), 12 GA `STL GALV` (galvanized floor). Otherwise `UnitBase_PerimeterAngle_*` (16 GA STL GALV) |
+| **Formed Channel** | Base | `091-30117-051`; "Channel, Formed" | `formedChannelMaterialGauge/Type` (fallback 10 GA hot roll) |
+| **Structural Channel / Angle** | Base | `091-30117-186/188` / `187/189` | `STL C CHNL`/`STL ANGLE` or aluminum, from `structuralMaterialType` |
+| **Floor Drain Support Angle** | Base | `091-30117-079` with profile "x 1.5 x 1.5" or "x 2 x 2" | 10 GA `STL HOT ROLL` (steel base) or `ALM SHT` (aluminum base). The engineering `UnitBase_FloorDrainSupportMaterial` constant (16 GA STL GALV) matched no real part and is not used |
+| **Floor Attachment Angle** | Base | `091-30117-079` with profile "x 2.5 x 1" | `UnitBase_AluminumFloorAttachmentAngle_*` (14 GA ALM SHT) |
+| **Not in config** | — | Lifting lugs, filler plates, drain pans, coil supports, grates, custom `079` angle profiles (e.g. 1.75 x 1.75), … | Not verified |
 
 ---
 
@@ -33,17 +40,28 @@ The classification categories, expectation sources, and checked parameters are s
 - **Thickness Mapping**: Extracted from the segment's side-specific casing thicknesses (Top, Left, Right, Front, Rear). If none are defined, it falls back to the skid's `nominalSurfaceThickness`.
 - **Thermal Break**: Extracted from the segment's `HousingStyle`. Sets the default dropdown to `"Yes"` if `"ThermalBreak"`, else `"No"`.
 
-### Wall Channel Material Defaults
-- Wall channels default to `16 GA` expected gauge.
-- Expected material defaults to `STL GALV2` (2" panel thickness), `STL GALV3` (3" panel thickness), `STL GALV4` (4" panel thickness), or `STL GALV?` (flags mismatch) if unrecognized.
+### Where expectations come from
+Expectations come from the unit's configuration and engineering data, never from the scanned parts, so a
+surface whose parts are consistently wrong is still flagged. These rules were confirmed against 56 real
+ISG units with `ucv-scan` (2026-10-21).
 
-### Base / Floor Defaults
-- **Base Structural Material**: If no parts are scanned, default to `STL C CHNL` or `ALM C CHNL` based on `StructuralMaterialType`. If parts are scanned, resolves to the dominant structural part's material.
-- **Formed Channels**: Defaults to `10 GA STL HOT ROLL` (steel base) or `10 GA ALM HOT ROLL` (aluminum base).
-- **Floor Sheet**: Initialized from `DefaultFloorMaterialGauge` and `DefaultFloorMaterialType`.
-- **Sub-Floor Sheet / Perimeter Angles**: Initialized directly from the scanned sub-floor and perimeter angle parts under that skid base.
-
----
+- **Side-specific casing**: each roof/wall surface's `surfaceID` maps to a `unitSurfaceList` entry with its
+  `unitSide`. Skin and liner come from that side's `skinMaterialType_<Side>` / `linerMaterialType_<Side>`
+  (roofs use Top). The old majority vote across all sides is only a fallback when the side is unknown.
+- **Engineering constants**: `DOCUMENT_ENGINEERING_JSON` → `rules.engineeringConstantList` holds per-part
+  standards such as `UnitBase_PerimeterAngle_MaterialType`, `Roof_RoofCap_MaterialGauge_Default` and
+  `Roof_RoofSealOffAngle_SealOffAngle_MaterialType_Default`. They are available to the builder as
+  `EngineeringData.Constants`.
+- **Upturned lip (UTL)**: a base is UTL when its own `unitBase.unitBaseGeometryList[].upturnedLipHeight` (or its
+  skid's `unitBaseList[].upturnedLipHeight`) is set. This matched the perimeter angle type on 89 of 90 scanned
+  bases. Bulkhead "UTL" descriptions are not used: bulkhead data is unreliable and missed 10 of 40 lip bases.
+  The config marks the whole base surface even when the lip is on only some sides, so **every** perimeter
+  angle on a lip base expects the UTL angle. Standard 16 GA STL GALV angles on the non-lip sides show as
+  mismatches by design (see `Docs/known_issues.md`); accepting either angle would hide a UTL angle that
+  wrongly came out as 16 GA STL GALV.
+- **Plate gauges**: plate materials keep their thickness label (0.125 ALM DIA stays "0.125", not 10 GA).
+- **Modified parts**: SQ parts (description "SQ PART - …" or `MOM_DATA.PART_SOURCE = SQPart`) and parts
+  edited through the verifier (`IS_HARD_EDITED`) are flagged *modified*. A freshly generated unit has none.
 
 ## 3. Special Logic, Overrides & Mappings
 

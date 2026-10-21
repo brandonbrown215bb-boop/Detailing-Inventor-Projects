@@ -45,10 +45,22 @@ Each rule object supports the following fields:
 
 When the verifier scans a part, it determines its classification in the following order:
 
-1. **Exact Stock Number Lookup**: Checks if the part's Stock Number/Model Number matches an entry in any rule's `StockNumbers` array.
-2. **Generic Stock Number Table**: Checks the legacy `PartClassifications` dictionary (used for `Base Accessory` and legacy definitions).
-3. **Description Keyword Match**: Checks if the part's description contains any keyword listed in a rule's `DescriptionKeywords` array (case-insensitive substring lookup). Runs in the order defined in the JSON file.
-4. **Fallback**: If nothing matches, the classification defaults to `"Unknown"`.
+1. **Stock Number Lookup**: Checks the part's Stock Number/Model Number against every rule's `StockNumbers` and the legacy `PartClassifications` table (used for `Base Accessory` and legacy definitions). A stock number must belong to **one** rule only.
+2. **Description Keyword Match**: Checks whether the description contains any rule's `DescriptionKeywords` (case-insensitive substring). The **longest matching keyword wins**, so `"wall corner liner"` beats `"liner"` and `"perimeter angle"` beats `"floor"`. On equal length the rule listed first wins.
+3. **Fallback**: If nothing matches, the classification is `"Unknown"`. Parts with no rule are **not verified** (shown as *Not in config*).
+
+When the config loads, the verifier logs (to `ucv_debug.txt`) any stock number or keyword listed under two rules, any `PartClassifications` entry that disagrees with a rule, and any mismatch rule with no `GaugeSource`/`MaterialSource`. The test `ShippedConfig_HasNoRuleProblems` fails if the shipped config has any of these.
+
+### Verification outcomes
+
+Every scanned part gets one outcome:
+
+| Outcome | Meaning |
+|---|---|
+| **Pass** / **Mismatch** | Compared against the surface row's expected value. |
+| **Display only** | Rule has `"VerificationMode": "display"`. |
+| **Not checked** | A rule applies but there is nothing to compare: the part's IAM has no surface row, the rule borrows a field that surface type doesn't have (e.g. a Floor Sheet inside a wall), or the expected value is blank. Shown in grey in the grid; hover for the reason. |
+| **Not in config** | No rule covers the part. Intentionally not verified and not shown in the grid. |
 
 ---
 
@@ -95,8 +107,16 @@ When using `borrow:`, you can reference the following field names:
 - **`InteriorLinerMaterial`**
 - **`ChannelSkinGauge`**
 - **`ChannelSkinMaterial`**
-- **`TrimSkinGauge`** *(Roof only)*
-- **`TrimSkinMaterial`** *(Roof only)*
+- **`TrimSkinGauge`** *(Roof only; same as `RoofCapGauge`)*
+- **`TrimSkinMaterial`** *(Roof only; same as `RoofCapMaterial`)*
+- **`RoofCapGauge`** / **`RoofCapMaterial`** *(Roof only: engineering roof cap gauge in the wall exterior material)*
+- **`RoofAccessoryGauge`** / **`RoofAccessoryMaterial`** *(Roof only: engineering roof seal-off angle defaults, normally 16 GA STL GALV)*
+
+Skin and liner fields are the surface's **own side** of the unit (roofs: Top). Channel fields are 16 GA
+`STL GALV2/3/4` by panel thickness on roofs and walls.
+
+To test a rule change against real units before shipping it, run `ucv-scan` (see
+`UnitConstructionVerifier.Scan/README.md`) and compare `summary.csv` before and after.
 
 ### For Base / Floor Parts (Base)
 - **`BaseStructuralMaterial`** *(automatically maps to `"STL C CHNL"` or `"ALM C CHNL"`)*
@@ -106,6 +126,8 @@ When using `borrow:`, you can reference the following field names:
 - **`FormedChannelGaugeAndMaterial`**
 - **`FloorGauge`**
 - **`FloorMaterial`**
+- **`DrainSupportAngleGauge`** / **`DrainSupportAngleMaterial`** *(10 GA STL HOT ROLL or ALM SHT by base alloy)*
+- **`FloorAttachmentAngleGauge`** / **`FloorAttachmentAngleMaterial`** *(engineering aluminum floor attachment angle)*
 - **`FloorGaugeAndMaterial`**
 - **`SubFloorGauge`**
 - **`SubFloorMaterial`**
@@ -136,13 +158,13 @@ When using `borrow:`, you can reference the following field names:
 ```
 
 ### Example 2: Sub-Floor Sheet (Stock Numbers + Description Keywords)
-- Matches if Model is `"091-30117-080"` OR description contains `"SUBFLOOR"`
+- Matches if Model is `"091-30117-080"` OR description contains `"subfloor"`, `"sub-floor"` or `"sub floor"`
 - Gauge and Material are borrowed from the row's Sub-Floor specs
 
 ```json
 {
   "Classification": "Sub-Floor",
-  "DescriptionKeywords": [ "SUBFLOOR" ],
+  "DescriptionKeywords": [ "subfloor", "sub-floor", "sub floor" ],
   "StockNumbers": [ "091-30117-080", "091-30117-061", "091-30117-062" ],
   "GaugeSource": "borrow:SubFloorGauge",
   "MaterialSource": "borrow:SubFloorMaterial",

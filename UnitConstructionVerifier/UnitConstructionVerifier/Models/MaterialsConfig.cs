@@ -21,6 +21,9 @@ namespace UnitConstructionVerifier.Models
         public static List<string> AluminumKeywords { get; } = new List<string>();
         public static List<string> SteelKeywords { get; } = new List<string>();
 
+        /// <summary>Problems found in <c>PartRules</c> when the config was last loaded (see <see cref="ValidateRules"/>).</summary>
+        public static List<string> RuleProblems { get; } = new List<string>();
+
         private static readonly List<string> DefaultGauges = new List<string>
         {
             "0", "0.063", "0.125", "0.188", "0.25", "000", "0000000", "1", "3", "7", "8", "9",
@@ -73,29 +76,29 @@ namespace UnitConstructionVerifier.Models
             PartClassifications.Clear();
             PartClassifications["091-30117-082"] = "Liner";
             PartClassifications["091-30117-084"] = "Liner";
-            PartClassifications["091-30117-073"] = "Liner";
+            PartClassifications["091-30117-073"] = "Wall Corner Liner";
             PartClassifications["091-30119-006"] = "Seal-Off Angle";
-            PartClassifications["091-30119-007"] = "Trim";
+            PartClassifications["091-30119-007"] = "Roof Accessory";
             PartClassifications["091-30117-083"] = "Skin";
             PartClassifications["091-30117-081"] = "Skin";
             PartClassifications["091-30117-177"] = "Skin";
             PartClassifications["091-30117-186"] = "Structural Channel";
-            PartClassifications["091-30117-187"] = "Structural Channel";
+            PartClassifications["091-30117-187"] = "Structural Angle";
             PartClassifications["091-30117-188"] = "Structural Channel";
-            PartClassifications["091-30117-189"] = "Structural Channel";
+            PartClassifications["091-30117-189"] = "Structural Angle";
             PartClassifications["091-30117-066"] = "Base Accessory";
             PartClassifications["091-30117-067"] = "Base Accessory";
             PartClassifications["091-30117-190"] = "Base Accessory";
-            PartClassifications["091-30117-001"] = "Trim";
-            PartClassifications["091-30117-058"] = "Trim";
-            PartClassifications["091-30117-072"] = "Trim";
-            PartClassifications["091-30117-074"] = "Trim";
-            PartClassifications["091-30117-076"] = "Trim";
+            PartClassifications["091-30117-001"] = "Roof Cap";
+            PartClassifications["091-30117-058"] = "Roof Cap";
+            PartClassifications["091-30117-072"] = "Wall Corner Cap";
+            PartClassifications["091-30117-074"] = "Roof Cap";
+            PartClassifications["091-30117-076"] = "Roof Accessory";
             PartClassifications["091-30117-011"] = "Trim";
-            PartClassifications["091-30117-057"] = "Trim";
-            PartClassifications["091-30117-049"] = "Trim";
-            PartClassifications["091-30117-053"] = "Trim";
-            PartClassifications["091-30117-022"] = "Trim";
+            PartClassifications["091-30117-057"] = "Tiering Angle";
+            PartClassifications["091-30117-049"] = "Attachment Angle";
+            PartClassifications["091-30117-053"] = "Attachment Angle";
+            PartClassifications["091-30117-022"] = "Roof Accessory";
             PartClassifications["091-30117-195"] = "Trim";
             PartClassifications["091-30117-196"] = "Trim";
             PartClassifications["091-30117-064"] = "Channel";
@@ -120,13 +123,16 @@ namespace UnitConstructionVerifier.Models
             PartClassifications["091-30117-051"] = "Formed Channel";
             PartClassifications["091-30117-054"] = "Perimeter Angle";
             PartClassifications["091-30117-055"] = "Perimeter Angle";
-            PartClassifications["091-30117-079"] = "Perimeter Angle";
+            // 091-30117-079 is generic angle stock; it is classified by its description profile (see PartRules).
 
             NonAutomatingChannels.Clear();
             NonAutomatingChannels.Add("091-30117-078");
             NonAutomatingChannels.Add("091-30117-048");
             NonAutomatingChannels.Add("091-30117-046");
             NonAutomatingChannels.Add("091-30117-077");
+            NonAutomatingChannels.Add("091-30117-068");
+            NonAutomatingChannels.Add("091-30117-069");
+            NonAutomatingChannels.Add("091-30117-070");
 
             AluminumKeywords.Clear();
             AluminumKeywords.AddRange(new[] { "ALM", "ALUMINUM", "ALMB" });
@@ -228,6 +234,11 @@ namespace UnitConstructionVerifier.Models
                             PartRules.Clear();
                             PartRules.AddRange(data.PartRules);
 
+                            RuleProblems.Clear();
+                            RuleProblems.AddRange(ValidateRules(PartRules, PartClassifications));
+                            foreach (var problem in RuleProblems)
+                                DebugLogger.Log($"[Config] {problem}");
+
                             // Auto-register any stock numbers declared in rules into the
                             // PartClassifications table so stock-number lookup resolves them
                             // before the description-keyword fallback is reached.
@@ -307,6 +318,15 @@ namespace UnitConstructionVerifier.Models
                 if (GaugeMappings.TryGetValue(normKey, out string mappedVal))
                 {
                     return mappedVal;
+                }
+
+                // Prefer a thickness-map entry for the exact material: 0.125 ALM DIA plate is "0.125",
+                // not the slightly closer 10 GA ALM SHT entry that the alloy-family search below would pick.
+                if (!string.IsNullOrWhiteSpace(materialHint) &&
+                    ResolveFromThickness(key, materialHint, out string exactGauge, out string exactMaterial) &&
+                    string.Equals(exactMaterial, MapMaterial(materialHint), StringComparison.OrdinalIgnoreCase))
+                {
+                    return exactGauge;
                 }
 
                 // Reverse lookup in JCI ThicknessMap database
@@ -562,23 +582,67 @@ namespace UnitConstructionVerifier.Models
 
             if (description == null) return string.Empty;
 
-            // Rule-based description-keyword classification.
-            // Runs after stock-number lookup but before the legacy hardcoded fallbacks,
-            // so config-defined rules take precedence over generic keyword matching.
+            // Rule-based description-keyword classification. The longest matching keyword wins so
+            // specific phrases ("wall corner liner", "perimeter angle") beat generic ones ("liner",
+            // "floor"); on equal length the earlier rule wins.
+            string? best = null;
+            int bestLength = 0;
             foreach (var rule in PartRules)
             {
                 if (rule.DescriptionKeywords == null) continue;
                 foreach (var keyword in rule.DescriptionKeywords)
                 {
                     if (!string.IsNullOrWhiteSpace(keyword) &&
+                        keyword.Length > bestLength &&
                         description.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        return rule.Classification;
+                        best = rule.Classification;
+                        bestLength = keyword.Length;
                     }
                 }
             }
 
-            return "Unknown";
+            return best ?? "Unknown";
+        }
+
+        /// <summary>
+        /// Checks rules for ambiguities that would otherwise be resolved silently by file order:
+        /// a stock number or keyword claimed by more than one rule, a legacy <c>PartClassifications</c>
+        /// entry that disagrees with a rule, and mismatch rules with nothing to compare.
+        /// </summary>
+        public static List<string> ValidateRules(IEnumerable<PartRule> rules, IReadOnlyDictionary<string, string> legacyClassifications)
+        {
+            var problems = new List<string>();
+            var stockOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var keywordOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var rule in rules)
+            {
+                foreach (var sn in (rule.StockNumbers ?? new List<string>()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()))
+                {
+                    if (stockOwners.TryGetValue(sn, out string owner) && !string.Equals(owner, rule.Classification, StringComparison.OrdinalIgnoreCase))
+                        problems.Add($"Stock number {sn} is listed in both '{owner}' and '{rule.Classification}'.");
+                    else
+                        stockOwners[sn] = rule.Classification;
+
+                    if (legacyClassifications.TryGetValue(sn, out string legacy) && !string.Equals(legacy, rule.Classification, StringComparison.OrdinalIgnoreCase))
+                        problems.Add($"PartClassifications maps {sn} to '{legacy}' but rule '{rule.Classification}' claims it.");
+                }
+
+                foreach (var kw in (rule.DescriptionKeywords ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Select(k => k.Trim()))
+                {
+                    if (keywordOwners.TryGetValue(kw, out string owner) && !string.Equals(owner, rule.Classification, StringComparison.OrdinalIgnoreCase))
+                        problems.Add($"Keyword '{kw}' is listed in both '{owner}' and '{rule.Classification}'.");
+                    else
+                        keywordOwners[kw] = rule.Classification;
+                }
+
+                bool isMismatchRule = !string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase);
+                if (isMismatchRule && string.IsNullOrWhiteSpace(rule.GaugeSource) && string.IsNullOrWhiteSpace(rule.MaterialSource))
+                    problems.Add($"Rule '{rule.Classification}' is a mismatch rule but has no GaugeSource or MaterialSource.");
+            }
+
+            return problems;
         }
 
         public static string AdjustExpectedChannel(string expectedChannel, string modelNumber)

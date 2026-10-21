@@ -37,24 +37,8 @@ namespace UnitConstructionVerifier.Extraction
                                     StringComparison.OrdinalIgnoreCase))
                             {
                                 DebugLogger.Log($"Found attribute {attr.Name} on set {set.Name}");
-                                string json = string.Empty;
-                                if (attr.Value is byte[] bytes)
-                                {
-                                    json = System.Text.Encoding.UTF8.GetString(bytes);
-                                    DebugLogger.Log($"Decoded byte[] value: length={json.Length}");
-                                }
-                                else if (attr.Value is System.Array arr)
-                                {
-                                    byte[] byteArr = new byte[arr.Length];
-                                    System.Array.Copy(arr, byteArr, arr.Length);
-                                    json = System.Text.Encoding.UTF8.GetString(byteArr);
-                                    DebugLogger.Log($"Decoded System.Array value: length={json.Length}");
-                                }
-                                else
-                                {
-                                    json = attr.Value?.ToString() ?? string.Empty;
-                                    DebugLogger.Log($"Got string value: length={json.Length}");
-                                }
+                                string json = AttributeText.Decode(attr.Value);
+                                DebugLogger.Log($"Decoded attribute value: length={json.Length}");
 
                                 if (string.IsNullOrWhiteSpace(json))
                                 {
@@ -74,18 +58,17 @@ namespace UnitConstructionVerifier.Extraction
                                     DebugLogger.Log($"Failed to save raw JSON: {ex.Message}");
                                 }
 
-                                var root = JsonConvert.DeserializeObject<ConfigJson>(json);
-                                if (root?.Configuration != null)
+                                var config = Parse(json, docName);
+                                if (config != null)
                                 {
-                                    root.Configuration.SourceIamPath = docName;
-                                    DebugLogger.Log($"Successfully deserialized configuration. Surface type: {root.Configuration.SurfaceType}");
+                                    DebugLogger.Log($"Successfully deserialized configuration. Surface type: {config.SurfaceType}");
 
-                                    var segNames = root.Configuration.SurfaceSegmentList
+                                    var segNames = config.SurfaceSegmentList
                                         .Select(s => $"{s.SegmentType}-{s.SegmentTypeSuffix}")
                                         .ToList();
                                     DebugLogger.Log($"  Segments in JSON: {string.Join(", ", segNames)}");
 
-                                    return root.Configuration;
+                                    return config;
                                 }
                                 else
                                 {
@@ -107,6 +90,17 @@ namespace UnitConstructionVerifier.Extraction
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Deserializes a DOCUMENT_CONFIG_JSON payload. Shared with the headless scan tool.
+        /// </summary>
+        public static ConfigData? Parse(string json, string sourceIamPath)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            var config = JsonConvert.DeserializeObject<ConfigJson>(json)?.Configuration;
+            if (config != null) config.SourceIamPath = sourceIamPath;
+            return config;
         }
 
         /// <summary>

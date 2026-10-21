@@ -78,10 +78,13 @@ namespace UnitConstructionVerifier.Extraction
 
                 if (config.SurfaceSegmentList.Count > 0)
                 {
-                    skinMat = DominantSkinMaterialForConfig(config);
-                    skinGauge = DominantSkinGaugeForConfig(config);
-                    linerMat = DominantLinerMaterialForConfig(config);
-                    linerGauge = DominantLinerGaugeForConfig(config);
+                    // Each surface uses its own side of the unit (roofs: Top). The majority vote across
+                    // all sides is only a fallback when the surface's side is unknown.
+                    string? side = isRoof ? "Top" : config.GetUnitSide();
+                    skinMat = SideValue(config, side, s => SkinOf(s, side!).Material) ?? DominantSkinMaterialForConfig(config);
+                    skinGauge = SideValue(config, side, s => SkinOf(s, side!).Gauge) ?? DominantSkinGaugeForConfig(config);
+                    linerMat = SideValue(config, side, s => LinerOf(s, side!).Material) ?? DominantLinerMaterialForConfig(config);
+                    linerGauge = SideValue(config, side, s => LinerOf(s, side!).Gauge) ?? DominantLinerGaugeForConfig(config);
 
                     var firstSeg = config.SurfaceSegmentList.First();
                     thickness = GetWallThickness(config, firstSeg);
@@ -115,8 +118,23 @@ namespace UnitConstructionVerifier.Extraction
 
                 string partNum = System.IO.Path.GetFileNameWithoutExtension(config.SourceIamPath);
 
+                // Standard casing channels (064/065/085/086) are always 16 GA STL GALV + panel thickness (2/3/4).
+                // Sloped outdoor roof channels (068/069/070) and brackets drop the suffix
+                // (MaterialsConfig.AdjustExpectedChannel). formedChannelMaterialType is deliberately not used:
+                // a unit whose config says Outdoor but has standard roof channels (Tiger Team FINAL) must be flagged.
+                string channelMat = ChannelMaterialFor(thickness);
+                string channelGauge = "16";
+
                 if (isRoof)
                 {
+                    // Roof caps follow the wall exterior (the roof's side skins), not the roof top skin.
+                    // Roofs without segments (sequence-fallback surfaces) borrow the unit's wall exterior.
+                    string wallExteriorMat = SideSkinMaterial(config) ?? UnitWallExteriorMaterial() ?? string.Empty;
+                    string capGauge = wallExteriorMat.Length == 0 ? string.Empty
+                        : _eng?.Constant("Roof_RoofCap_MaterialGauge_Default") is { Length: > 0 } g ? g : "16";
+                    string accessoryGauge = _eng?.Constant("Roof_RoofSealOffAngle_SealOffAngle_MaterialGauge_Default") is { Length: > 0 } ag ? ag : "16";
+                    string accessoryMat = _eng?.Constant("Roof_RoofSealOffAngle_SealOffAngle_MaterialType_Default") is { Length: > 0 } am ? am : "STL GALV";
+
                     var row = new RoofSurfaceRow
                     {
                         PartNumber = partNum,
@@ -127,10 +145,14 @@ namespace UnitConstructionVerifier.Extraction
                         ExteriorSkinMaterial = skinMat,
                         InteriorLinerGauge = linerGauge,
                         InteriorLinerMaterial = linerMat,
-                        ChannelSkinGauge = skinGauge,
-                        ChannelSkinMaterial = skinMat,
-                        TrimSkinGauge = skinGauge,
-                        TrimSkinMaterial = skinMat,
+                        ChannelSkinGauge = channelGauge,
+                        ChannelSkinMaterial = channelMat,
+                        TrimSkinGauge = capGauge,
+                        TrimSkinMaterial = wallExteriorMat,
+                        RoofCapGauge = capGauge,
+                        RoofCapMaterial = wallExteriorMat,
+                        RoofAccessoryGauge = accessoryGauge,
+                        RoofAccessoryMaterial = accessoryMat,
                         InsulationThicknessAndMaterial = insulStr,
                         ThermalBreak = isThermalBreak ? "Yes" : "No",
                         SourceSurfaceIam = config.SourceIamPath
@@ -140,25 +162,7 @@ namespace UnitConstructionVerifier.Extraction
                 else
                 {
                     string paint = config.SurfaceSegmentList.FirstOrDefault()?.FloorPaintType ?? string.Empty;
-
-                    string wallChannelMat = "STL GALV?";
-                    if (!string.IsNullOrEmpty(thickness))
-                    {
-                        string clean = thickness.Replace("\"", "").Trim();
-                        if (double.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
-                        {
-                            int rounded = (int)Math.Round(val);
-                            if (rounded == 2) wallChannelMat = "STL GALV2";
-                            else if (rounded == 3) wallChannelMat = "STL GALV3";
-                            else if (rounded == 4) wallChannelMat = "STL GALV4";
-                        }
-                        else
-                        {
-                            if (clean.Contains("2")) wallChannelMat = "STL GALV2";
-                            else if (clean.Contains("3")) wallChannelMat = "STL GALV3";
-                            else if (clean.Contains("4")) wallChannelMat = "STL GALV4";
-                        }
-                    }
+                    string wallChannelMat = channelMat;
 
                     bool isShared = config.IsSharedWall();
                     if (isShared)
@@ -178,7 +182,7 @@ namespace UnitConstructionVerifier.Extraction
                         ExteriorSkinMaterial = skinMat,
                         InteriorLinerGauge = linerGauge,
                         InteriorLinerMaterial = linerMat,
-                        ChannelSkinGauge = "16",
+                        ChannelSkinGauge = channelGauge,
                         ChannelSkinMaterial = wallChannelMat,
                         InsulationThicknessAndMaterial = insulStr,
                         ThermalBreak = isThermalBreak ? "Yes" : "No",
@@ -210,46 +214,22 @@ namespace UnitConstructionVerifier.Extraction
                 string segsStr = string.Join(", ", config.SurfaceSegmentList.Select(s => s.FullSegmentName));
                 string partNum = System.IO.Path.GetFileNameWithoutExtension(config.SourceIamPath);
 
-                bool isSteel = config.StructuralMaterialType == null || 
+                // Expectations come from the engineering config only, never from the scanned parts,
+                // so a base whose parts are consistently wrong is still flagged.
+                bool isSteel = config.StructuralMaterialType == null ||
                                config.StructuralMaterialType.IndexOf("steel", StringComparison.OrdinalIgnoreCase) >= 0;
                 string baseMat = isSteel ? "STL C CHNL" : "ALM C CHNL";
-                string formedGauge = "10";
-                string formedMatOnly = isSteel ? "STL HOT ROLL" : "ALM HOT ROLL";
+                string formedMatOnly = !string.IsNullOrWhiteSpace(config.FormedChannelMaterialType)
+                    ? MaterialsConfig.MapMaterial(config.FormedChannelMaterialType)
+                    : (isSteel ? "STL HOT ROLL" : "ALM HOT ROLL");
+                string formedGauge = config.FormedChannelMaterialGauge.HasValue
+                    ? MaterialsConfig.MapGauge(config.FormedChannelMaterialGauge.Value.ToString(CultureInfo.InvariantCulture), formedMatOnly)
+                    : "10";
                 string basePaint = string.Empty;
 
                 if (baseIpts.Count > 0)
                 {
-                    var structuralParts = baseIpts
-                        .Where(p => p.GetClassification() == "Structural Channel" ||
-                                    p.GetClassification() == "Structural Angle")
-                        .ToList();
-
-                    if (structuralParts.Count > 0)
-                    {
-                        var dominantStructural = structuralParts
-                            .GroupBy(p => p.YCMATL)
-                            .OrderByDescending(g => g.Count())
-                            .First().Key;
-                        if (!string.IsNullOrWhiteSpace(dominantStructural))
-                        {
-                            baseMat = dominantStructural;
-                        }
-                    }
-
-                    var formedParts = baseIpts
-                        .Where(p => p.GetClassification() == "Formed Channel")
-                        .ToList();
-
-                    if (formedParts.Count > 0)
-                    {
-                        var dominantFormed = formedParts
-                            .GroupBy(p => new { p.MtlGauge, p.YCMATL })
-                            .OrderByDescending(g => g.Count())
-                            .First().Key;
-                        formedGauge = MaterialsConfig.MapGauge(dominantFormed.MtlGauge, dominantFormed.YCMATL);
-                        formedMatOnly = MaterialsConfig.MapMaterial(dominantFormed.YCMATL);
-                    }
-
+                    // Base paint is display-only, so the dominant scanned value is fine here.
                     var nonFloorParts = baseIpts
                         .Where(p => p.GetClassification() == "Formed Channel" ||
                                     p.GetClassification() == "Structural Channel" ||
@@ -303,33 +283,31 @@ namespace UnitConstructionVerifier.Extraction
                         : $"{thick} {insul.InsulationType}".Trim();
                 }
 
-                var subFloorParts = _ipt.Parts
-                    .Where(p => string.Equals(p.OwnerIamPath, config.SourceIamPath, StringComparison.OrdinalIgnoreCase) &&
-                                p.IsSubFloor)
-                    .ToList();
+                // Sub-floor: unitBase.unitBaseGeometryList[].subFloorMaterialType / subFloorMaterialGauge.
                 string subFloorGauge = string.Empty;
                 string subFloorMat = string.Empty;
-                if (subFloorParts.Count > 0)
+                var subFloorGeom = config.UnitBase?.UnitBaseGeometryList
+                    .FirstOrDefault(g => g.HasSubFloor != false && !string.IsNullOrWhiteSpace(g.SubFloorMaterialType));
+                if (subFloorGeom != null)
                 {
-                    var first = subFloorParts[0];
-                    subFloorGauge = MaterialsConfig.MapGauge(first.MtlGauge, first.YCMATL);
-                    subFloorMat = MaterialsConfig.MapMaterial(first.YCMATL);
+                    subFloorMat = MaterialsConfig.MapMaterial(subFloorGeom.SubFloorMaterialType!);
+                    subFloorGauge = subFloorGeom.SubFloorMaterialGauge.HasValue
+                        ? MaterialsConfig.MapGauge(subFloorGeom.SubFloorMaterialGauge.Value.ToString(CultureInfo.InvariantCulture), subFloorMat)
+                        : string.Empty;
                 }
 
-                // Extract Perimeter Angle
-                string perimeterGauge = string.Empty;
-                string perimeterMat = string.Empty;
-                var perimeterParts = baseIpts
-                    .Where(p => p.GetClassification() == "Perimeter Angle")
-                    .ToList();
-                if (perimeterParts.Count > 0)
+                // Perimeter angle: bases with an upturned lip (UTL) use the UTL angle for their floor;
+                // everything else uses the engineering standard (UnitBase_PerimeterAngle_*, normally 16 GA STL GALV).
+                string perimeterGauge;
+                string perimeterMat;
+                if (config.HasUpturnedLip())
                 {
-                    var dominantPerimeter = perimeterParts
-                        .GroupBy(p => new { p.MtlGauge, p.YCMATL })
-                        .OrderByDescending(g => g.Count())
-                        .First().Key;
-                    perimeterGauge = MaterialsConfig.MapGauge(dominantPerimeter.MtlGauge, dominantPerimeter.YCMATL);
-                    perimeterMat = MaterialsConfig.MapMaterial(dominantPerimeter.YCMATL);
+                    (perimeterGauge, perimeterMat) = UtlPerimeterAngle(floorMat);
+                }
+                else
+                {
+                    perimeterGauge = _eng?.Constant("UnitBase_PerimeterAngle_MaterialGauge") is { Length: > 0 } pg ? pg : "16";
+                    perimeterMat = _eng?.Constant("UnitBase_PerimeterAngle_MaterialType") is { Length: > 0 } pm ? pm : "STL GALV";
                 }
 
                 var baseObj = config.UnitBaseList
@@ -364,6 +342,12 @@ namespace UnitConstructionVerifier.Extraction
                     SubFloorMaterial = subFloorMat,
                     PerimeterAngleGauge = perimeterGauge,
                     PerimeterAngleMaterial = perimeterMat,
+                    // Drain support angles are 10 GA in the base alloy; the engineering
+                    // UnitBase_FloorDrainSupportMaterial constant (16 GA STL GALV) matched no scanned part.
+                    DrainSupportAngleGauge = "10",
+                    DrainSupportAngleMaterial = isSteel ? "STL HOT ROLL" : "ALM SHT",
+                    FloorAttachmentAngleGauge = _eng?.Constant("UnitBase_AluminumFloorAttachmentAngle_MaterialGauge") is { Length: > 0 } fg ? fg : "14",
+                    FloorAttachmentAngleMaterial = _eng?.Constant("UnitBase_AluminumFloorAttachmentAngle_MaterialType") is { Length: > 0 } fm ? fm : "ALM SHT",
                     SourceSurfaceIam = config.SourceIamPath
                 };
                 data.BaseRows.Add(row);
@@ -444,6 +428,96 @@ namespace UnitConstructionVerifier.Extraction
                 if (!string.IsNullOrEmpty(mat)) list.Add(mat);
             }
             return list.GroupBy(v => v).OrderByDescending(g => g.Count()).FirstOrDefault()?.Key ?? string.Empty;
+        }
+
+        /// <summary>
+        /// UTL perimeter angles follow the floor: 10 GA ALM SHT on aluminum floors, 10 GA in the floor's own stainless
+        /// code (e.g. SST304D; the "D" is kept and normalized downstream) on stainless floors, 12 GA STL GALV on galvanized floors
+        /// (seen on job 20129 and the UTL Notch test case). Unknown floors give no material, so the part is Not checked.
+        /// </summary>
+        private static (string Gauge, string Material) UtlPerimeterAngle(string floorMat)
+        {
+            string floor = (floorMat ?? string.Empty).Trim().ToUpperInvariant();
+            if (floor.StartsWith("ALM")) return ("10", "ALM SHT");
+            if (floor.StartsWith("SST")) return ("10", floorMat!.Trim());
+            if (floor.StartsWith("STL")) return ("12", "STL GALV");
+            return (string.Empty, string.Empty);
+        }
+
+        private static (string Gauge, string Material) SkinOf(SurfaceSegment s, string side) => side switch
+        {
+            "Top"   => (FormatGauge(s.SkinMaterialGauge_Top),   s.SkinMaterialType_Top   ?? string.Empty),
+            "Left"  => (FormatGauge(s.SkinMaterialGauge_Left),  s.SkinMaterialType_Left  ?? string.Empty),
+            "Right" => (FormatGauge(s.SkinMaterialGauge_Right), s.SkinMaterialType_Right ?? string.Empty),
+            "Front" => (FormatGauge(s.SkinMaterialGauge_Front), s.SkinMaterialType_Front ?? string.Empty),
+            "Rear"  => (FormatGauge(s.SkinMaterialGauge_Rear),  s.SkinMaterialType_Rear  ?? string.Empty),
+            _       => (string.Empty, string.Empty),
+        };
+
+        private static (string Gauge, string Material) LinerOf(SurfaceSegment s, string side) => side switch
+        {
+            "Top"   => (FormatGauge(s.LinerMaterialGauge_Top),   s.LinerMaterialType_Top   ?? string.Empty),
+            "Left"  => (FormatGauge(s.LinerMaterialGauge_Left),  s.LinerMaterialType_Left  ?? string.Empty),
+            "Right" => (FormatGauge(s.LinerMaterialGauge_Right), s.LinerMaterialType_Right ?? string.Empty),
+            "Front" => (FormatGauge(s.LinerMaterialGauge_Front), s.LinerMaterialType_Front ?? string.Empty),
+            "Rear"  => (FormatGauge(s.LinerMaterialGauge_Rear),  s.LinerMaterialType_Rear  ?? string.Empty),
+            _       => (string.Empty, string.Empty),
+        };
+
+        private static string FormatGauge(double? gauge) =>
+            gauge.HasValue ? gauge.Value.ToString(CultureInfo.InvariantCulture) : string.Empty;
+
+        /// <summary>Most common non-empty value of <paramref name="select"/> across the config's segments for one side, or null.</summary>
+        private static string? SideValue(ConfigData config, string? side, Func<SurfaceSegment, string> select)
+        {
+            if (string.IsNullOrEmpty(side)) return null;
+            return config.SurfaceSegmentList
+                .Select(select)
+                .Where(v => !string.IsNullOrEmpty(v))
+                .GroupBy(v => v)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+        }
+
+        /// <summary>The wall exterior material: most common skin material on the four vertical sides, or null.</summary>
+        private static string? SideSkinMaterial(ConfigData config)
+        {
+            return new[] { "Left", "Right", "Front", "Rear" }
+                .SelectMany(side => config.SurfaceSegmentList.Select(s => SkinOf(s, side).Material))
+                .Where(v => !string.IsNullOrEmpty(v))
+                .GroupBy(v => v)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+        }
+
+        /// <summary>Most common own-side exterior skin material across the unit's non-interior wall surfaces, or null.</summary>
+        private string? UnitWallExteriorMaterial()
+        {
+            return _configs
+                .Where(c => (c.SurfaceType ?? string.Empty).IndexOf("WALL", StringComparison.OrdinalIgnoreCase) >= 0 && !c.IsSharedWall())
+                .Select(c => SideValue(c, c.GetUnitSide(), s => SkinOf(s, c.GetUnitSide()!).Material))
+                .Where(v => !string.IsNullOrEmpty(v))
+                .GroupBy(v => v)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault()?.Key;
+        }
+
+        /// <summary>Standard channel material for a panel thickness: STL GALV2/3/4, or "STL GALV?" when unknown.</summary>
+        private static string ChannelMaterialFor(string thickness)
+        {
+            string clean = (thickness ?? string.Empty).Replace("\"", "").Trim();
+            if (double.TryParse(clean, NumberStyles.Any, CultureInfo.InvariantCulture, out double val))
+            {
+                int rounded = (int)Math.Round(val);
+                if (rounded >= 2 && rounded <= 4) return "STL GALV" + rounded;
+            }
+            else
+            {
+                if (clean.Contains("2")) return "STL GALV2";
+                if (clean.Contains("3")) return "STL GALV3";
+                if (clean.Contains("4")) return "STL GALV4";
+            }
+            return "STL GALV?";
         }
 
         private static string DominantSkinGaugeForConfig(ConfigData config)

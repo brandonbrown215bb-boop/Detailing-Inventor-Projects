@@ -571,10 +571,7 @@
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="RoofThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnRoofThermalComboChanged" TabIndex="20">
-                                                <ComboBoxItem Content="Yes"/>
-                                                <ComboBoxItem Content="No"/>
-                                            </ComboBox>
+                                            <ComboBox x:Name="RoofThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnRoofThermalComboChanged" TabIndex="20"/>
                                         </StackPanel>
                                     </WrapPanel>
                             </StackPanel>
@@ -602,10 +599,16 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="RoofPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="RoofPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" BeginningEdit="OnPartsGridBeginningEdit" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
+                                            <Setter Property="ToolTip" Value="{Binding Reason}"/>
+                                            <Setter Property="ToolTipService.IsEnabled" Value="{Binding IsNotChecked}"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNotChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#9A9A9A"/>
+                                                    <Setter Property="FontStyle" Value="Italic"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsMismatch}" Value="True">
                                                     <Setter Property="Background" Value="#4C2020"/>
                                                 </DataTrigger>
@@ -644,7 +647,7 @@
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
                                         <DataGridTextColumn Header="Checked Parameter" Binding="{Binding Parameter}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Expected Spec" Binding="{Binding Expected}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
-                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
+                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
                                         <DataGridTextColumn Header="Status" Binding="{Binding StatusText, Mode=OneWay}" IsReadOnly="True" Width="0.8*" MinWidth="80"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -726,10 +729,7 @@
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="WallThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnWallThermalComboChanged" TabIndex="39">
-                                                <ComboBoxItem Content="Yes"/>
-                                                <ComboBoxItem Content="No"/>
-                                            </ComboBox>
+                                            <ComboBox x:Name="WallThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnWallThermalComboChanged" TabIndex="39"/>
                                         </StackPanel>
                                     </WrapPanel>
                             </StackPanel>
@@ -756,10 +756,16 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="WallPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="WallPartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" BeginningEdit="OnPartsGridBeginningEdit" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
+                                            <Setter Property="ToolTip" Value="{Binding Reason}"/>
+                                            <Setter Property="ToolTipService.IsEnabled" Value="{Binding IsNotChecked}"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNotChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#9A9A9A"/>
+                                                    <Setter Property="FontStyle" Value="Italic"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsMismatch}" Value="True">
                                                     <Setter Property="Background" Value="#4C2020"/>
                                                 </DataTrigger>
@@ -798,7 +804,7 @@
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
                                         <DataGridTextColumn Header="Checked Parameter" Binding="{Binding Parameter}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Expected Spec" Binding="{Binding Expected}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
-                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
+                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
                                         <DataGridTextColumn Header="Status" Binding="{Binding StatusText, Mode=OneWay}" IsReadOnly="True" Width="0.8*" MinWidth="80"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -847,19 +853,11 @@
                                     <WrapPanel Margin="0,4,0,0">
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Base Height:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="BaseHeightCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="50">
-                                                <ComboBoxItem Content="6&quot;"/>
-                                                <ComboBoxItem Content="8&quot;"/>
-                                                <ComboBoxItem Content="10&quot;"/>
-                                                <ComboBoxItem Content="12&quot;"/>
-                                            </ComboBox>
+                                            <ComboBox x:Name="BaseHeightCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="50"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Base Structural Mat:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="BaseMatCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="51">
-                                                <ComboBoxItem Content="STL C CHNL"/>
-                                                <ComboBoxItem Content="ALM C CHNL"/>
-                                            </ComboBox>
+                                            <ComboBox x:Name="BaseMatCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnBaseExpectationsComboChanged" TabIndex="51"/>
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Formed Channel:" Style="{StaticResource FormLabel}"/>
@@ -883,10 +881,7 @@
                                         </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,16,4">
                                             <TextBlock Text="Floor Thermal Break:" Style="{StaticResource FormLabel}"/>
-                                            <ComboBox x:Name="FloorThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnFloorThermalComboChanged" TabIndex="60">
-                                                <ComboBoxItem Content="Yes"/>
-                                                <ComboBoxItem Content="No"/>
-                                            </ComboBox>
+                                            <ComboBox x:Name="FloorThermalCombo" Background="{StaticResource BgPrimary}" Foreground="{StaticResource TextPrimary}" Height="24" SelectionChanged="OnFloorThermalComboChanged" TabIndex="60"/>
                                         </StackPanel>
                                     </WrapPanel>
                                 </StackPanel>
@@ -914,10 +909,16 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
-                                <DataGrid Grid.Row="1" x:Name="BasePartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
+                                <DataGrid Grid.Row="1" x:Name="BasePartsGrid" SelectionMode="Extended" SelectionChanged="OnPartsGridSelectionChanged" BeginningEdit="OnPartsGridBeginningEdit" PreviewMouseLeftButtonDown="OnPartsGridPreviewMouseDown" ContextMenu="{StaticResource PartContextMenu}">
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
+                                            <Setter Property="ToolTip" Value="{Binding Reason}"/>
+                                            <Setter Property="ToolTipService.IsEnabled" Value="{Binding IsNotChecked}"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNotChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#9A9A9A"/>
+                                                    <Setter Property="FontStyle" Value="Italic"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsMismatch}" Value="True">
                                                     <Setter Property="Background" Value="#4C2020"/>
                                                 </DataTrigger>
@@ -956,7 +957,7 @@
                                         <DataGridTextColumn Header="Part Type" Binding="{Binding PartType}" IsReadOnly="True" Width="1*" MinWidth="80"/>
                                         <DataGridTextColumn Header="Checked Parameter" Binding="{Binding Parameter}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
                                         <DataGridTextColumn Header="Expected Spec" Binding="{Binding Expected}" IsReadOnly="True" Width="1.5*" MinWidth="120"/>
-                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
+                                        <DataGridTextColumn Header="Actual Part Spec" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Width="1.5*" MinWidth="120" EditingElementStyle="{StaticResource DataGridEditingTextBox}"/>
                                         <DataGridTextColumn Header="Status" Binding="{Binding StatusText, Mode=OneWay}" IsReadOnly="True" Width="0.8*" MinWidth="80"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -987,6 +988,12 @@
                 </StackPanel>
  
                 <StackPanel Grid.Column="1" x:Name="NormalModeFooterPanel" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="UnsavedOverridesLabel" Text="● Unsaved expectation changes" Foreground="{StaticResource AccentOrange}"
+                               FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed"
+                               ToolTip="Click Save Overrides to keep these expectation changes for this unit"/>
+                    <Button Content="Save Snapshot" Style="{StaticResource SecondaryButton}"
+                            Margin="0,0,8,0" Click="OnSaveSnapshot"
+                            ToolTip="Save this unit's scan data for regression tests"/>
                     <Button Content="Save Overrides" Style="{StaticResource SecondaryButton}"
                             Margin="0,0,8,0" Click="OnSave"/>
                     <Button Content="✓  Run Verification Check" Style="{StaticResource PrimaryButton}"

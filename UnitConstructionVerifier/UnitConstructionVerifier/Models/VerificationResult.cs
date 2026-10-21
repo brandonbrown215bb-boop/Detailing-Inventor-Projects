@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UnitConstructionVerifier.Models
 {
@@ -30,6 +31,16 @@ namespace UnitConstructionVerifier.Models
             return MaterialsConfig.GetPartClassification(ModelNumber, Description);
         }
 
+        /// <summary>
+        /// True when the part was modified after the unit was generated: an SQ part
+        /// (description "SQ PART - ..." or MOM_DATA PART_SOURCE = SQPart) or a part edited
+        /// through the verifier (IS_HARD_EDITED). Fresh units have none.
+        /// </summary>
+        public bool IsModified =>
+            IsHardEdited ||
+            string.Equals(PartSource, "SQPart", System.StringComparison.OrdinalIgnoreCase) ||
+            (Description ?? string.Empty).TrimStart().StartsWith("SQ PART", System.StringComparison.OrdinalIgnoreCase);
+
         /// <summary>True when the part classification is "Sub-Floor".</summary>
         public bool IsSubFloor => GetClassification() == "Sub-Floor";
     }
@@ -48,6 +59,41 @@ namespace UnitConstructionVerifier.Models
     {
         public bool IsPass => Mismatches.Count == 0;
         public List<IptMismatch> Mismatches { get; set; } = new();
+
+        /// <summary>One outcome per part, including parts that could not be checked.</summary>
+        public List<PartCheck> Checks { get; set; } = new();
+
+        public int CountOf(PartCheckStatus status) => Checks.Count(c => c.Status == status);
+    }
+
+    public enum PartCheckStatus
+    {
+        Pass,
+        Mismatch,
+        /// <summary>Rule is display-only; values are shown but never flagged.</summary>
+        DisplayOnly,
+        /// <summary>A rule applies but the part could not be compared; <see cref="PartCheck.Reason"/> says why.</summary>
+        NotChecked,
+        /// <summary>No rule covers this part, so it is intentionally not verified.</summary>
+        NotInConfig,
+    }
+
+    /// <summary>The verification outcome for one IPT part.</summary>
+    public sealed class PartCheck
+    {
+        public string SurfaceIamPath  { get; set; } = string.Empty;
+        public string IptPartNumber   { get; set; } = string.Empty;
+        public string IptFilePath     { get; set; } = string.Empty;
+        public string Classification  { get; set; } = string.Empty;
+        public string Section         { get; set; } = string.Empty;
+        public string FieldName       { get; set; } = string.Empty;
+        public string ExpectedValue   { get; set; } = string.Empty;
+        public string ActualValue     { get; set; } = string.Empty;
+        public PartCheckStatus Status { get; set; }
+        public string Reason          { get; set; } = string.Empty;
+
+        /// <summary>The part was modified after generation (SQ part or verifier edit); see <see cref="IptProperties.IsModified"/>.</summary>
+        public bool IsModified        { get; set; }
     }
 
     /// <summary>

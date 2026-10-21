@@ -37,6 +37,15 @@ namespace UnitConstructionVerifier.Operations
             return false;
         }
 
+        /// <summary>True when an edit to this grid parameter can be written to part properties.</summary>
+        public static bool CanWrite(string parameter)
+        {
+            return !string.IsNullOrWhiteSpace(parameter)
+                && (string.Equals(parameter, "Thickness", System.StringComparison.OrdinalIgnoreCase)
+                    || IsGaugeAndMaterialParameter(parameter)
+                    || IsMaterialOnlyParameter(parameter));
+        }
+
         public static bool HasAnyValue(PartPropertyEdits edits)
         {
             return edits != null &&

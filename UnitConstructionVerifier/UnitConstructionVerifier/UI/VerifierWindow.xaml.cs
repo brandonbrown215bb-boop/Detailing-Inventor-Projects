@@ -19,6 +19,7 @@ namespace UnitConstructionVerifier.UI
         private readonly UnitConstructionData _data;
         private readonly string               _iamPath;
         private IptScanResult?                _iptResult;
+        private UnitSnapshot?                 _snapshot;
         private bool                          _isUpdatingUi;
         private readonly Inventor.Application _inventorApp;
         private readonly Dictionary<string, string> _pendingEdits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -27,6 +28,9 @@ namespace UnitConstructionVerifier.UI
         private byte _xRayColorB = XRayHighlightColors.Default.B;
         private PartPreviewWindow? _partPreviewWindow;
         private bool _isRefreshingPartsGrid;
+        private bool _overridesDirty;
+        private List<string> _gauges = new List<string>();
+        private List<string> _materials = new List<string>();
         private bool _keepVerifierAboveInventor;
         private bool _pendingVerifierStackRestore;
         private bool _pendingVerifierFocusRestore;
@@ -65,6 +69,11 @@ namespace UnitConstructionVerifier.UI
             _iptResult = iptResult;
         }
 
+        public void SetSnapshot(UnitSnapshot snapshot)
+        {
+            _snapshot = snapshot;
+        }
+
         // ── Global Other Specs ────────────────────────────────────────────────
 
         private void PopulateGlobalSpecs()
@@ -92,12 +101,14 @@ namespace UnitConstructionVerifier.UI
             if (_isUpdatingUi) return;
             _data.OtherConstruction.UpturnedLip = LipCheckBox.IsChecked == true;
             LipHeightBox.Visibility = _data.OtherConstruction.UpturnedLip ? Visibility.Visible : Visibility.Collapsed;
+            MarkOverridesDirty();
         }
 
         private void OnLipHeightChanged(object sender, TextChangedEventArgs e)
         {
             if (_isUpdatingUi) return;
             _data.OtherConstruction.UpturnedLipHeight = LipHeightBox.Text;
+            MarkOverridesDirty();
         }
 
         private void OnCurbCheckChanged(object sender, RoutedEventArgs e)
@@ -105,12 +116,38 @@ namespace UnitConstructionVerifier.UI
             if (_isUpdatingUi) return;
             _data.OtherConstruction.CurbRest = CurbCheckBox.IsChecked == true;
             CurbHeightBox.Visibility = _data.OtherConstruction.CurbRest ? Visibility.Visible : Visibility.Collapsed;
+            MarkOverridesDirty();
         }
 
         private void OnCurbHeightChanged(object sender, TextChangedEventArgs e)
         {
             if (_isUpdatingUi) return;
             _data.OtherConstruction.CurbRestHeight = CurbHeightBox.Text;
+            MarkOverridesDirty();
+        }
+
+        // ── Unsaved Work ──────────────────────────────────────────────────────
+
+        private void MarkOverridesDirty()
+        {
+            _overridesDirty = true;
+            UnsavedOverridesLabel.Visibility = Visibility.Visible;
+        }
+
+        private void ClearOverridesDirty()
+        {
+            _overridesDirty = false;
+            UnsavedOverridesLabel.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Shows the surface's stored value in a dropdown even when it is not a standard option,
+        /// so reading the dropdown back never replaces it with "".
+        /// </summary>
+        private static void ShowStoredValue(ComboBox combo, IReadOnlyList<string> standard, string? stored)
+        {
+            combo.ItemsSource = ExpectationChoices.WithStoredValue(standard, stored, out string? selected);
+            combo.SelectedItem = selected;
         }
 
         // ── Roof Tab Event Handlers ───────────────────────────────────────────
@@ -132,17 +169,17 @@ namespace UnitConstructionVerifier.UI
             try
             {
                 RoofThicknessText.Text = selected.Thickness;
-                RoofExteriorGaugeCombo.SelectedItem = selected.ExteriorSkinGauge;
-                RoofExteriorMaterialCombo.SelectedItem = selected.ExteriorSkinMaterial;
-                RoofInteriorGaugeCombo.SelectedItem = selected.InteriorLinerGauge;
-                RoofInteriorMaterialCombo.SelectedItem = selected.InteriorLinerMaterial;
-                RoofChannelGaugeCombo.SelectedItem = selected.ChannelSkinGauge;
-                RoofChannelMaterialCombo.SelectedItem = selected.ChannelSkinMaterial;
-                RoofTrimGaugeCombo.SelectedItem = selected.TrimSkinGauge;
-                RoofTrimMaterialCombo.SelectedItem = selected.TrimSkinMaterial;
+                ShowStoredValue(RoofExteriorGaugeCombo, _gauges, selected.ExteriorSkinGauge);
+                ShowStoredValue(RoofExteriorMaterialCombo, _materials, selected.ExteriorSkinMaterial);
+                ShowStoredValue(RoofInteriorGaugeCombo, _gauges, selected.InteriorLinerGauge);
+                ShowStoredValue(RoofInteriorMaterialCombo, _materials, selected.InteriorLinerMaterial);
+                ShowStoredValue(RoofChannelGaugeCombo, _gauges, selected.ChannelSkinGauge);
+                ShowStoredValue(RoofChannelMaterialCombo, _materials, selected.ChannelSkinMaterial);
+                ShowStoredValue(RoofTrimGaugeCombo, _gauges, selected.TrimSkinGauge);
+                ShowStoredValue(RoofTrimMaterialCombo, _materials, selected.TrimSkinMaterial);
                 RoofInsulationText.Text = selected.InsulationThicknessAndMaterial;
 
-                RoofThermalCombo.SelectedIndex = string.Equals(selected.ThermalBreak, "Yes", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+                ShowStoredValue(RoofThermalCombo, ExpectationChoices.YesNo, selected.ThermalBreak);
             }
             finally
             {
@@ -173,6 +210,7 @@ namespace UnitConstructionVerifier.UI
             selected.TrimSkinMaterial = RoofTrimMaterialCombo.SelectedItem as string ?? string.Empty;
             selected.InsulationThicknessAndMaterial = RoofInsulationText.Text;
 
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -182,7 +220,8 @@ namespace UnitConstructionVerifier.UI
             var selected = RoofSurfaceList.SelectedItem as RoofSurfaceRow;
             if (selected == null) return;
 
-            selected.ThermalBreak = (RoofThermalCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "No";
+            selected.ThermalBreak = RoofThermalCombo.SelectedItem as string ?? string.Empty;
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -207,6 +246,7 @@ namespace UnitConstructionVerifier.UI
                 row.ThermalBreak = selected.ThermalBreak;
             }
 
+            MarkOverridesDirty();
             MessageBox.Show("Casing specifications copied to all Roof surfaces.", "Apply Casing Specs", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -230,15 +270,15 @@ namespace UnitConstructionVerifier.UI
             {
                 WallThicknessText.Text = selected.Thickness;
                 WallPaintText.Text = selected.ExteriorPaint;
-                WallExteriorGaugeCombo.SelectedItem = selected.ExteriorSkinGauge;
-                WallExteriorMaterialCombo.SelectedItem = selected.ExteriorSkinMaterial;
-                WallInteriorGaugeCombo.SelectedItem = selected.InteriorLinerGauge;
-                WallInteriorMaterialCombo.SelectedItem = selected.InteriorLinerMaterial;
-                WallChannelGaugeCombo.SelectedItem = selected.ChannelSkinGauge;
-                WallChannelMaterialCombo.SelectedItem = selected.ChannelSkinMaterial;
+                ShowStoredValue(WallExteriorGaugeCombo, _gauges, selected.ExteriorSkinGauge);
+                ShowStoredValue(WallExteriorMaterialCombo, _materials, selected.ExteriorSkinMaterial);
+                ShowStoredValue(WallInteriorGaugeCombo, _gauges, selected.InteriorLinerGauge);
+                ShowStoredValue(WallInteriorMaterialCombo, _materials, selected.InteriorLinerMaterial);
+                ShowStoredValue(WallChannelGaugeCombo, _gauges, selected.ChannelSkinGauge);
+                ShowStoredValue(WallChannelMaterialCombo, _materials, selected.ChannelSkinMaterial);
                 WallInsulationText.Text = selected.InsulationThicknessAndMaterial;
 
-                WallThermalCombo.SelectedIndex = string.Equals(selected.ThermalBreak, "Yes", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+                ShowStoredValue(WallThermalCombo, ExpectationChoices.YesNo, selected.ThermalBreak);
             }
             finally
             {
@@ -268,6 +308,7 @@ namespace UnitConstructionVerifier.UI
             selected.ChannelSkinMaterial = WallChannelMaterialCombo.SelectedItem as string ?? string.Empty;
             selected.InsulationThicknessAndMaterial = WallInsulationText.Text;
 
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -277,7 +318,8 @@ namespace UnitConstructionVerifier.UI
             var selected = WallSurfaceList.SelectedItem as WallSurfaceRow;
             if (selected == null) return;
 
-            selected.ThermalBreak = (WallThermalCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "No";
+            selected.ThermalBreak = WallThermalCombo.SelectedItem as string ?? string.Empty;
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -301,6 +343,7 @@ namespace UnitConstructionVerifier.UI
                 row.ThermalBreak = selected.ThermalBreak;
             }
 
+            MarkOverridesDirty();
             MessageBox.Show("Casing specifications copied to all Wall surfaces.", "Apply Casing Specs", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -322,18 +365,18 @@ namespace UnitConstructionVerifier.UI
             _isUpdatingUi = true;
             try
             {
-                SelectComboItemByContent(BaseHeightCombo, selected.BaseHeight);
-                SelectComboItemByContent(BaseMatCombo, selected.BaseMaterial);
-                FormedChannelGaugeCombo.SelectedItem = selected.FormedChannelGauge;
-                FormedChannelMaterialCombo.SelectedItem = selected.FormedChannelMaterial;
-                FloorGaugeCombo.SelectedItem = selected.FloorGauge;
-                FloorMaterialCombo.SelectedItem = selected.FloorMaterial;
-                SubFloorGaugeCombo.SelectedItem = selected.SubFloorGauge;
-                SubFloorMaterialCombo.SelectedItem = selected.SubFloorMaterial;
-                PerimeterAngleGaugeCombo.SelectedItem = selected.PerimeterAngleGauge;
-                PerimeterAngleMaterialCombo.SelectedItem = selected.PerimeterAngleMaterial;
+                ShowStoredValue(BaseHeightCombo, ExpectationChoices.BaseHeights, selected.BaseHeight);
+                ShowStoredValue(BaseMatCombo, ExpectationChoices.BaseMaterials, selected.BaseMaterial);
+                ShowStoredValue(FormedChannelGaugeCombo, _gauges, selected.FormedChannelGauge);
+                ShowStoredValue(FormedChannelMaterialCombo, _materials, selected.FormedChannelMaterial);
+                ShowStoredValue(FloorGaugeCombo, _gauges, selected.FloorGauge);
+                ShowStoredValue(FloorMaterialCombo, _materials, selected.FloorMaterial);
+                ShowStoredValue(SubFloorGaugeCombo, _gauges, selected.SubFloorGauge);
+                ShowStoredValue(SubFloorMaterialCombo, _materials, selected.SubFloorMaterial);
+                ShowStoredValue(PerimeterAngleGaugeCombo, _gauges, selected.PerimeterAngleGauge);
+                ShowStoredValue(PerimeterAngleMaterialCombo, _materials, selected.PerimeterAngleMaterial);
 
-                FloorThermalCombo.SelectedIndex = string.Equals(selected.FloorThermalBreak, "Yes", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+                ShowStoredValue(FloorThermalCombo, ExpectationChoices.YesNo, selected.FloorThermalBreak);
             }
             finally
             {
@@ -352,8 +395,8 @@ namespace UnitConstructionVerifier.UI
             var selected = BaseSurfaceList.SelectedItem as BaseSurfaceRow;
             if (selected == null) return;
 
-            selected.BaseHeight = (BaseHeightCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
-            selected.BaseMaterial = (BaseMatCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
+            selected.BaseHeight = BaseHeightCombo.SelectedItem as string ?? string.Empty;
+            selected.BaseMaterial = BaseMatCombo.SelectedItem as string ?? string.Empty;
             selected.FormedChannelGauge = FormedChannelGaugeCombo.SelectedItem as string ?? string.Empty;
             selected.FormedChannelMaterial = FormedChannelMaterialCombo.SelectedItem as string ?? string.Empty;
             selected.FloorGauge = FloorGaugeCombo.SelectedItem as string ?? string.Empty;
@@ -363,6 +406,7 @@ namespace UnitConstructionVerifier.UI
             selected.PerimeterAngleGauge = PerimeterAngleGaugeCombo.SelectedItem as string ?? string.Empty;
             selected.PerimeterAngleMaterial = PerimeterAngleMaterialCombo.SelectedItem as string ?? string.Empty;
 
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -384,7 +428,8 @@ namespace UnitConstructionVerifier.UI
             var selected = BaseSurfaceList.SelectedItem as BaseSurfaceRow;
             if (selected == null) return;
 
-            selected.FloorThermalBreak = (FloorThermalCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "No";
+            selected.FloorThermalBreak = FloorThermalCombo.SelectedItem as string ?? string.Empty;
+            MarkOverridesDirty();
             RefreshPartsGrid(selected);
         }
 
@@ -407,124 +452,35 @@ namespace UnitConstructionVerifier.UI
 
         private void RefreshPartsGridCore(object surfaceRow)
         {
-            var gridRows = new List<IptVerificationRow>();
-
             if (surfaceRow is RoofSurfaceRow roof)
-            {
-                var parts = _iptResult.Parts
-                    .Where(p => string.Equals(p.OwnerIamPath, roof.SourceSurfaceIam, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                foreach (var p in parts)
-                {
-                    var rule = VerificationEngine.FindRule(p);
-                    if (rule != null)
-                    {
-                        var rowFields = VerificationEngine.BuildRowFields(roof);
-                        string expectedGauge = VerificationEngine.ResolveRuleField(rule.GaugeSource, rowFields);
-                        string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
-
-                        if (string.Equals(rule.Classification, "Channel", StringComparison.OrdinalIgnoreCase))
-                        {
-                            expectedMaterial = MaterialsConfig.AdjustExpectedChannel(expectedMaterial, p.ModelNumber);
-                        }
-
-                        string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
-                        bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
-
-                        string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
-
-                        if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
-                        {
-                            isMismatch = false;
-                        }
-
-                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
-                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
-                    }
-                }
-
-                RoofPartsGrid.ItemsSource = gridRows;
-            }
+                RoofPartsGrid.ItemsSource = BuildPartsGridRows(roof.SourceSurfaceIam, "Roof", VerificationEngine.BuildRowFields(roof));
             else if (surfaceRow is WallSurfaceRow wall)
-            {
-                var parts = _iptResult.Parts
-                    .Where(p => string.Equals(p.OwnerIamPath, wall.SourceSurfaceIam, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                foreach (var p in parts)
-                {
-                    var rule = VerificationEngine.FindRule(p);
-                    if (rule != null)
-                    {
-                        var rowFields = VerificationEngine.BuildRowFields(wall);
-                        string expectedGauge = VerificationEngine.ResolveRuleField(rule.GaugeSource, rowFields);
-                        string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
-
-                        if (string.Equals(rule.Classification, "Channel", StringComparison.OrdinalIgnoreCase))
-                        {
-                            expectedMaterial = MaterialsConfig.AdjustExpectedChannel(expectedMaterial, p.ModelNumber);
-                        }
-
-                        string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
-                        bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
-
-                        string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
-
-                        if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
-                        {
-                            isMismatch = false;
-                        }
-
-                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
-                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
-                    }
-                }
-
-                WallPartsGrid.ItemsSource = gridRows;
-            }
+                WallPartsGrid.ItemsSource = BuildPartsGridRows(wall.SourceSurfaceIam, "Wall", VerificationEngine.BuildRowFields(wall));
             else if (surfaceRow is BaseSurfaceRow bs)
+                BasePartsGrid.ItemsSource = BuildPartsGridRows(bs.SourceSurfaceIam, "Base", VerificationEngine.BuildRowFields(bs));
+        }
+
+        /// <summary>
+        /// One grid row per part in the surface, using the same check as Run Verification.
+        /// Parts no rule covers are left out; parts a rule covers but that could not be checked are shown.
+        /// </summary>
+        private List<IptVerificationRow> BuildPartsGridRows(string surfaceIam, string surfaceKind, Dictionary<string, string> rowFields)
+        {
+            var gridRows = new List<IptVerificationRow>();
+            var parts = _iptResult!.Parts
+                .Where(p => string.Equals(p.OwnerIamPath, surfaceIam, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var p in parts)
             {
-                var parts = _iptResult.Parts
-                    .Where(p => string.Equals(p.OwnerIamPath, bs.SourceSurfaceIam, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var check = VerificationEngine.CheckPart(p, rowFields, surfaceKind);
+                if (check.Status == PartCheckStatus.NotInConfig) continue;
 
-                foreach (var p in parts)
-                {
-                    var rule = VerificationEngine.FindRule(p);
-                    if (rule != null)
-                    {
-                        var rowFields = VerificationEngine.BuildRowFields(bs);
-                        string expectedGauge = VerificationEngine.ResolveRuleField(rule.GaugeSource, rowFields);
-                        string expectedMaterial = VerificationEngine.ResolveRuleField(rule.MaterialSource, rowFields);
-
-                        string expected = ConstructionDataHelper.FormatGaugeAndMaterial(expectedGauge, expectedMaterial);
-                        string actual = FormatGaugeAndMaterial(p.MtlGauge, p.YCMATL, expectedMaterial);
-
-                        if (string.Equals(rule.Classification, "Structural Channel", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(rule.Classification, "Structural Angle", StringComparison.OrdinalIgnoreCase))
-                        {
-                            actual = p.YCMATL;
-                        }
-
-                        bool isMismatch = !string.IsNullOrWhiteSpace(expected) && Normalize(actual) != Normalize(expected);
-
-                        string field = string.IsNullOrWhiteSpace(rule.FieldName) ? rule.Classification : rule.FieldName;
-
-                        if (string.Equals(rule.VerificationMode, "display", StringComparison.OrdinalIgnoreCase))
-                        {
-                            isMismatch = false;
-                        }
-
-                        string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
-                        AddGridRow(gridRows, p.PartNumber, description, rule.Classification, field, expected, actual, isMismatch, p.FilePath);
-                    }
-                }
-
-                BasePartsGrid.ItemsSource = gridRows;
+                string description = MaterialsConfig.GetPartDescription(p.ModelNumber, p.Description);
+                AddGridRow(gridRows, p.PartNumber, description, check.Classification, check.FieldName,
+                    check.ExpectedValue, check.ActualValue, check.Status, check.Reason, check.IsModified, p.FilePath);
             }
+
+            return gridRows;
         }
 
         // ── Save & Verify Actions ─────────────────────────────────────────────
@@ -532,8 +488,42 @@ namespace UnitConstructionVerifier.UI
         private void OnSave(object sender, RoutedEventArgs e)
         {
             PersistenceManager.SaveOverrides(_iamPath, _data);
+            ClearOverridesDirty();
             MessageBox.Show($"Overrides saved to:\n{PersistenceManager.GetSidecarPath(_iamPath)}",
                 "Saved Overrides", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void OnSaveSnapshot(object sender, RoutedEventArgs e)
+        {
+            if (_snapshot is null)
+            {
+                MessageBox.Show("Scan data not available — cannot save a snapshot.",
+                    "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string defaultPath = SnapshotSerializer.GetDefaultPath(_iamPath);
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title            = "Save Unit Snapshot",
+                FileName         = Path.GetFileName(defaultPath),
+                InitialDirectory = Path.GetDirectoryName(defaultPath),
+                Filter           = "Unit snapshot (*" + SnapshotSerializer.FileSuffix + ")|*" + SnapshotSerializer.FileSuffix,
+            };
+            if (dialog.ShowDialog(this) != true) return;
+
+            try
+            {
+                SnapshotSerializer.Save(dialog.FileName, _snapshot);
+                MessageBox.Show($"Snapshot saved to:\n{dialog.FileName}\n\nCopy it into UnitConstructionVerifier.Tests\\Snapshots to use it as a regression baseline.",
+                    "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "OnSaveSnapshot");
+                MessageBox.Show($"Could not save snapshot:\n{ex.Message}",
+                    "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void OnVerify(object sender, RoutedEventArgs e)
@@ -548,14 +538,26 @@ namespace UnitConstructionVerifier.UI
             var engine = new VerificationEngine(_data, _iptResult);
             VerificationResult result = engine.Run();
 
-            if (result.IsPass)
+            int passed     = result.CountOf(PartCheckStatus.Pass);
+            int notChecked = result.CountOf(PartCheckStatus.NotChecked);
+            int modified   = result.Checks.Count(c => c.IsModified);
+            string coverage = $"\n\nChecked: {passed + result.Mismatches.Count} parts" +
+                              (notChecked > 0 ? $"\nNot checked: {notChecked} parts (shown in grey in the surface grids; hover for the reason)" : string.Empty) +
+                              (modified > 0 ? $"\nModified after generation (SQ or edited): {modified} parts, marked \"modified\" in the grids" : string.Empty);
+
+            if (result.IsPass && notChecked == 0)
             {
-                MessageBox.Show("✓  All checks passed! No mismatches found across any surfaces.",
+                MessageBox.Show("✓  All checks passed! No mismatches found across any surfaces." + coverage,
                     "Verification Passed", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else if (result.IsPass)
+            {
+                MessageBox.Show("✓  No mismatches found, but some parts could not be checked." + coverage,
+                    "Verification Incomplete", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else
             {
-                MessageBox.Show($"✗  Verification complete. Found {result.Mismatches.Count} mismatches in this assembly. Review individual surface grids to see discrepancies highlighted in red.",
+                MessageBox.Show($"✗  Verification complete. Found {result.Mismatches.Count} mismatches in this assembly. Review individual surface grids to see discrepancies highlighted in red." + coverage,
                     "Verification Mismatches", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
@@ -575,7 +577,9 @@ namespace UnitConstructionVerifier.UI
             string parameter,
             string expected,
             string actual,
-            bool isMismatch,
+            PartCheckStatus checkStatus,
+            string reason,
+            bool isModified,
             string filePath)
         {
             var row = new IptVerificationRow
@@ -586,8 +590,11 @@ namespace UnitConstructionVerifier.UI
                 Parameter = parameter,
                 Expected = expected,
                 Actual = actual,
-                IsMismatch = isMismatch,
-                FilePath = filePath
+                CheckStatus = checkStatus,
+                Reason = reason,
+                IsModified = isModified,
+                FilePath = filePath,
+                IsWritable = PartPropertyEditsMapper.CanWrite(parameter)
             };
             row.PropertyChanged += OnRowPropertyChanged;
 
@@ -605,7 +612,7 @@ namespace UnitConstructionVerifier.UI
             if (sender is IptVerificationRow row && e.PropertyName == nameof(IptVerificationRow.NewValue))
             {
                 string key = $"{row.FilePath}|{row.Parameter}";
-                if (row.IsEditPending)
+                if (row.IsEditPending && row.IsWritable)
                 {
                     _pendingEdits[key] = row.NewValue;
                 }
@@ -649,7 +656,8 @@ namespace UnitConstructionVerifier.UI
             var selectedRows = grid.SelectedItems.Cast<IptVerificationRow>().ToList();
             foreach (var row in selectedRows)
             {
-                if (row != null)
+                // Not-checked rows have no expected value to sync to.
+                if (row != null && row.IsWritable && !string.IsNullOrWhiteSpace(row.Expected))
                 {
                     row.NewValue = row.Expected;
                 }
@@ -662,7 +670,7 @@ namespace UnitConstructionVerifier.UI
             {
                 foreach (var row in rows)
                 {
-                    if (row.IsMismatch)
+                    if (row.IsMismatch && row.IsWritable)
                     {
                         row.NewValue = row.Expected;
                     }
@@ -704,6 +712,7 @@ namespace UnitConstructionVerifier.UI
 
             // Group edits by file
             var groupedEdits = new Dictionary<string, Operations.PartPropertyEdits>(StringComparer.OrdinalIgnoreCase);
+            var unwritable = new List<string>();
             foreach (var kvp in _pendingEdits)
             {
                 string[] parts = kvp.Key.Split('|');
@@ -720,7 +729,7 @@ namespace UnitConstructionVerifier.UI
 
                 if (!Operations.PartPropertyEditsMapper.TryApply(edits, parameter, value))
                 {
-                    System.Diagnostics.Debug.WriteLine($"[UCV] Ignored pending edit for unrecognized parameter: {parameter}");
+                    unwritable.Add($"{Path.GetFileName(filePath)}: {parameter} = {value}");
                 }
             }
 
@@ -733,14 +742,21 @@ namespace UnitConstructionVerifier.UI
                 groupedEdits.Remove(filePath);
             }
 
+            string unwritableNote = unwritable.Count == 0
+                ? string.Empty
+                : "These edits cannot be written to part properties and are skipped:\n" +
+                  string.Join("\n", unwritable.Select(u => $" - {u}")) + "\n\n";
+
             if (groupedEdits.Count == 0)
             {
-                MessageBox.Show("No pending edits mapped to writable part properties.", "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(unwritableNote + "No staged edits map to writable part properties. Nothing was written.",
+                    "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             // Confirm modifications
             var sb = new System.Text.StringBuilder();
+            sb.Append(unwritableNote);
             sb.AppendLine("The following part files will be modified in Inventor:");
             foreach (var path in groupedEdits.Keys)
             {
@@ -894,37 +910,11 @@ namespace UnitConstructionVerifier.UI
             return s.Trim().Replace("\"", "").Replace("'", "").ToUpperInvariant();
         }
 
-        private static string FormatGaugeAndMaterial(string gauge, string material, string expectedMaterialHint = null)
-        {
-            gauge    = (gauge    ?? string.Empty).Trim();
-            material = (material ?? string.Empty).Trim();
-
-            // If the gauge is a decimal thickness, try to resolve both gauge and material from the database mapping first
-            if (double.TryParse(gauge, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
-            {
-                string hint = !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material;
-                if (MaterialsConfig.ResolveFromThickness(gauge, hint, out string resolvedGauge, out string resolvedMaterial))
-                {
-                    gauge = resolvedGauge;
-                    // If no explicit material override is set (e.g. YCMATL is empty or template default), use the resolved material code (e.g. STL GALV PPC)
-                    if (string.IsNullOrEmpty(material) || material.Equals("Steel, Galvanized", StringComparison.OrdinalIgnoreCase) || material.Equals("Steel", StringComparison.OrdinalIgnoreCase) || material.Equals("STL GALV", StringComparison.OrdinalIgnoreCase))
-                    {
-                        material = resolvedMaterial;
-                    }
-                }
-            }
-
-            string mappedGauge = MaterialsConfig.MapGauge(gauge, !string.IsNullOrEmpty(expectedMaterialHint) ? expectedMaterialHint : material);
-            string mappedMaterial = MaterialsConfig.MapMaterial(material);
-
-            if (string.IsNullOrEmpty(mappedGauge) && string.IsNullOrEmpty(mappedMaterial)) return string.Empty;
-            if (string.IsNullOrEmpty(mappedGauge))    return mappedMaterial;
-            if (string.IsNullOrEmpty(mappedMaterial)) return mappedGauge;
-            return $"{mappedGauge} GA {mappedMaterial}";
-        }
-
         private void PopulateDropdowns(List<string> gauges, List<string> materials)
         {
+            _gauges = gauges;
+            _materials = materials;
+
             _isUpdatingUi = true;
             try
             {
@@ -976,7 +966,7 @@ namespace UnitConstructionVerifier.UI
                 FormedChannelGaugeCombo, FloorGaugeCombo, SubFloorGaugeCombo, PerimeterAngleGaugeCombo
             })
             {
-                combo.Width = gaugeWidth;
+                combo.MinWidth = gaugeWidth;
             }
 
             foreach (ComboBox combo in new[]
@@ -986,7 +976,7 @@ namespace UnitConstructionVerifier.UI
                 FormedChannelMaterialCombo, FloorMaterialCombo, SubFloorMaterialCombo, PerimeterAngleMaterialCombo
             })
             {
-                combo.Width = materialWidth;
+                combo.MinWidth = materialWidth;
             }
 
             SizeComboToItems(BaseHeightCombo, "6\"", "8\"", "10\"", "12\"");
@@ -998,7 +988,7 @@ namespace UnitConstructionVerifier.UI
 
         private static void SizeComboToItems(ComboBox combo, params string[] items)
         {
-            combo.Width = MeasureItemsTextWidth(items) + 28;
+            combo.MinWidth = MeasureItemsTextWidth(items) + 28;
         }
 
         private static double MeasureItemsTextWidth(System.Collections.IEnumerable items)
@@ -1030,29 +1020,6 @@ namespace UnitConstructionVerifier.UI
             }
 
             return max;
-        }
-
-        private void SelectComboItemByContent(ComboBox combo, string content)
-        {
-            if (content == null) { combo.SelectedIndex = -1; return; }
-            string target = content.Trim();
-            for (int i = 0; i < combo.Items.Count; i++)
-            {
-                if (combo.Items[i] is ComboBoxItem item)
-                {
-                    if (string.Equals(item.Content?.ToString()?.Trim(), target, StringComparison.OrdinalIgnoreCase))
-                    {
-                        combo.SelectedIndex = i;
-                        return;
-                    }
-                }
-                else if (string.Equals(combo.Items[i]?.ToString()?.Trim(), target, StringComparison.OrdinalIgnoreCase))
-                {
-                    combo.SelectedIndex = i;
-                    return;
-                }
-            }
-            combo.SelectedIndex = -1;
         }
 
         private void OnOpenSurfaceInInventor(object sender, RoutedEventArgs e)
@@ -1334,7 +1301,41 @@ namespace UnitConstructionVerifier.UI
 
         private void OnVerifierWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
+            string? message = UnsavedWorkPrompt.BuildMessage(_overridesDirty, _pendingEdits.Count);
+            if (message != null)
+            {
+                MessageBoxResult answer = MessageBox.Show(
+                    this,
+                    message,
+                    "Unsaved Changes",
+                    _overridesDirty ? MessageBoxButton.YesNoCancel : MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+
+                if (answer == MessageBoxResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                if (answer == MessageBoxResult.Yes)
+                {
+                    PersistenceManager.SaveOverrides(_iamPath, _data);
+                    ClearOverridesDirty();
+                }
+            }
+
             InventorSelectionHelper.RestoreNormal(_inventorApp);
+        }
+
+        private void OnPartsGridBeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            // Only Edit Mode may stage part edits, and only for properties the writer can set.
+            if (EditModeCheckBox.IsChecked != true ||
+                e.Row.Item is not IptVerificationRow row ||
+                !row.IsWritable)
+            {
+                e.Cancel = true;
+            }
         }
 
         private void OnPartsGridPreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -1609,8 +1610,21 @@ namespace UnitConstructionVerifier.UI
         public string Parameter     { get; set; } = string.Empty;
         public string Expected      { get; set; } = string.Empty;
         public string Actual        { get; set; } = string.Empty;
-        public bool   IsMismatch    { get; set; }
-        public string Status        => IsMismatch ? "✗ Mismatch" : "✓ Pass";
+        public PartCheckStatus CheckStatus { get; set; }
+        public string Reason        { get; set; } = string.Empty;
+        public bool   IsMismatch    => CheckStatus == PartCheckStatus.Mismatch;
+        public bool   IsNotChecked  => CheckStatus == PartCheckStatus.NotChecked;
+        /// <summary>SQ part or verifier-edited part; never present on a freshly generated unit.</summary>
+        public bool   IsModified    { get; set; }
+        /// <summary>True when an edit to <see cref="Parameter"/> can be written back to the part.</summary>
+        public bool   IsWritable    { get; set; }
+        public string Status        => (CheckStatus switch
+        {
+            PartCheckStatus.Mismatch    => "✗ Mismatch",
+            PartCheckStatus.NotChecked  => "– Not checked",
+            PartCheckStatus.DisplayOnly => "Display only",
+            _                           => "✓ Pass",
+        }) + (IsModified ? " · modified" : string.Empty);
         public string FilePath      { get; set; } = string.Empty;
 
         private string _newValue = string.Empty;

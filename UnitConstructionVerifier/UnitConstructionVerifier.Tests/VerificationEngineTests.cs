@@ -420,9 +420,9 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("16 GA STL GALV", result.Mismatches[0].ActualValue);
         }
         [Test]
-        public void TestWallVerification_SealOffAngle_MatchesLinerMaterial()
+        public void TestWallVerification_SealOffAngle_MatchesExteriorSkin()
         {
-            // Seal-Off Angle with correct gauge (16 GA) and material matching the liner → no mismatch.
+            // Wall seal-off angles are cut from the exterior skin (verified on real ISG units) → no mismatch.
             var userData = new UnitConstructionData
             {
                 WallRows = new List<WallSurfaceRow>
@@ -430,6 +430,8 @@ namespace UnitConstructionVerifier.Tests
                     new WallSurfaceRow
                     {
                         SourceSurfaceIam  = "Wall.iam",
+                        ExteriorSkinGauge     = "18",
+                        ExteriorSkinMaterial  = "STL GALV PPC",
                         InteriorLinerGauge    = "22",
                         InteriorLinerMaterial = "STL GALV"
                     }
@@ -445,8 +447,8 @@ namespace UnitConstructionVerifier.Tests
                         OwnerIamPath = "Wall.iam",
                         PartNumber   = "SealOff-Pass",
                         Description  = "Wall Seal-Off Angle",
-                        MtlGauge     = "16",
-                        YCMATL       = "STL GALV"
+                        MtlGauge     = "18",
+                        YCMATL       = "STL GALV PPC"
                     }
                 }
             };
@@ -461,7 +463,7 @@ namespace UnitConstructionVerifier.Tests
         [Test]
         public void TestWallVerification_SealOffAngle_WrongGaugeMismatch()
         {
-            // Seal-Off Angle with wrong gauge (18 instead of fixed 16) → one mismatch.
+            // Wall seal-off angles match the exterior skin; a liner-gauge part is one mismatch.
             var userData = new UnitConstructionData
             {
                 WallRows = new List<WallSurfaceRow>
@@ -469,6 +471,8 @@ namespace UnitConstructionVerifier.Tests
                     new WallSurfaceRow
                     {
                         SourceSurfaceIam      = "Wall.iam",
+                        ExteriorSkinGauge     = "18",
+                        ExteriorSkinMaterial  = "STL GALV PPC",
                         InteriorLinerGauge    = "22",
                         InteriorLinerMaterial = "STL GALV"
                     }
@@ -484,7 +488,7 @@ namespace UnitConstructionVerifier.Tests
                         OwnerIamPath = "Wall.iam",
                         PartNumber   = "SealOff-Fail",
                         Description  = "Wall Seal-Off Angle",
-                        MtlGauge     = "18",          // Wrong — rule expects fixed:16
+                        MtlGauge     = "22",          // Wrong — rule expects the exterior skin
                         YCMATL       = "STL GALV"
                     }
                 }
@@ -496,8 +500,8 @@ namespace UnitConstructionVerifier.Tests
             Assert.IsFalse(result.IsPass);
             Assert.AreEqual(1, result.Mismatches.Count);
             Assert.AreEqual("Seal-Off Angle Gauge & Material", result.Mismatches[0].FieldName);
-            Assert.AreEqual("16 GA STL GALV", result.Mismatches[0].ExpectedValue);
-            Assert.AreEqual("18 GA STL GALV", result.Mismatches[0].ActualValue);
+            Assert.AreEqual("18 GA STL GALV PPC", result.Mismatches[0].ExpectedValue);
+            Assert.AreEqual("22 GA STL GALV", result.Mismatches[0].ActualValue);
         }
 
         [Test]

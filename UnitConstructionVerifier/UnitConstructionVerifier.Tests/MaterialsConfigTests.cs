@@ -141,16 +141,16 @@ namespace UnitConstructionVerifier.Tests
             // Stock number classification matches
             Assert.AreEqual("Liner", MaterialsConfig.GetPartClassification("091-30117-082", "random desc"));
             Assert.AreEqual("Skin", MaterialsConfig.GetPartClassification("091-30117-083", ""));
-            Assert.AreEqual("Trim", MaterialsConfig.GetPartClassification("091-30117-074", "other desc"));
+            Assert.AreEqual("Roof Cap", MaterialsConfig.GetPartClassification("091-30117-074", "other desc"));
             Assert.AreEqual("Structural Angle", MaterialsConfig.GetPartClassification("091-30117-187", "Structural steel angle"));
-            Assert.AreEqual("Trim", MaterialsConfig.GetPartClassification("091-30117-076", "Split Cover"));
+            Assert.AreEqual("Roof Accessory", MaterialsConfig.GetPartClassification("091-30117-076", "Split Cover"));
             Assert.AreEqual("Sub-Floor", MaterialsConfig.GetPartClassification("091-30117-080", "Attachment Angle"));
             Assert.AreEqual("Split Cover", MaterialsConfig.GetPartClassification("091-30117-075", ""));
             Assert.AreEqual("Formed Channel", MaterialsConfig.GetPartClassification("091-30117-051", "Formed Channel"));
 
             // Legacy Description Fallbacks when stock number is unknown
             Assert.AreEqual("Liner", MaterialsConfig.GetPartClassification("UNKNOWN", "Corner liner"));
-            Assert.AreEqual("Trim", MaterialsConfig.GetPartClassification("", "roof corner cap"));
+            Assert.AreEqual("Roof Cap", MaterialsConfig.GetPartClassification("", "roof corner cap"));
             Assert.AreEqual("Channel", MaterialsConfig.GetPartClassification(null, "C:SC-100 Channel"));
             Assert.AreEqual("Skin", MaterialsConfig.GetPartClassification("123-456", "outer panel"));
             Assert.AreEqual("Floor Sheet", MaterialsConfig.GetPartClassification("ABC-XYZ", "bottom floor plate"));
@@ -167,8 +167,8 @@ namespace UnitConstructionVerifier.Tests
             Assert.AreEqual("Seal-Off Angle", MaterialsConfig.GetPartClassification("UNKNOWN", "wall seal-off angle"));
             Assert.AreEqual("Seal-Off Angle", MaterialsConfig.GetPartClassification(null,      "WALL SEAL-OFF ANGLE 16GA"));
 
-            // Roof seal-off angle routes to Trim.
-            Assert.AreEqual("Trim",      MaterialsConfig.GetPartClassification("",        "Roof Seal-Off Angle"));
+            // Roof seal-off angle is a roof accessory (16 GA STL GALV), not a wall seal-off angle.
+            Assert.AreEqual("Roof Accessory", MaterialsConfig.GetPartClassification("",   "Roof Seal-Off Angle"));
         }
 
         [Test]

@@ -6,3 +6,4 @@
 .vs/
 UnitConstructionVerifier_Dist.zip
 *.bak
+*.received.json

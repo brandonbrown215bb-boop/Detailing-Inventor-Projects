@@ -62,6 +62,11 @@ Pick highlight color from the header swatch (shared with X-Ray palette).
 ### Expectations / parts grids
 
 - Review expected vs actual construction data per surface.
+- Each part row shows **✓ Pass**, **✗ Mismatch** (red), **Display only**, or **– Not checked** (grey italic). Hover a not-checked row for the reason: no expected value, the part sits in the wrong surface type, or its IAM has no surface row.
+- Parts no rule in `materials_config.json` covers are not verified and not listed.
+- **Run Verification Check** reports how many parts were checked and how many could not be.
+- Parts changed after the unit was generated (SQ parts, or parts edited here) show **· modified** after their status. A freshly generated unit has none.
+- Expectations come from the unit's own configuration and engineering data: each roof/wall uses its own side of the unit, sub-floor comes from the base configuration, and perimeter angles on bases with an upturned lip (UTL) are 10 GA aluminum/stainless or 12 GA STL GALV by floor type (16 GA STL GALV otherwise). On a base whose lip runs on only some sides, the standard angles on the non-lip sides show as mismatches by design; see `Docs/known_issues.md`. See `Docs/part_types_classification.md`.
 - **Apply** actions push approved edits (e.g. casing, properties) to parts.
 - Splitters between sections can be dragged to resize.
 
@@ -82,6 +87,20 @@ When editing part properties from the verifier:
 - Every edited part is stamped `IS_HARD_EDITED = TRUE`, `MOM_DATA.PART_SOURCE = SQPart`, `MOM_DATA.DOCUMENT_STATUS = Changed_SQ`, and gets the `EditedAppearance` color from `materials_config.json` (default **Yellow**).
 - Write-back has not yet been signed off on real units; check edited parts in Inventor before releasing them.
 - Use **Edit Mode** flows in the UI as documented in the window — apply only after reviewing the grid.
+- Part values can be edited only while **Edit Mode** is on, and only on rows whose checked parameter can be written back (thickness, gauge & material, base/formed-channel material). Other rows stay read-only, and **Sync** skips them.
+- If a staged edit cannot be written, the confirmation lists it as skipped instead of dropping it silently.
+
+### Unsaved changes
+
+- Changing an expectation (or the lip/curb settings) shows **● Unsaved expectation changes** in the footer until you click **Save Overrides**.
+- Closing the verifier with unsaved expectation changes or staged part edits asks first: **Yes** saves expectations and closes, **No** closes without saving, **Cancel** keeps the window open. Staged part edits are never written on close.
+- Expectation dropdowns always show the surface's stored value, even when it is not in the standard list (it appears at the top of the list). A blank value stays blank; Thermal Break no longer shows "No" for a blank value.
+
+---
+
+## Save Snapshot (regression baselines)
+
+**Save Snapshot** in the footer writes `<unit>.unit_snapshot.json` (default: next to the IAM) with the scan data the verifier built its expectations from. Use it on units you know are correct, then add them to the tests as described in `UnitConstructionVerifier.Tests/Snapshots/README.md`. It does not change any Inventor files.
 
 ---
 
@@ -102,6 +121,13 @@ Default highlight uses a **locator box**, not Inventor’s selection set.
 **Workaround:** Use **⧉** for part/surface numbers. Avoid Ctrl+V in Inventor while verifying unless you know what’s on the clipboard.
 
 Full notes: `Docs/known_issues.md`
+
+---
+
+## Checking many units without Inventor open
+
+`ucv-scan` reads unit folders read-only and writes one snapshot and outcome per unit plus a `summary.csv`.
+See `UnitConstructionVerifier.Scan/README.md`.
 
 ---
 

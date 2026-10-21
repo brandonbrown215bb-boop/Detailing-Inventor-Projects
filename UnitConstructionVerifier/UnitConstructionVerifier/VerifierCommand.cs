@@ -235,8 +235,19 @@ namespace UnitConstructionVerifier
                 UnitConstructionData data = builder.Build();
                 DebugLogger.Log($"Built model: RoofRows={data.RoofRows.Count}, WallRows={data.WallRows.Count}, BaseRows={data.BaseRows.Count}");
 
-                // Load any previously saved overrides
+                // Capture builder inputs before overrides change the model, for snapshot regression tests
                 string iamPath = asmDoc.FullFileName;
+                var snapshot = new UnitSnapshot
+                {
+                    SourceIamPath = iamPath,
+                    CapturedAtUtc = DateTime.UtcNow,
+                    AddinVersion  = typeof(VerifierCommand).Assembly.GetName().Version?.ToString() ?? string.Empty,
+                    Configs       = configDatas,
+                    Engineering   = engData,
+                    Ipt           = iptResult,
+                };
+
+                // Load any previously saved overrides
                 DebugLogger.Log($"Loading overrides for {iamPath}");
                 PersistenceManager.LoadOverrides(iamPath, data);
 
@@ -261,6 +272,7 @@ namespace UnitConstructionVerifier
 
                 var window = new VerifierWindow(data, iamPath, _app);
                 window.SetIptScanResult(iptResult);
+                window.SetSnapshot(snapshot);
                 window.Closed += (_, __) =>
                 {
                     if (ReferenceEquals(_activeWindow, window))

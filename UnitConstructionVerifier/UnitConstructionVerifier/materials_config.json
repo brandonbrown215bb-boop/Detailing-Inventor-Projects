@@ -97,7 +97,10 @@
     "091-30117-078",
     "091-30117-048",
     "091-30117-046",
-    "091-30117-077"
+    "091-30117-077",
+    "091-30117-068",
+    "091-30117-069",
+    "091-30117-070"
   ],
   "AluminumKeywords": [
     "ALM",
@@ -120,8 +123,7 @@
       ],
       "StockNumbers": [
         "091-30117-082",
-        "091-30117-084",
-        "091-30117-073"
+        "091-30117-084"
       ],
       "GaugeSource": "borrow:InteriorLinerGauge",
       "MaterialSource": "borrow:InteriorLinerMaterial",
@@ -150,32 +152,14 @@
     {
       "Classification": "Trim",
       "DescriptionKeywords": [
-        "roof corner cap",
-        "roof cap",
         "sq part - trim",
-        "peaked roof split cover",
-        "roof seal-off angle",
-        "rf-peak split cvr",
         "rf-cap seam rigid",
         "rf-trim seam",
-        "wall attachment angle",
-        "attachment angle",
         "rf-seam cap split",
-        "roof super angle",
         "wl-split cover ext"
       ],
       "StockNumbers": [
-        "091-30117-001",
-        "091-30117-058",
-        "091-30117-072",
-        "091-30117-074",
-        "091-30119-007",
-        "091-30117-076",
         "091-30117-011",
-        "091-30117-057",
-        "091-30117-049",
-        "091-30117-053",
-        "091-30117-022",
         "091-30117-195",
         "091-30117-196"
       ],
@@ -184,6 +168,73 @@
       "VerificationMode": "mismatch",
       "Section": "Casing",
       "FieldName": "Trim Gauge & Material"
+    },
+    {
+      "Classification": "Roof Cap",
+      "DescriptionKeywords": [
+        "roof corner cap",
+        "roof cap"
+      ],
+      "StockNumbers": [
+        "091-30117-001",
+        "091-30117-058",
+        "091-30117-074"
+      ],
+      "GaugeSource": "if:RoofCapMaterial=ALM EMB?fixed:20:borrow:RoofCapGauge",
+      "MaterialSource": "borrow:RoofCapMaterial",
+      "VerificationMode": "mismatch",
+      "Section": "Casing",
+      "FieldName": "Roof Cap Gauge & Material"
+    },
+    {
+      "Classification": "Roof Accessory",
+      "DescriptionKeywords": [
+        "peaked roof split cover",
+        "rf-peak split cvr",
+        "roof seal-off angle",
+        "roof super angle"
+      ],
+      "StockNumbers": [
+        "091-30117-022",
+        "091-30117-076",
+        "091-30119-007"
+      ],
+      "GaugeSource": "borrow:RoofAccessoryGauge",
+      "MaterialSource": "borrow:RoofAccessoryMaterial",
+      "VerificationMode": "mismatch",
+      "Section": "Casing",
+      "FieldName": "Roof Accessory Gauge & Material"
+    },
+    {
+      "Classification": "Tiering Angle",
+      "DescriptionKeywords": [
+        "tiering angle"
+      ],
+      "StockNumbers": [
+        "091-30117-057"
+      ],
+      "GaugeSource": "fixed:14",
+      "MaterialSource": "fixed:STL GALV",
+      "VerificationMode": "mismatch",
+      "Section": "Casing",
+      "FieldName": "Tiering Angle Gauge & Material"
+    },
+    {
+      "Classification": "Attachment Angle",
+      "DescriptionKeywords": [
+        "wall attachment angle",
+        "attachment angle",
+        "angle, formed"
+      ],
+      "StockNumbers": [
+        "091-30117-049",
+        "091-30117-053"
+      ],
+      "GaugeSource": "fixed:16",
+      "MaterialSource": "borrow:InteriorLinerMaterial",
+      "VerificationMode": "mismatch",
+      "Section": "Casing",
+      "FieldName": "Attachment Angle Gauge & Material"
     },
     {
       "Classification": "Channel",
@@ -239,8 +290,8 @@
       "StockNumbers": [
         "091-30119-006"
       ],
-      "GaugeSource": "fixed:16",
-      "MaterialSource": "borrow:InteriorLinerMaterial",
+      "GaugeSource": "borrow:ExteriorSkinGauge",
+      "MaterialSource": "borrow:ExteriorSkinMaterial",
       "VerificationMode": "mismatch",
       "Section": "Casing",
       "FieldName": "Seal-Off Angle Gauge & Material"
@@ -248,7 +299,9 @@
     {
       "Classification": "Sub-Floor",
       "DescriptionKeywords": [
-        "SUBFLOOR"
+        "subfloor",
+        "sub-floor",
+        "sub floor"
       ],
       "StockNumbers": [
         "091-30117-080",
@@ -299,14 +352,38 @@
       ],
       "StockNumbers": [
         "091-30117-054",
-        "091-30117-055",
-        "091-30117-079"
+        "091-30117-055"
       ],
       "GaugeSource": "borrow:PerimeterAngleGauge",
       "MaterialSource": "borrow:PerimeterAngleMaterial",
       "VerificationMode": "mismatch",
       "Section": "Base",
       "FieldName": "Perimeter Angle Gauge & Material"
+    },
+    {
+      "Classification": "Floor Drain Support Angle",
+      "DescriptionKeywords": [
+        "x 1.5 x 1.5",
+        "x 2 x 2"
+      ],
+      "StockNumbers": [],
+      "GaugeSource": "borrow:DrainSupportAngleGauge",
+      "MaterialSource": "borrow:DrainSupportAngleMaterial",
+      "VerificationMode": "mismatch",
+      "Section": "Base",
+      "FieldName": "Drain Support Angle Gauge & Material"
+    },
+    {
+      "Classification": "Floor Attachment Angle",
+      "DescriptionKeywords": [
+        "x 2.5 x 1"
+      ],
+      "StockNumbers": [],
+      "GaugeSource": "borrow:FloorAttachmentAngleGauge",
+      "MaterialSource": "borrow:FloorAttachmentAngleMaterial",
+      "VerificationMode": "mismatch",
+      "Section": "Base",
+      "FieldName": "Floor Attachment Angle Gauge & Material"
     },
     {
       "Classification": "Structural Channel",
@@ -370,29 +447,29 @@
   "PartClassifications": {
     "091-30117-082": "Liner",
     "091-30117-084": "Liner",
-    "091-30117-073": "Liner",
+    "091-30117-073": "Wall Corner Liner",
     "091-30119-006": "Seal-Off Angle",
-    "091-30119-007": "Trim",
+    "091-30119-007": "Roof Accessory",
     "091-30117-083": "Skin",
     "091-30117-081": "Skin",
     "091-30117-177": "Skin",
     "091-30117-186": "Structural Channel",
-    "091-30117-187": "Structural Channel",
+    "091-30117-187": "Structural Angle",
     "091-30117-188": "Structural Channel",
-    "091-30117-189": "Structural Channel",
+    "091-30117-189": "Structural Angle",
     "091-30117-066": "Base Accessory",
     "091-30117-067": "Base Accessory",
     "091-30117-190": "Base Accessory",
-    "091-30117-001": "Trim",
-    "091-30117-058": "Trim",
-    "091-30117-072": "Trim",
-    "091-30117-074": "Trim",
-    "091-30117-076": "Trim",
+    "091-30117-001": "Roof Cap",
+    "091-30117-058": "Roof Cap",
+    "091-30117-072": "Wall Corner Cap",
+    "091-30117-074": "Roof Cap",
+    "091-30117-076": "Roof Accessory",
     "091-30117-011": "Trim",
-    "091-30117-057": "Trim",
-    "091-30117-049": "Trim",
-    "091-30117-053": "Trim",
-    "091-30117-022": "Trim",
+    "091-30117-057": "Tiering Angle",
+    "091-30117-049": "Attachment Angle",
+    "091-30117-053": "Attachment Angle",
+    "091-30117-022": "Roof Accessory",
     "091-30117-195": "Trim",
     "091-30117-196": "Trim",
     "091-30117-064": "Channel",
@@ -416,8 +493,7 @@
     "091-30117-089": "Split Cover",
     "091-30117-051": "Formed Channel",
     "091-30117-054": "Perimeter Angle",
-    "091-30117-055": "Perimeter Angle",
-    "091-30117-079": "Perimeter Angle"
+    "091-30117-055": "Perimeter Angle"
   },
   "PartDescriptions": {
     "091-30117-082": "WALL LINER",

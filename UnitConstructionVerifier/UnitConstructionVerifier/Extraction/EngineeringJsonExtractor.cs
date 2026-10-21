@@ -29,41 +29,8 @@ namespace UnitConstructionVerifier.Extraction
                             if (!string.Equals(attr.Name, AttrSetSearchName,
                                     StringComparison.OrdinalIgnoreCase)) continue;
 
-                            string json = string.Empty;
-                            if (attr.Value is byte[] bytes)
-                            {
-                                json = System.Text.Encoding.UTF8.GetString(bytes);
-                            }
-                            else if (attr.Value is System.Array arr)
-                            {
-                                byte[] byteArr = new byte[arr.Length];
-                                System.Array.Copy(arr, byteArr, arr.Length);
-                                json = System.Text.Encoding.UTF8.GetString(byteArr);
-                            }
-                            else
-                            {
-                                json = attr.Value?.ToString() ?? string.Empty;
-                            }
-
-                            if (string.IsNullOrWhiteSpace(json)) continue;
-
-                            var root = JsonConvert.DeserializeObject<EngineeringJson>(json);
-                            if (root?.Rules is null) continue;
-
-                            var result = new EngineeringData();
-                            foreach (var constant in root.Rules.Constants)
-                            {
-                                double? v = TryParseDouble(constant.Value);
-                                switch (constant.Type)
-                                {
-                                    case "UnitBase_CurbSupportAngleHeight":
-                                        result.CurbSupportAngleHeight = v; break;
-                                    case "UnitBase_CurbSupportAngleFlangeLength":
-                                        result.CurbSupportAngleFlange = v; break;
-                                    case "UnitBase_CurbSupportAngleThickness":
-                                        result.CurbSupportAngleThickness = v; break;
-                                }
-                            }
+                            var result = Parse(AttributeText.Decode(attr.Value));
+                            if (result is null) continue;
                             return result;
                         }
                         catch { /* skip malformed */ }
@@ -75,6 +42,36 @@ namespace UnitConstructionVerifier.Extraction
                 System.Diagnostics.Debug.WriteLine($"[UCV] EngineeringJsonExtractor: {ex.Message}");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Parses a DOCUMENT_ENGINEERING_JSON payload. Shared with the headless scan tool.
+        /// </summary>
+        public static EngineeringData? Parse(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            var root = JsonConvert.DeserializeObject<EngineeringJson>(json);
+            if (root?.Rules is null) return null;
+
+            var result = new EngineeringData();
+            foreach (var constant in root.Rules.Constants)
+            {
+                if (string.IsNullOrWhiteSpace(constant.Type)) continue;
+                double? v = TryParseDouble(constant.Value);
+                if (constant.Value != null)
+                    result.Constants[constant.Type] = v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : constant.Value.ToString() ?? string.Empty;
+
+                switch (constant.Type)
+                {
+                    case "UnitBase_CurbSupportAngleHeight":
+                        result.CurbSupportAngleHeight = v; break;
+                    case "UnitBase_CurbSupportAngleFlangeLength":
+                        result.CurbSupportAngleFlange = v; break;
+                    case "UnitBase_CurbSupportAngleThickness":
+                        result.CurbSupportAngleThickness = v; break;
+                }
+            }
+            return result;
         }
 
         /// <summary>
@@ -116,8 +113,13 @@ namespace UnitConstructionVerifier.Extraction
             return result;
         }
 
-        private static void Merge(EngineeringData target, EngineeringData source)
+        public static void Merge(EngineeringData target, EngineeringData source)
         {
+            // Constants are per-unit standards; the first surface that defines one wins.
+            foreach (var kvp in source.Constants)
+                if (!target.Constants.ContainsKey(kvp.Key))
+                    target.Constants[kvp.Key] = kvp.Value;
+
             if (source.CurbSupportAngleHeight.HasValue && 
                 (!target.CurbSupportAngleHeight.HasValue || source.CurbSupportAngleHeight > target.CurbSupportAngleHeight))
                 target.CurbSupportAngleHeight = source.CurbSupportAngleHeight;

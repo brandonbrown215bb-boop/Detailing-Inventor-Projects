@@ -49,3 +49,27 @@ With the Verifier window open, the user selects a surface or part in the list (l
 | v1.0.18.0+ | Locator box / X-Ray | Ctrl+C does not refresh Inventor assembly clipboard; Ctrl+V may paste **previous** Inventor copy |
 
 See also: `HOW_TO_USE.md` and `RELEASE_NOTES.md`.
+
+---
+
+## Perimeter angles on bases with an upturned lip on only some sides
+
+**Status:** By design.
+
+### Symptom
+
+On a base with an upturned lip (UTL), some perimeter angles pass as 10 GA ALM SHT (or 12 GA STL GALV /
+10 GA stainless) while others show **✗ Mismatch** with 16 GA STL GALV as the actual value.
+
+### Cause
+
+The configuration marks the whole base surface as UTL (`upturnedLipHeight`), even when the lip runs on only
+one side. It does not say which sides, so the verifier expects the UTL angle on every perimeter angle of that
+base.
+
+### What to do
+
+Check the flagged angles: if they are on a side with no upturned lip, 16 GA STL GALV is correct and the
+mismatch can be ignored. If they are on the lip side, the part is wrong. The verifier deliberately does not
+accept both values, because that would hide a UTL angle that came out as 16 GA STL GALV.
+

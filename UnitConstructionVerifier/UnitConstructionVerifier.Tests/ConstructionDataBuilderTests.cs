@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
+using UnitConstructionVerifier.Engine;
 using UnitConstructionVerifier.Extraction;
 using UnitConstructionVerifier.Models;
 
@@ -182,7 +183,9 @@ namespace UnitConstructionVerifier.Tests
                 SurfaceType = "BASE",
                 SourceIamPath = "Base_Test.iam",
                 DefaultFloorMaterialGauge = 16,
-                DefaultFloorMaterialType = "STEEL, GALVANIZED"
+                DefaultFloorMaterialType = "STEEL, GALVANIZED",
+                FormedChannelMaterialGauge = 10,
+                FormedChannelMaterialType = "STL HOT ROLL"
             };
 
             var ipt1 = new IptProperties
@@ -198,8 +201,8 @@ namespace UnitConstructionVerifier.Tests
                 OwnerIamPath = "Base_Test.iam",
                 PartNumber = "Formed-Part",
                 Description = "Channel, Formed 10ga",
-                MtlGauge = "10",
-                YCMATL = "STL HOT ROLL"
+                MtlGauge = "12",
+                YCMATL = "ALM HOT ROLL"
             };
             var ipt3 = new IptProperties
             {
@@ -219,12 +222,48 @@ namespace UnitConstructionVerifier.Tests
 
             Assert.AreEqual("16", row.FloorGauge);
             Assert.AreEqual("STL GALV", row.FloorMaterial);
-            Assert.AreEqual("20", row.SubFloorGauge);
-            Assert.AreEqual("STL GALV", row.SubFloorMaterial);
+            // Formed channel comes from config even though the scanned part disagrees.
             Assert.AreEqual("10", row.FormedChannelGauge);
             Assert.AreEqual("STL HOT ROLL", row.FormedChannelMaterial);
-            Assert.AreEqual("12", row.PerimeterAngleGauge);
+
+            // No unitBase sub-floor data in this config, and parts never set expectations.
+            Assert.AreEqual("", row.SubFloorGauge);
+            Assert.AreEqual("", row.SubFloorMaterial);
+
+            // Non-UTL perimeter angle falls back to the 16 GA STL GALV standard without engineering data.
+            Assert.AreEqual("16", row.PerimeterAngleGauge);
             Assert.AreEqual("STL GALV", row.PerimeterAngleMaterial);
+        }
+
+        [Test]
+        public void BaseStructural_ComesFromConfig_NotFromParts()
+        {
+            var config = new ConfigData { SurfaceType = "BASE", SourceIamPath = "B.iam", StructuralMaterialType = "Steel" };
+            var scan = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties { PartNumber = "s1", OwnerIamPath = "B.iam", ModelNumber = "091-30117-186", YCMATL = "ALM C CHNL" },
+                    new IptProperties { PartNumber = "s2", OwnerIamPath = "B.iam", ModelNumber = "091-30117-186", YCMATL = "ALM C CHNL" },
+                }
+            };
+
+            var data = new ConstructionDataBuilder(new List<ConfigData> { config }, null, scan).Build();
+            var result = new VerificationEngine(data, scan).Run();
+
+            Assert.AreEqual("STL C CHNL", data.BaseRows[0].BaseMaterial);
+            Assert.AreEqual(2, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void FormedChannel_FallsBackToStructuralType_WhenConfigOmitsIt()
+        {
+            var config = new ConfigData { SurfaceType = "BASE", SourceIamPath = "B.iam", StructuralMaterialType = "Aluminum" };
+
+            var data = new ConstructionDataBuilder(new List<ConfigData> { config }, null, new IptScanResult()).Build();
+
+            Assert.AreEqual("10", data.BaseRows[0].FormedChannelGauge);
+            Assert.AreEqual("ALM HOT ROLL", data.BaseRows[0].FormedChannelMaterial);
         }
 
         [Test]

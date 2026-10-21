@@ -11,19 +11,6 @@ namespace UnitConstructionVerifier.Extraction
     /// </summary>
     public sealed class IptPropertyReader
     {
-        // iProperty set names
-        private const string UserDefinedSet     = "Inventor User Defined Properties";
-        private const string DesignTrackingSet  = "Design Tracking Properties";
-
-        // iProperty names
-        private const string PropThickness      = "Thickness";
-        private const string PropYCMATL         = "YCMATL";
-        private const string PropModelNumber    = "MODEL_NUMBER";
-        private const string PropMtlGauge       = "INPUT_PARAMETER_Mtl_Gauge";
-        private const string PropMaterialStyle  = "INPUT_PARAMETER_MaterialStyle";
-        private const string PropPartNumber     = "Part Number";
-        private const string PropDescription    = "Description";
-
         public IptScanResult ScanAssembly(AssemblyDocument rootDoc)
         {
             var result  = new IptScanResult();
@@ -74,198 +61,71 @@ namespace UnitConstructionVerifier.Extraction
             }
         }
 
-        private IptProperties ReadPartProperties(PartDocument doc, string ownerIamPath)
+        private static IptProperties ReadPartProperties(PartDocument doc, string ownerIamPath)
+            => IptPropertyMapper.Map(new PartDocumentSource(doc), ownerIamPath);
+
+        /// <summary><see cref="IPartPropertySource"/> over a live Inventor part document.</summary>
+        private sealed class PartDocumentSource : IPartPropertySource
         {
-            var props = new IptProperties
+            private readonly PartDocument _doc;
+
+            public PartDocumentSource(PartDocument doc) => _doc = doc;
+
+            public string FilePath => _doc.FullFileName;
+
+            public string ReadProperty(string setName, string propertyName)
             {
-                FilePath      = doc.FullFileName,
-                OwnerIamPath  = ownerIamPath,
-            };
+                try { return _doc.PropertySets[setName][propertyName]?.Value?.ToString() ?? string.Empty; }
+                catch { return string.Empty; }
+            }
 
-            try
+            public bool HasAttributeSet(string setName) => FindSet(setName) != null;
+
+            public string ReadAttribute(string setName, string attributeName)
             {
-                PropertySets sets = doc.PropertySets;
-                string materialIdentifier = string.Empty;
-
-                // ── Design Tracking Properties ────────────────────────────────
-                PropertySet? tracking = TryGetSet(sets, DesignTrackingSet);
-                string stockNumber = string.Empty;
-                if (tracking is not null)
-                {
-                    props.PartNumber  = ReadProp(tracking, PropPartNumber);
-                    props.Description = ReadProp(tracking, PropDescription);
-                    materialIdentifier = ReadProp(tracking, "Material Identifier");
-                    stockNumber = ReadProp(tracking, "Stock Number");
-                }
-
-                // ── User Defined iProperties ──────────────────────────────────
-                PropertySet? userDefined = TryGetSet(sets, UserDefinedSet);
-                if (userDefined is not null)
-                {
-                    string isHardEditedStr = ReadProp(userDefined, "IS_HARD_EDITED");
-                    props.IsHardEdited = string.Equals(isHardEditedStr, "TRUE", StringComparison.OrdinalIgnoreCase) ||
-                                         string.Equals(isHardEditedStr, "1", StringComparison.OrdinalIgnoreCase);
-
-                    props.Thickness     = ReadProp(userDefined, PropThickness);
-                    props.YCMATL        = ReadProp(userDefined, PropYCMATL);
-                    if (string.IsNullOrWhiteSpace(props.YCMATL))
-                    {
-                        props.YCMATL    = ReadProp(userDefined, "INPUT_PARAMETER_MaterialType");
-                    }
-                    if (string.IsNullOrWhiteSpace(props.YCMATL))
-                    {
-                        props.YCMATL    = ReadProp(userDefined, PropMaterialStyle);
-                    }
-                    props.ModelNumber   = ReadProp(userDefined, PropModelNumber);
-                    if (string.IsNullOrWhiteSpace(props.ModelNumber))
-                    {
-                        props.ModelNumber = stockNumber;
-                    }
-                    props.MtlGauge      = ReadProp(userDefined, PropMtlGauge);
-                    props.MaterialStyle = ReadProp(userDefined, PropMaterialStyle);
-                }
-
-                // ── MOM_DATA AttributeSet (100% Authoritative Source) ─────────
-                AttributeSet? momData = TryGetAttributeSet(doc, "MOM_DATA");
-                if (momData is not null)
-                {
-                    string momMat = ReadAttribute(momData, "MATERIAL_TYPE_CODE");
-                    string momThick = ReadAttribute(momData, "ORIGINAL_SHEET_METAL_THICKNESS");
-                    string momModel = ReadAttribute(momData, "MODEL_NUMBER");
-                    string momSource = ReadAttribute(momData, "PART_SOURCE");
-
-                    if (!string.IsNullOrWhiteSpace(momMat))    props.YCMATL = momMat.Trim();
-                    if (!string.IsNullOrWhiteSpace(momThick))  props.Thickness = momThick.Trim();
-                    if (!string.IsNullOrWhiteSpace(momModel))  props.ModelNumber = momModel.Trim();
-                    if (!string.IsNullOrWhiteSpace(momSource)) props.PartSource = momSource.Trim();
-                }
-
-                // ── Fallback Material Resolution ──────────────────────────────
-                if (string.IsNullOrWhiteSpace(props.YCMATL))
-                {
-                    try
-                    {
-                        string name = doc.ActiveMaterial?.Name;
-                        if (!string.IsNullOrWhiteSpace(name))
-                        {
-                            int colonIdx = name.IndexOf(':');
-                            if (colonIdx >= 0)
-                            {
-                                name = name.Substring(colonIdx + 1);
-                            }
-                            props.YCMATL = name.Trim();
-                        }
-                    }
-                    catch { }
-                }
-
-                if (string.IsNullOrWhiteSpace(props.YCMATL) && !string.IsNullOrWhiteSpace(materialIdentifier))
-                {
-                    props.YCMATL = ExtractMaterialFromIdentifier(materialIdentifier);
-                }
-
-                if (momData is null && props.GetClassification() == "Formed Channel" && props.YCMATL == "STL GALV")
-                {
-                    props.YCMATL = "STL HOT ROLL";
-                }
-
-                // ── Sheet Metal Component Definition ──────────────────────────
-                // Only use the live sheet metal thickness to update the Thickness field if empty.
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(props.Thickness) && doc.ComponentDefinition is SheetMetalComponentDefinition smDef)
+                    var set = FindSet(setName);
+                    if (set == null) return string.Empty;
+                    foreach (Inventor.Attribute attr in set)
+                        if (string.Equals(attr.Name, attributeName, StringComparison.OrdinalIgnoreCase))
+                            return attr.Value?.ToString() ?? string.Empty;
+                }
+                catch { }
+                return string.Empty;
+            }
+
+            public string ActiveMaterialName()
+            {
+                try { return _doc.ActiveMaterial?.Name ?? string.Empty; }
+                catch { return string.Empty; }
+            }
+
+            public string SheetMetalThicknessInches()
+            {
+                try
+                {
+                    if (_doc.ComponentDefinition is SheetMetalComponentDefinition smDef)
                     {
-                        double actualThick = Convert.ToDouble(smDef.Thickness.Value) / 2.54;
-                        props.Thickness = actualThick.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
+                        double inches = Convert.ToDouble(smDef.Thickness.Value) / 2.54;
+                        return inches.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
                     }
                 }
                 catch { }
-
-                // Only fall back to Thickness for gauge display if the user property is truly absent
-                if (string.IsNullOrWhiteSpace(props.MtlGauge))
-                {
-                    props.MtlGauge = props.Thickness;
-                }
+                return string.Empty;
             }
-            catch { /* return whatever we managed to read */ }
 
-            return props;
-        }
-
-        private static AttributeSet? TryGetAttributeSet(PartDocument doc, string setName)
-        {
-            try
+            private AttributeSet? FindSet(string setName)
             {
-                foreach (AttributeSet set in doc.AttributeSets)
+                try
                 {
-                    if (string.Equals(set.Name, setName, StringComparison.OrdinalIgnoreCase))
-                        return set;
+                    foreach (AttributeSet set in _doc.AttributeSets)
+                        if (string.Equals(set.Name, setName, StringComparison.OrdinalIgnoreCase))
+                            return set;
                 }
+                catch { }
+                return null;
             }
-            catch { }
-            return null;
-        }
-
-        private static string ReadAttribute(AttributeSet set, string attrName)
-        {
-            try
-            {
-                foreach (Inventor.Attribute attr in set)
-                {
-                    if (string.Equals(attr.Name, attrName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return attr.Value?.ToString() ?? string.Empty;
-                    }
-                }
-            }
-            catch { }
-            return string.Empty;
-        }
-
-        private static string ExtractMaterialFromIdentifier(string identifier)
-        {
-            if (string.IsNullOrWhiteSpace(identifier)) return string.Empty;
-
-            int hashIndex = identifier.IndexOf('#');
-            if (hashIndex >= 0)
-            {
-                string sub = identifier.Substring(hashIndex + 1);
-                int colonIndex = sub.IndexOf(':');
-                if (colonIndex >= 0)
-                {
-                    sub = sub.Substring(colonIndex + 1);
-                }
-                int newlineIndex = sub.IndexOf('\n');
-                if (newlineIndex >= 0)
-                {
-                    sub = sub.Substring(0, newlineIndex);
-                }
-                int returnIndex = sub.IndexOf('\r');
-                if (returnIndex >= 0)
-                {
-                    sub = sub.Substring(0, returnIndex);
-                }
-                int secondHash = sub.IndexOf('#');
-                if (secondHash >= 0)
-                {
-                    sub = sub.Substring(0, secondHash);
-                }
-                return sub.Trim();
-            }
-
-            return string.Empty;
-        }
-
-        private static PropertySet? TryGetSet(PropertySets sets, string name)
-        {
-            try { return sets[name]; }
-            catch { return null; }
-        }
-
-        private static string ReadProp(PropertySet set, string name)
-        {
-            try { return set[name]?.Value?.ToString() ?? string.Empty; }
-            catch { return string.Empty; }
         }
 
         private static bool HasConfigJson(AssemblyDocument doc)
