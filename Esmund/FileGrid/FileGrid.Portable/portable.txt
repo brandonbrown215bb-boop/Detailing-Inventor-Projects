@@ -1,0 +1,1 @@
+Place this file next to FileGrid.exe to keep layouts and settings in a .\data folder beside the executable (easy to copy to coworkers).

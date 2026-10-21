@@ -1,0 +1,11 @@
+<UserControl x:Class="FileGrid.Portable.Views.GridSurface"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True"
+             AllowDrop="True"
+             Background="#0a0a0a">
+  <Grid>
+    <Canvas x:Name="LinkCanvas" Panel.ZIndex="1" />
+    <Canvas x:Name="BoxCanvas" Panel.ZIndex="2" />
+  </Grid>
+</UserControl>
