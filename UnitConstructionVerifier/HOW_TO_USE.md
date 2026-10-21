@@ -1,8 +1,8 @@
 # Unit Construction Verifier — How to use
 
-**Esmund fork** — Inventor add-in for verifying unit construction against scanned expectations: surfaces, parts, properties, and visual highlight.
+Inventor add-in for verifying unit construction against scanned expectations: surfaces, parts, properties, and visual highlight.
 
-This copy lives under `Esmund/UnitConstructionVerifier` and is **separate from** the root `UnitConstructionVerifier/` folder in this repo (co-worker baseline).
+This root `UnitConstructionVerifier/` copy is the **release line** for detailers. `Esmund/UnitConstructionVerifier` is a separate fork and is not what detailers install.
 
 **Requirements:** Windows, Autodesk Inventor 2020, .NET Framework 4.8 SDK (Visual Studio Build Tools or VS).
 
@@ -10,7 +10,7 @@ This copy lives under `Esmund/UnitConstructionVerifier` and is **separate from**
 
 ## Build and install
 
-From this folder (`Esmund/UnitConstructionVerifier`):
+From this folder (`UnitConstructionVerifier`):
 
 ```bat
 build-and-install.bat
@@ -78,6 +78,9 @@ When editing part properties from the verifier:
 
 - Config-driven parameter names (e.g. **Exterior Gauge & Material**) sync to sheet metal IPTs.
 - Changes save even if the part is already open in Inventor.
+- Edited values go to the user-defined iProperties (`Thickness`, `YCMATL`, `INPUT_PARAMETER_*`) **and** the `MOM_DATA` attribute set (`ORIGINAL_SHEET_METAL_THICKNESS`, `MATERIAL_TYPE_CODE`). `MOM_DATA` is read first when present.
+- Every edited part is stamped `IS_HARD_EDITED = TRUE`, `MOM_DATA.PART_SOURCE = SQPart`, `MOM_DATA.DOCUMENT_STATUS = Changed_SQ`, and gets the `EditedAppearance` color from `materials_config.json` (default **Yellow**).
+- Write-back has not yet been signed off on real units; check edited parts in Inventor before releasing them.
 - Use **Edit Mode** flows in the UI as documented in the window — apply only after reviewing the grid.
 
 ---
@@ -118,7 +121,7 @@ Creates a source zip (respects `_package_exclude.txt`). Useful for transfer to a
 |-------|-----|
 | Add-in not in Inventor | Confirm deploy path, restart Inventor, check `.addin` in Addins folder |
 | Deploy “file locked” | Close Inventor; deploy renames old DLL with timestamp |
-| Highlight missing on direct IAM open | Ensure you’re on this fork (v1.0.17+ feature) |
+| Highlight missing on direct IAM open | Ensure you’re on v1.0.17 or later |
 | Property write-back failed | Confirm IPT is sheet metal and parameter names match config JSON |
 | Accidental paste dialog | Cancel in Inventor; see clipboard section above |
 
@@ -128,6 +131,8 @@ Creates a source zip (respects `_package_exclude.txt`). Useful for transfer to a
 
 | File | Purpose |
 |------|---------|
-| `STABLE_BASE.md` | Fork feature summary and version notes |
+| `RELEASE_NOTES.md` | Version history |
+| `Docs/project_review.md` | Roadmap to the v1 release (section 0) |
+| `Docs/config_rules_guide.md` | Adding part classification rules |
 | `Docs/known_issues.md` | Operational troubleshooting |
 | `UnitConstructionVerifier/materials_config.json` | Materials / thickness mapping |

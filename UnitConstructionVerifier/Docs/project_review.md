@@ -4,6 +4,40 @@
 
 ---
 
+## 0. v1 Release Direction (agreed 2026-10-21)
+
+This section supersedes the roadmap in section 6. Sections 1–5 remain as background.
+
+### Finish line
+
+The **root `UnitConstructionVerifier/` copy** is the release line. v1 is done when detailers on
+Inventor 2020 install it per-user (no admin rights) from a shared network folder and can trust its
+pass/fail signal on normal multi-skid units. `Esmund/UnitConstructionVerifier/` stays a separate fork
+that may feed features back; it is not merged or retired.
+
+Status since the July review: the config-driven `PartRules` engine (including Seal-Off Angle), the R2
+highlight/wireframe/preview work, and `MOM_DATA` read/write-back with the hard-edit appearance have
+shipped in the root copy.
+
+### Phases
+
+| Phase | Scope | Done when |
+|---|---|---|
+| **0. Release baseline** | Fix root docs (`HOW_TO_USE.md` currently describes the Esmund fork), bring over `known_issues.md`, remove `.bak` files and the stale dist zip, port missing Esmund v1.0.17–1.0.19 fixes and the `PartPropertyEditsMapper` test, version bump and release notes | Root builds, tests pass, docs describe root |
+| **1. Correctness** | Snapshot regression tests first (capture 2–3 known-good multi-skid units), then sequence-fallback segment rows (MB/AT/FF), an Unknown-classification indicator, per-row pass/fail in the surface list, and builder test expansion | Snapshot suite green; no silently skipped parts |
+| **2. Hover tooltip simplification** | Reduce `ThicknessHoverCommand` to the signal still useful alongside the verifier window | Tooltip contents agreed with the user and shipped |
+| **3. Write-back field validation** | Workstation smoke checklist for `MOM_DATA` + iProperty + appearance write-back, including whether `PART_SOURCE=SQPart` / `DOCUMENT_STATUS=Changed_SQ` are safe for downstream MOM DXF/nesting tools, and read-only/open-part handling | Checklist signed off on real units |
+| **4. IDW BOM verification (report only)** | Locate surface and skid-packet IDWs (sibling folder first, browse fallback), compare BOM rows and material annotations against the assembly and verified specs. No IDW edits in v1 | Report shown in the verifier for a real unit |
+| **5. Rollout** | Network-share release with a per-user install/update/rollback script, version shown in the UI, file-based error log, logging for silent `catch {}` blocks, debug JSON dumps gated, distribution guide, pilot with 1–2 detailers | Pilot detailers using it without help |
+
+### Deferred past v1
+
+- Excel-driven library part write-back / MOM add-in conversion (`library_part_writeback_implementation_plan.md`).
+- IDW write-back of material fields.
+- Vault checkout integration.
+
+---
+
 ## 1. Project Summary
 
 The **UnitConstructionVerifier** is an Autodesk Inventor 2020 COM add-in (.NET/C# + WPF) that cross-checks physical AHU assembly parts against their engineering configuration database. It reads embedded `DOCUMENT_CONFIG_JSON` attributes from surface IAMs, scans IPT custom properties (`YCMATL`, gauge, stock number), builds an expected-vs-actual material spec comparison, and displays mismatches in a tabbed WPF panel with optional write-back to Inventor.
@@ -89,7 +123,7 @@ This means the classification engine needs a **config-driven rule schema** in `m
 
 ---
 
-## 6. Prioritized Roadmap
+## 6. Prioritized Roadmap (July 2026 — superseded by section 0)
 
 ### 🔴 Priority 1 — Expand Part Classification Rules & Correctness
 

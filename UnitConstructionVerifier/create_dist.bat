@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: Source Paths (Relative to solution root)
-set "BIN_DIR=UnitConstructionVerifier\bin\Debug\net48"
+set "BIN_DIR=UnitConstructionVerifier\bin\Release\net48"
 set "SRC_DIR=UnitConstructionVerifier"
 set "DIST_DIR=dist"
 set "ZIP_NAME=UnitConstructionVerifier_Dist.zip"
