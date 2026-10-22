@@ -943,16 +943,30 @@
             </Grid>
         </Border>
 
-        <!-- ── Re-check summary ── -->
-        <Border x:Name="CheckBanner" Grid.Row="1" Margin="12,10,12,0" CornerRadius="6" Padding="12,7"
-                Background="{StaticResource FailTint}" Visibility="Collapsed">
-            <DockPanel>
-                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="✕" Click="OnCloseBannerClick" ToolTip="Dismiss"/>
-                <Button x:Name="BannerNextIssueButton" DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Go to first issue"
-                        Margin="0,0,8,0" Click="OnNextIssueClick"/>
-                <TextBlock x:Name="CheckBannerText" TextWrapping="Wrap" VerticalAlignment="Center"/>
-            </DockPanel>
-        </Border>
+        <StackPanel Grid.Row="1">
+            <!-- ── Inventor moved to another unit than the one being checked ── -->
+            <Border x:Name="OtherUnitBanner" Margin="12,10,12,0" CornerRadius="6" Padding="12,7"
+                    Background="{StaticResource PendingTint}" BorderBrush="{StaticResource AccentPending}" BorderThickness="1" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="✕" Click="OnCloseOtherUnitBannerClick"
+                            ToolTip="Keep checking this unit"/>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Check this unit" Margin="0,0,8,0"
+                            Click="OnCheckActiveUnitClick" ToolTip="Close this check (asks about unsaved changes) and check the unit open in Inventor"/>
+                    <TextBlock x:Name="OtherUnitText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource AccentPending}"/>
+                </DockPanel>
+            </Border>
+
+            <!-- ── Re-check summary ── -->
+            <Border x:Name="CheckBanner" Margin="12,10,12,0" CornerRadius="6" Padding="12,7"
+                    Background="{StaticResource FailTint}" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="✕" Click="OnCloseBannerClick" ToolTip="Dismiss"/>
+                    <Button x:Name="BannerNextIssueButton" DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Go to first issue"
+                            Margin="0,0,8,0" Click="OnNextIssueClick"/>
+                    <TextBlock x:Name="CheckBannerText" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </DockPanel>
+            </Border>
+        </StackPanel>
 
         <!-- ── Surface tabs ── -->
         <TabControl x:Name="MainTabControl" Grid.Row="2" Background="Transparent" BorderThickness="0" SelectionChanged="OnMainTabChanged">
@@ -1445,6 +1459,22 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Progress while part files are written and the unit re-scanned. Blocks input; the view underneath stays as it was
+             (disabling the whole view turned the surface lists white and greyed everything, which looked broken). -->
+        <Grid x:Name="BusyOverlay" Grid.RowSpan="4" Panel.ZIndex="11" Background="#B30C0D12" Visibility="Collapsed">
+            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
+                    MaxWidth="460" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock x:Name="BusyTitle" Text="Writing part changes…" Style="{StaticResource SectionHeader}" FontSize="15"/>
+                    <TextBlock x:Name="BusyDetail" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                    <ProgressBar x:Name="BusyProgress" Height="6" Minimum="0" Maximum="1" Foreground="{StaticResource AccentPending}"
+                                 Background="{StaticResource BgInput}" BorderThickness="0"/>
+                    <TextBlock Text="Inventor opens, updates and saves each part in turn, so this can take a while on many parts."
+                               Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="11.5"/>
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <!-- Write review: every staged change; untick to leave it staged. Covers the window until Write or Cancel. -->
         <Grid x:Name="WriteReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">

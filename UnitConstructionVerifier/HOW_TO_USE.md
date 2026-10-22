@@ -50,6 +50,10 @@ The verifier is **modeless** — you can pan and rotate the model in Inventor wh
   Status, Part, Expected and In part. Description, Type and Checks come back when it is wider.
 - The dock's own ✕ only hides it. Run the command again on the same unit to bring it back as it was. Running it on a
   different unit closes the open one first, asking about unsaved changes.
+- The verifier keeps checking the unit it was opened on. When Inventor switches to a different assembly, a yellow bar
+  says so; **Check this unit** closes the current check (asking about unsaved changes) and checks the one Inventor is
+  on. Opening one of the unit's own surface sub-assemblies does not count as another unit. Selecting a surface in the
+  verifier switches Inventor back to the verifier's unit, so the highlight lands on the right model.
 - Closing Inventor does not ask about unsaved changes in a docked verifier. Click **Save expectations** first.
 
 ---
@@ -142,7 +146,9 @@ When editing part properties from the verifier:
 - **Review & write to parts…** opens a review over the window listing every staged change: part, property, the
   value now, and the value it will be. Untick any change you do not want written yet; unticked changes stay
   staged. **Write N changes** writes the ticked ones in one Inventor transaction (part files must be checked out
-  of Vault); **Cancel** writes nothing.
+  of Vault); **Cancel** writes nothing. While it writes, a progress panel shows which part it is on
+  (Inventor opens, updates and saves each part in turn, which takes a while on many parts), then the verifier
+  re-checks its own unit.
 - If a staged edit cannot be written to a part property, the review shows it struck through and unticked.
 
 ### Unsaved changes

@@ -96,6 +96,11 @@ static class Program
         grid.SelectedIndex = 1;
         Pump();
         Shot(w0, "02-roof-selected");
+        v0.ShowActiveAssembly(@"C:\Units\OTHER-UNIT_MAIN.iam");
+        Pump();
+        Shot(w0, "07-other-unit");
+        v0.ShowActiveAssembly(data.IamPath);
+        Pump();
 
         ((ButtonBase)v0.FindName("BannerNextIssueButton")).GetType();
         v0.GetType().GetMethod("OnVerify", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
@@ -118,6 +123,12 @@ static class Program
         Pump();
         Shot(w0, "06-write-review");
         v0.GetType().GetMethod("OnWriteReviewCancel", flags)!.Invoke(v0, new object[] { v0, new RoutedEventArgs() });
+        Pump();
+        v0.GetType().GetMethod("ShowBusy", flags)!.Invoke(v0, new object[] { "Writing part changes…" });
+        v0.GetType().GetMethod("UpdateBusy", flags)!.Invoke(v0, new object[] { "4 of 11: 091Z010068-0089.ipt", 3.0 / 11 });
+        Pump();
+        Shot(w0, "08-busy");
+        ((FrameworkElement)v0.FindName("BusyOverlay")).Visibility = Visibility.Collapsed;
         Pump();
 
         ((TabControl)v0.FindName("MainTabControl")).SelectedIndex = 2;

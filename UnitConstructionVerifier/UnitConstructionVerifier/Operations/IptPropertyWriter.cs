@@ -25,15 +25,10 @@ namespace UnitConstructionVerifier.Operations
 
             try
             {
-                // Optimization: Search already-loaded documents first.
-                foreach (Document openDoc in _app.Documents)
-                {
-                    if (string.Equals(openDoc.FullFileName, iptPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        doc = openDoc as PartDocument;
-                        break;
-                    }
-                }
+                // Already loaded (as part of the open unit, usually)? A direct lookup: walking every open document cost
+                // hundreds of COM calls per part on a full unit.
+                try { doc = _app.Documents.get_ItemByName(iptPath) as PartDocument; }
+                catch { doc = null; }
 
                 // If not found in the open documents collection, open it silently in the background
                 if (doc == null)

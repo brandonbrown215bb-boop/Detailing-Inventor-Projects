@@ -2,6 +2,17 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.30.0 (2026-10-22) — following units; writing many parts
+
+- **Switching units:** when Inventor moves to a different assembly, the verifier shows which unit it is still
+  checking, with **Check this unit** to switch. Before, it kept showing the first unit with no hint.
+- **Writing many parts** no longer greys out the whole verifier and turns the surface lists white while Inventor works.
+  A progress panel shows which part is being written (4 of 11: …) and blocks input until it finishes.
+- **Fixed:** after writing, the verifier re-scanned whichever assembly was active in Inventor, so writing while
+  Inventor was on another unit loaded that unit's parts into the verifier. It now re-scans its own unit, and the
+  undo transaction is on its own unit too.
+- Finding each part to write is a direct lookup instead of a walk over every open document (hundreds on a full unit).
+
 ## v1.0.29.0 (2026-10-22) — dock the verifier inside Inventor
 
 - **Dock / Pop out** (header) moves the verifier between its own window and a panel docked inside Inventor (right of

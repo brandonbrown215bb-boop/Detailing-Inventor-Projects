@@ -112,6 +112,40 @@ namespace UnitConstructionVerifier.UI
 
         private void OnDockToggleClick(object sender, RoutedEventArgs e) => DockToggleRequested?.Invoke();
 
+        /// <summary>Raised by the bar's Check this unit button: check the assembly now active in Inventor instead.</summary>
+        public event Action? CheckActiveUnitRequested;
+
+        /// <summary>
+        /// Says when Inventor is on a different assembly than the unit being checked, and offers to check that one.
+        /// Hidden for this unit and for its own surface sub-assemblies (opened directly, they are still this unit).
+        /// Nothing is re-scanned until the user asks, so staged edits are never dropped behind their back.
+        /// </summary>
+        public void ShowActiveAssembly(string activeIamPath)
+        {
+            if (IsThisUnit(activeIamPath))
+            {
+                OtherUnitBanner.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            OtherUnitText.Text = $"Inventor is on {Path.GetFileName(activeIamPath)}. This verifier is still checking {Path.GetFileName(_iamPath)}.";
+            OtherUnitBanner.Visibility = Visibility.Visible;
+        }
+
+        private bool IsThisUnit(string iamPath)
+        {
+            bool Same(string? other) => !string.IsNullOrWhiteSpace(other) && string.Equals(other, iamPath, StringComparison.OrdinalIgnoreCase);
+            return Same(_iamPath)
+                || _data.RoofRows.Any(r => Same(r.SourceSurfaceIam))
+                || _data.WallRows.Any(r => Same(r.SourceSurfaceIam))
+                || _data.BaseRows.Any(r => Same(r.SourceSurfaceIam))
+                || (_iptResult?.Parts.Any(p => Same(p.OwnerIamPath)) ?? false);
+        }
+
+        private void OnCloseOtherUnitBannerClick(object sender, RoutedEventArgs e) => OtherUnitBanner.Visibility = Visibility.Collapsed;
+
+        private void OnCheckActiveUnitClick(object sender, RoutedEventArgs e) => CheckActiveUnitRequested?.Invoke();
+
         /// <summary>The unit assembly this view checks.</summary>
         public string IamPath => _iamPath;
 
@@ -1132,9 +1166,10 @@ namespace UnitConstructionVerifier.UI
             Inventor.Transaction trans = null;
             try
             {
-                if (_inventorApp.ActiveDocument != null)
+                Inventor._Document? transactionDoc = (Inventor._Document?)FindUnitDocument() ?? _inventorApp.ActiveDocument;
+                if (transactionDoc != null)
                 {
-                    trans = _inventorApp.TransactionManager.StartTransaction(_inventorApp.ActiveDocument, "UCV Edit Mode Sync");
+                    trans = _inventorApp.TransactionManager.StartTransaction(transactionDoc, "UCV Edit Mode Sync");
                 }
             }
             catch (Exception ex)
@@ -1146,7 +1181,8 @@ namespace UnitConstructionVerifier.UI
             int successCount = 0;
             var errorList = new List<string>();
 
-            this.IsEnabled = false;
+            int fileNumber = 0;
+            ShowBusy("Writing part changes…");
 
             try
             {
@@ -1154,6 +1190,10 @@ namespace UnitConstructionVerifier.UI
                 {
                     string filePath = kvp.Key;
                     Operations.PartPropertyEdits edits = kvp.Value;
+
+                    // Show which part is being written before Inventor blocks on it.
+                    fileNumber++;
+                    UpdateBusy($"{fileNumber} of {groupedEdits.Count}: {Path.GetFileName(filePath)}", (fileNumber - 1.0) / groupedEdits.Count);
 
                     if (writer.UpdatePartProperties(filePath, edits, out string err))
                     {
@@ -1163,11 +1203,6 @@ namespace UnitConstructionVerifier.UI
                     {
                         errorList.Add($"{Path.GetFileName(filePath)}: {err}");
                     }
-
-                    // Keep UI responsive (STA constraint friendly)
-                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
-                        System.Windows.Threading.DispatcherPriority.Background,
-                        new Action(() => { }));
                 }
 
                 if (errorList.Count > 0)
@@ -1202,9 +1237,9 @@ namespace UnitConstructionVerifier.UI
 
                     string stillStaged = _pendingEdits.Count == 0 ? string.Empty
                         : $" {WriteReview.Plural(_pendingEdits.Count, "change")} still staged.";
-                    ShowNotice($"Updated {WriteReview.Plural(successCount, "part file")}. Re-scanned the assembly.{stillStaged}");
-
+                    UpdateBusy($"Re-checking {Path.GetFileName(_iamPath)}…", 1);
                     ReScanAndRefresh();
+                    ShowNotice($"Updated {WriteReview.Plural(successCount, "part file")}. Re-checked the unit.{stillStaged}");
                 }
             }
             catch (Exception ex)
@@ -1217,13 +1252,17 @@ namespace UnitConstructionVerifier.UI
             }
             finally
             {
-                this.IsEnabled = true;
+                BusyOverlay.Visibility = Visibility.Collapsed;
             }
         }
 
         private void ReScanAndRefresh()
         {
-            if (string.IsNullOrEmpty(_iamPath) || _inventorApp.ActiveDocument is not Inventor.AssemblyDocument asmDoc) return;
+            if (string.IsNullOrEmpty(_iamPath) || FindUnitDocument() is not Inventor.AssemblyDocument asmDoc)
+            {
+                ShowNotice($"{Path.GetFileName(_iamPath)} is not open in Inventor, so it was not re-checked.");
+                return;
+            }
 
             try
             {
@@ -1240,6 +1279,39 @@ namespace UnitConstructionVerifier.UI
             {
                 Dialogs.Show(this, $"Failed to re-scan assembly after update: {ex.Message}", "Error Refreshing", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        /// <summary>
+        /// The unit this verifier checks, if it is open in Inventor. Never just the active assembly: the user may have
+        /// moved Inventor to another unit, and re-scanning that one would load its parts into this verifier.
+        /// </summary>
+        private Inventor.AssemblyDocument? FindUnitDocument()
+        {
+            try
+            {
+                return _inventorApp.Documents.get_ItemByName(_iamPath) as Inventor.AssemblyDocument;
+            }
+            catch
+            {
+                return null; // not open
+            }
+        }
+
+        private void ShowBusy(string title)
+        {
+            BusyTitle.Text = title;
+            BusyDetail.Text = string.Empty;
+            BusyProgress.Value = 0;
+            BusyOverlay.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>Updates the progress panel and lets WPF draw it before the next blocking Inventor call.</summary>
+        private void UpdateBusy(string detail, double fraction)
+        {
+            BusyDetail.Text = detail;
+            BusyProgress.Value = fraction;
+            // Render runs above Background priority, so this returns after the panel has been redrawn.
+            Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
         }
 
         // ── Text Normalization & Format Utilities ──────────────────────────────
@@ -2012,6 +2084,12 @@ namespace UnitConstructionVerifier.UI
         /// </summary>
         private void OnViewPreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (BusyOverlay.Visibility == Visibility.Visible)
+            {
+                e.Handled = true;
+                return;
+            }
+
             var focused = Keyboard.FocusedElement as DependencyObject;
             bool inText = focused is System.Windows.Controls.Primitives.TextBoxBase;
             ModifierKeys modifiers = Keyboard.Modifiers;

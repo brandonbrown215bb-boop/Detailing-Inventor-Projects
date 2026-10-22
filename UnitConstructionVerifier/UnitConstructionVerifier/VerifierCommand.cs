@@ -29,8 +29,37 @@ namespace UnitConstructionVerifier
         private InvBtnDef?      _buttonDef;
         private InvBtnSink?     _onExecuteHandler;
         private VerifierPresenter? _presenter;
+        private Inventor.ApplicationEvents? _appEvents;
+        private Inventor.ApplicationEventsSink_OnActivateDocumentEventHandler? _onActivateDocument;
 
-        internal VerifierCommand(InvApp app) => _app = app;
+        internal VerifierCommand(InvApp app)
+        {
+            _app = app;
+
+            // An open verifier (docked especially) says when Inventor moves to another unit, and offers to check it.
+            _appEvents = app.ApplicationEvents;
+            _onActivateDocument = OnActivateDocument;
+            _appEvents.OnActivateDocument += _onActivateDocument;
+        }
+
+        private void OnActivateDocument(Inventor._Document document, Inventor.EventTimingEnum beforeOrAfter, InvNVM context,
+            out Inventor.HandlingCodeEnum handlingCode)
+        {
+            handlingCode = Inventor.HandlingCodeEnum.kEventNotHandled;
+            if (beforeOrAfter != Inventor.EventTimingEnum.kAfter || _presenter?.Current is not VerifierView view) return;
+
+            try
+            {
+                if (document.DocumentType == Inventor.DocumentTypeEnum.kAssemblyDocumentObject)
+                {
+                    view.ShowActiveAssembly(document.FullFileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierCommand.OnActivateDocument");
+            }
+        }
 
         // ── Called by RibbonManager ───────────────────────────────────────────
 
@@ -187,7 +216,10 @@ namespace UnitConstructionVerifier
 
         // ── Button click ──────────────────────────────────────────────────────
 
-        private void OnExecute(InvNVM context)
+        private void OnExecute(InvNVM context) => Verify();
+
+        /// <summary>Checks the assembly active in Inventor: the ribbon button, and the verifier's Check this unit bar.</summary>
+        private void Verify()
         {
             DebugLogger.Clear();
             DebugLogger.Log("OnExecute started");
@@ -218,8 +250,17 @@ namespace UnitConstructionVerifier
                 _presenter ??= new VerifierPresenter(_app);
                 if (_presenter.Current is VerifierView open)
                 {
-                    if (string.Equals(open.IamPath, iamPath, StringComparison.OrdinalIgnoreCase) || !_presenter.Close())
+                    if (string.Equals(open.IamPath, iamPath, StringComparison.OrdinalIgnoreCase))
                     {
+                        DebugLogger.Log("Verifier already open on this unit; bringing it forward");
+                        _presenter.BringForward();
+                        return;
+                    }
+
+                    DebugLogger.Log($"Closing the verifier on {open.IamPath}");
+                    if (!_presenter.Close())
+                    {
+                        DebugLogger.Log("Close cancelled (unsaved changes kept)");
                         _presenter.BringForward();
                         return;
                     }
@@ -267,6 +308,8 @@ namespace UnitConstructionVerifier
                 var view = new VerifierView(data, iamPath, _app);
                 view.SetIptScanResult(iptResult);
                 view.SetSnapshot(snapshot);
+                // After the click finishes: Verify closes the view whose button raised this.
+                view.CheckActiveUnitRequested += () => view.Dispatcher.BeginInvoke(new Action(Verify));
                 _presenter.Show(view);
                 DebugLogger.Log($"Verifier opened ({(_presenter.IsDocked ? "docked" : "window")})");
             }
@@ -284,6 +327,11 @@ namespace UnitConstructionVerifier
         {
             _presenter?.Dispose();
             _presenter = null;
+
+            if (_appEvents is not null && _onActivateDocument is not null)
+            {
+                _appEvents.OnActivateDocument -= _onActivateDocument;
+            }
             if (_buttonDef is not null && _onExecuteHandler is not null)
                 _buttonDef.OnExecute -= _onExecuteHandler;
             _buttonDef        = null;
