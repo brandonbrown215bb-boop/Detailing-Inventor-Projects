@@ -862,13 +862,13 @@
 
         <!-- ── Header: unit, overall status, highlight, edit switch ── -->
         <Border Grid.Row="0" Background="{StaticResource BgSurface}" Padding="16,10">
-            <Grid>
+            <Grid x:Name="HeaderGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="⬡" FontSize="20" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock x:Name="IamPathLabel" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="320"
@@ -893,9 +893,9 @@
                             </Border>
                         </StackPanel>
                     </Button>
-                </StackPanel>
+                </WrapPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Highlight" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <Border Background="{StaticResource BgInput}" CornerRadius="6" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
@@ -937,7 +937,7 @@
                     <CheckBox x:Name="EditModeCheckBox" Style="{StaticResource SwitchCheckBox}" Content="Edit parts"
                               Checked="OnEditModeChanged" Unchecked="OnEditModeChanged"
                               ToolTip="Stage changes to part properties, then write them to the IPT files"/>
-                </StackPanel>
+                </WrapPanel>
             </Grid>
         </Border>
 
@@ -966,7 +966,7 @@
                     </StackPanel>
                 </TabItem.Header>
                 <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
-                    <Grid>
+                    <Grid x:Name="RoofBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
                             <ColumnDefinition Width="5"/>
@@ -1010,7 +1010,7 @@
                                                 </ToggleButton.Template>
                                             </ToggleButton>
                                         </DockPanel>
-                                        <Grid Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=RoofSpecToggle, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid x:Name="RoofSpecGrid" Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=RoofSpecToggle, Converter={StaticResource BoolToVisibility}}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1066,14 +1066,14 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
                                     <DockPanel Margin="0,0,0,8">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <WrapPanel x:Name="RoofPartsActions" DockPanel.Dock="Right" Orientation="Horizontal">
                                             <StackPanel x:Name="RoofSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                                 <Button Content="Use expected for selected" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncSelectedRoof"/>
                                                 <Button Content="Use expected for all mismatches" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncAllMismatchesRoof"/>
                                             </StackPanel>
                                             <Button x:Name="RoofPreviewButton" Content="Preview part" Style="{StaticResource SmallButton}" IsEnabled="False"
                                                     Click="OnWireframePreviewClick" ToolTip="Open a wireframe of the selected part"/>
-                                        </StackPanel>
+                                        </WrapPanel>
                                         <TextBlock Text="Parts" Style="{StaticResource SectionHeader}" Margin="0,0,14,0"/>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <RadioButton x:Name="RoofFilterAll" GroupName="RoofFilter" Tag="All" Content="All" IsChecked="True" Style="{StaticResource FilterChip}" Checked="OnPartsFilterChanged"/>
@@ -1098,7 +1098,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="RoofPlaceholderText" Text="Select a roof surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="RoofPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a roof surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1116,7 +1116,7 @@
                     </StackPanel>
                 </TabItem.Header>
                 <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
-                    <Grid>
+                    <Grid x:Name="WallBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
                             <ColumnDefinition Width="5"/>
@@ -1160,7 +1160,7 @@
                                                 </ToggleButton.Template>
                                             </ToggleButton>
                                         </DockPanel>
-                                        <Grid Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=WallSpecToggle, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid x:Name="WallSpecGrid" Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=WallSpecToggle, Converter={StaticResource BoolToVisibility}}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1215,14 +1215,14 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
                                     <DockPanel Margin="0,0,0,8">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <WrapPanel x:Name="WallPartsActions" DockPanel.Dock="Right" Orientation="Horizontal">
                                             <StackPanel x:Name="WallSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                                 <Button Content="Use expected for selected" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncSelectedWall"/>
                                                 <Button Content="Use expected for all mismatches" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncAllMismatchesWall"/>
                                             </StackPanel>
                                             <Button x:Name="WallPreviewButton" Content="Preview part" Style="{StaticResource SmallButton}" IsEnabled="False"
                                                     Click="OnWireframePreviewClick" ToolTip="Open a wireframe of the selected part"/>
-                                        </StackPanel>
+                                        </WrapPanel>
                                         <TextBlock Text="Parts" Style="{StaticResource SectionHeader}" Margin="0,0,14,0"/>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <RadioButton x:Name="WallFilterAll" GroupName="WallFilter" Tag="All" Content="All" IsChecked="True" Style="{StaticResource FilterChip}" Checked="OnPartsFilterChanged"/>
@@ -1247,7 +1247,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="WallPlaceholderText" Text="Select a wall surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="WallPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a wall surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1265,7 +1265,7 @@
                     </StackPanel>
                 </TabItem.Header>
                 <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
-                    <Grid>
+                    <Grid x:Name="BaseBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
                             <ColumnDefinition Width="5"/>
@@ -1305,7 +1305,7 @@
                                                 </ControlTemplate>
                                             </ToggleButton.Template>
                                         </ToggleButton>
-                                        <Grid Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=BaseSpecToggle, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid x:Name="BaseSpecGrid" Margin="14,10,0,0" Visibility="{Binding IsChecked, ElementName=BaseSpecToggle, Converter={StaticResource BoolToVisibility}}">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1368,14 +1368,14 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
                                     <DockPanel Margin="0,0,0,8">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <WrapPanel x:Name="BasePartsActions" DockPanel.Dock="Right" Orientation="Horizontal">
                                             <StackPanel x:Name="BaseSyncButtonsPanel" Orientation="Horizontal" Visibility="Collapsed">
                                                 <Button Content="Use expected for selected" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncSelectedBase"/>
                                                 <Button Content="Use expected for all mismatches" Style="{StaticResource SmallButton}" Margin="0,0,6,0" Click="OnSyncAllMismatchesBase"/>
                                             </StackPanel>
                                             <Button x:Name="BasePreviewButton" Content="Preview part" Style="{StaticResource SmallButton}" IsEnabled="False"
                                                     Click="OnWireframePreviewClick" ToolTip="Open a wireframe of the selected part"/>
-                                        </StackPanel>
+                                        </WrapPanel>
                                         <TextBlock Text="Parts" Style="{StaticResource SectionHeader}" Margin="0,0,14,0"/>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <RadioButton x:Name="BaseFilterAll" GroupName="BaseFilter" Tag="All" Content="All" IsChecked="True" Style="{StaticResource FilterChip}" Checked="OnPartsFilterChanged"/>
@@ -1400,7 +1400,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="BasePlaceholderText" Text="Select a base or floor surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="BasePlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a base or floor surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1410,13 +1410,13 @@
 
         <!-- ── Footer ── -->
         <Border Grid.Row="3" Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16,9">
-            <Grid>
+            <Grid x:Name="FooterGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Border x:Name="EditModeFooterPanel" Background="{StaticResource PendingTint}" BorderBrush="{StaticResource AccentPending}"
                             BorderThickness="1" CornerRadius="6" Padding="10,4" Margin="0,0,12,0" Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
@@ -1431,9 +1431,9 @@
                                VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed"
                                ToolTip="Click Save expectations to keep these changes for this unit"/>
                     <TextBlock x:Name="NoticeText" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
+                </WrapPanel>
 
-                <StackPanel Grid.Column="1" x:Name="NormalModeFooterPanel" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" x:Name="NormalModeFooterPanel" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <Button x:Name="OverflowButton" Content="⋯" Style="{StaticResource GhostButton}" FontSize="14" Padding="10,2" Margin="0,0,6,0"
                             Click="OnOverflowClick" ToolTip="More"/>
                     <Button Content="Save expectations" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="OnSave"
@@ -1468,12 +1468,12 @@
                             <TextBlock Grid.Column="5" Text="Will be" Style="{StaticResource ColumnLabel}"/>
                         </Grid>
                     </StackPanel>
-                    <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="False">
+                    <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
                         <Button x:Name="WriteReviewConfirmButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="14,5"
                                 Background="{StaticResource AccentPending}" Content="Write changes" Click="OnWriteReviewConfirm"/>
                         <Button x:Name="WriteReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                                 Content="Cancel" IsCancel="True" Click="OnWriteReviewCancel"/>
-                        <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"
+                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,12,0"
                                    Text="Part files must be checked out of Vault. Ticked changes are written in one transaction."/>
                     </DockPanel>
                     <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1">

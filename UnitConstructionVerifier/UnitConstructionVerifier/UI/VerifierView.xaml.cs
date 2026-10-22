@@ -92,6 +92,9 @@ namespace UnitConstructionVerifier.UI
             // Inventor hosts this view without a WPF Application, so an uncaught exception in any handler
             // terminates Inventor. Log it and keep running instead. Removed in Shutdown.
             Dispatcher.UnhandledException += OnDispatcherUnhandledException;
+
+            // Docked beside the model the view is narrow: fold to one column there, back to two when wide.
+            SizeChanged += (_, __) => ApplyResponsiveLayout();
         }
 
         /// <summary>The unit assembly this view checks.</summary>
@@ -121,6 +124,85 @@ namespace UnitConstructionVerifier.UI
 
             return true;
         }
+
+        private bool? _narrow;
+
+        /// <summary>True while the view uses the one-column layout for a narrow dock.</summary>
+        public bool IsNarrow => _narrow == true;
+
+        /// <summary>
+        /// Below <see cref="ResponsiveLayout.NarrowBelow"/> the surface list sits above the detail, each expectation
+        /// form reads top to bottom (collapsed until opened), header and footer stack, the part action buttons move under
+        /// the filters, and the grid drops Description, Type and Checks (Expected and In part show what each check is).
+        /// </summary>
+        private void ApplyResponsiveLayout()
+        {
+            if (ActualWidth <= 0) return;
+            bool narrow = ActualWidth < ResponsiveLayout.NarrowBelow;
+            if (_narrow == narrow) return;
+            _narrow = narrow;
+
+            var columnLabel = TryFindResource("ColumnLabel") as Style;
+            Func<UIElement, bool> repeatedHeader = e => columnLabel != null && e is TextBlock text && text.Style == columnLabel;
+
+            foreach (Grid body in new[] { RoofBody, WallBody, BaseBody })
+            {
+                if (narrow)
+                    ResponsiveLayout.StackColumns(body,
+                        new RowDefinition { Height = new GridLength(190), MinHeight = 110 },
+                        new RowDefinition { Height = new GridLength(5) },
+                        new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 220 });
+                else
+                    ResponsiveLayout.Restore(body);
+            }
+
+            // The forms are tall once folded; start them collapsed so the parts grid keeps its room.
+            foreach (System.Windows.Controls.Primitives.ToggleButton toggle in new[] { RoofSpecToggle, WallSpecToggle, BaseSpecToggle })
+            {
+                toggle.IsChecked = !narrow;
+            }
+
+            foreach (Grid form in new[] { RoofSpecGrid, WallSpecGrid, BaseSpecGrid })
+            {
+                if (narrow) ResponsiveLayout.FoldColumns(form, 4, repeatedHeader);
+                else ResponsiveLayout.Restore(form);
+            }
+
+            foreach (Grid bar in new[] { HeaderGrid, FooterGrid })
+            {
+                if (narrow) ResponsiveLayout.FoldColumns(bar, 1);
+                else ResponsiveLayout.Restore(bar);
+            }
+
+            foreach (WrapPanel actions in new[] { RoofPartsActions, WallPartsActions, BasePartsActions })
+            {
+                DockPanel.SetDock(actions, narrow ? Dock.Bottom : Dock.Right);
+                actions.Margin = narrow ? new Thickness(0, 6, 0, 0) : new Thickness(0);
+            }
+
+            foreach (DataGrid grid in new[] { RoofPartsGrid, WallPartsGrid, BasePartsGrid })
+            {
+                foreach (DataGridColumn column in grid.Columns)
+                {
+                    string header = column.Header as string ?? string.Empty;
+                    if (header == "Description" || header == "Type" || header == "Checks")
+                    {
+                        column.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+                    }
+                    else if (header == "Status" || header == "Expected" || header == "In part")
+                    {
+                        // Let the remaining columns share a ~400 px dock instead of scrolling sideways.
+                        if (!_wideColumnSizes.ContainsKey(column)) _wideColumnSizes[column] = (column.Width, column.MinWidth);
+                        (DataGridLength width, double minWidth) = _wideColumnSizes[column];
+                        column.MinWidth = narrow ? 76 : minWidth;
+                        column.Width = narrow && header == "Status" ? new DataGridLength(86) : width;
+                    }
+                }
+            }
+        }
+
+        private readonly Dictionary<DataGridColumn, (DataGridLength Width, double MinWidth)> _wideColumnSizes =
+            new Dictionary<DataGridColumn, (DataGridLength Width, double MinWidth)>();
 
         /// <summary>Called once when the view is closed for good, after <see cref="ConfirmClose"/>.</summary>
         public void Shutdown()
