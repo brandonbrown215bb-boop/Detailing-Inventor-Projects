@@ -50,6 +50,9 @@ namespace UnitConstructionVerifier
             {
                 EnsureDirectoryExists();
                 string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR in {context}: {ex.Message}\r\nStack Trace:\r\n{ex.StackTrace}\r\n";
+                // XAML load errors hide the real cause in inner exceptions.
+                for (Exception? inner = ex.InnerException; inner != null; inner = inner.InnerException)
+                    line += $"  Inner {inner.GetType().Name}: {inner.Message}\r\n";
                 File.AppendAllText(LogPath, line);
             }
             catch {}

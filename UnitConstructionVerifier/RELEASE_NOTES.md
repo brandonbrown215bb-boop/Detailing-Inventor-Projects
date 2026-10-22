@@ -2,6 +2,38 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.25.0 (2026-10-21) — window redesign (UI review Option A)
+
+The verifier window keeps its layout but shows problems before you go looking and stops interrupting with dialogs.
+
+- **Status everywhere:** the header shows mismatches across the unit, tabs show a count per surface type, and
+  each surface has a status dot and count. Status re-runs on its own when an expectation changes.
+  **Next issue** (F8) jumps to the next surface with a mismatch.
+- **Re-check unit** (was Run Verification Check) shows its summary in a banner with **Go to first issue**
+  instead of a message box. Saves, copies and "copied to all" show a short note in the footer.
+- **Highlight** is one labelled choice: **Box / X-Ray / Off** (replaces the X-Ray checkbox and Normal button).
+  Off now stays off until you pick Box or X-Ray.
+- **Edit parts** switch replaces the Edit Mode checkbox. Staged edits collect in a footer tray that stays visible
+  until they are written or discarded; Re-check and Save stay available while editing.
+- **Expected construction** uses labelled Gauge / Material columns that no longer rewrap, and can be collapsed.
+  Upturned lip and curb rest moved from the header to Base & Floor → Unit. Gauges are listed in numeric order.
+- **Parts grid:** colored status chips, All / Issues / Not checked filters, not-checked reasons inline after the
+  description, columns renamed (Checks, Expected, In part). The copy buttons are gone: right-click for
+  **Copy part number** (all selected rows) or press Ctrl+C.
+- **Search** filters surfaces by surface number, segment or part number.
+- **Fixed:** right-click **Open in Inventor** on a part row did nothing (the menu never saw the row).
+  The wireframe preview opened partly off-screen; it now opens on whichever side of the verifier fits.
+  Selected surfaces and tabs were hard to read, grids had a light row-header strip and light scrollbars,
+  and not-checked rows were not grey.
+- **Copy to all roofs/walls** asks before replacing other surfaces' expectations.
+- **Crash guard:** an error inside the verifier window is now logged to `ucv_debug.txt` and shown as a note
+  in the footer. Inventor gives add-in windows no WPF `Application`, so before this any uncaught error
+  closed Inventor without a log entry.
+- Two problems found while testing in Inventor: the window failed to open because Inventor runs WPF in
+  .NET 4.0 compatibility, where two system colour keys collide; and clicking a part's description text
+  closed Inventor (the click handler could not walk up from a text run). Both are fixed and covered by tests.
+- Save Snapshot moved to the footer **⋯** menu.
+
 ## v1.0.24.0 (2026-10-21) — window no longer loses edits
 
 From the UI review of the verifier window (data risks D1–D4 and I3).

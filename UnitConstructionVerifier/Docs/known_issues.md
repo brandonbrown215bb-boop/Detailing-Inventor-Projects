@@ -21,7 +21,7 @@ With the Verifier window open, the user selects a surface or part in the list (l
 
 3. **Ctrl+V** therefore applies whatever was **already on Inventor’s clipboard** from an earlier **Inventor** copy (Ctrl+C in the graphics window or browser), not from the Verifier list.
 
-4. The Verifier has **no custom Ctrl+C / Ctrl+V handlers**. Grid **Ctrl+C** only copies visible cell text (WPF default). The **⧉** buttons copy part/surface **text** via `Clipboard.SetText`, not assembly occurrences.
+4. The Verifier has **no Ctrl+V handler**. Ctrl+C on a selected part or surface copies its **number** as text (v1.0.25), and the right-click **Copy part number / Copy surface number** items do the same via `Clipboard.SetText`. None of these put assembly occurrences on the clipboard.
 
 ### What is *not* happening
 
@@ -31,9 +31,9 @@ With the Verifier window open, the user selects a surface or part in the list (l
 
 ### Workarounds for users
 
-- Before using the Verifier, avoid leaving a stale **Inventor component copy** on the clipboard; copy something neutral in Notepad, or use **Normal** / close the Verifier and clear selection if confused.
+- Before using the Verifier, avoid leaving a stale **Inventor component copy** on the clipboard; copy something neutral in Notepad, or set **Highlight → Off** / close the Verifier and clear selection if confused.
 - If paste was accidental, cancel Inventor’s resolve/paste dialog; no change was made by the Verifier itself.
-- Use **⧉** on a row when you need the part or surface **number** on the text clipboard.
+- Right-click a row and use **Copy part number / Copy surface number** when you need the number on the text clipboard.
 
 ### Possible future mitigations (not implemented)
 

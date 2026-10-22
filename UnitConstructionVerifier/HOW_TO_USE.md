@@ -43,37 +43,65 @@ The verifier window is **modeless** — you can pan and rotate the model in Inve
 
 ## Main window
 
-### Surface list
+### Header
 
-- Lists surfaces from the construction scan for the active unit.
-- **Click a row** to highlight that surface in Inventor.
-- **⧉** buttons copy part or surface **text** to the Windows clipboard (use these instead of Ctrl+C for numbers).
-
-### Highlight modes
+- The unit file name, then a status pill: **✓ All N checked parts match** or **✗ N mismatches on M surfaces**.
+  It updates on its own whenever an expectation changes; there is nothing to run first.
+- **N not checked** appears when a rule covers a part but it could not be checked.
+- **Next issue** (or **F8**) jumps to the next surface with a mismatch, opens its tab, and selects the first
+  mismatched part.
+- **Highlight** chooses how the selected surface or part is shown in Inventor:
 
 | Mode | Behavior |
 |------|----------|
-| **Default (locator box)** | Oriented range box around the part/surface — does not use Inventor SelectSet |
-| **X-Ray** | Detailed edge outline within the active surface |
-| **Normal** | Restores native Inventor green prehighlight; also restores when the window closes |
+| **Box** (default) | Colored locator box around the part or surface. Does not use Inventor's selection set. |
+| **X-Ray** | Detailed edge outline of the selected part within its surface. |
+| **Off** | No verifier highlight; Inventor's normal green selection is restored (same as Highlighter's Normal). Stays off until you pick Box or X-Ray. Closing the window also restores normal selection. |
 
-Pick highlight color from the header swatch (shared with X-Ray palette).
+  The round swatch next to it picks the highlight color.
+- **Edit parts** turns on part editing (see below).
 
-### Expectations / parts grids
+### Surface tabs and list
 
-- Review expected vs actual construction data per surface.
-- Each part row shows **✓ Pass**, **✗ Mismatch** (red), **Display only**, or **– Not checked** (grey italic). Hover a not-checked row for the reason: no expected value, the part sits in the wrong surface type, or its IAM has no surface row.
-- Parts no rule in `materials_config.json` covers are not verified and not listed.
-- **Run Verification Check** reports how many parts were checked and how many could not be.
-- Parts changed after the unit was generated (SQ parts, or parts edited here) show **· modified** after their status. A freshly generated unit has none.
+- Tabs show a red count of mismatches per surface type, or a green ✓ when that type has none.
+- Each surface has a status dot (red: mismatches, green: all checked parts match, grey: nothing checked) and a
+  red count.
+- **Find surface or part…** filters the list by surface number, segment, or the number of any part inside the
+  surface.
+- **Click a surface** to highlight it in Inventor. Right-click for **Copy surface number** and **Open in Inventor**.
+
+### Expected construction
+
+- Gauge and material sit in labelled columns that do not move when the window is resized. Click the
+  **Expected construction** heading to collapse the block and give the parts grid more room.
+- **Copy to all roofs… / Copy to all walls…** asks before replacing the other surfaces' expectations.
+- **Upturned lip** and **Curb rest** are unit-wide settings, under **Unit** on the Base & Floor tab.
 - Expectations come from the unit's own configuration and engineering data: each roof/wall uses its own side of the unit, sub-floor comes from the base configuration, and perimeter angles on bases with an upturned lip (UTL) are 10 GA aluminum/stainless or 12 GA STL GALV by floor type (16 GA STL GALV otherwise). On a base whose lip runs on only some sides, the standard angles on the non-lip sides show as mismatches by design; see `Docs/known_issues.md`. See `Docs/part_types_classification.md`.
-- **Apply** actions push approved edits (e.g. casing, properties) to parts.
-- Splitters between sections can be dragged to resize.
+
+### Parts grid
+
+- **All / Issues / Not checked** filter the grid; each shows its count.
+- **Status** is a colored chip: **✓ Pass**, **✗ Mismatch**, **Display only**, **– Not checked**, or **● Staged**.
+  Hover the chip for the reason or, on a staged row, the old and new value.
+- A not-checked part shows its reason after the description: no expected value, the part sits in the wrong
+  surface type, or its IAM has no surface row.
+- Parts changed after the unit was generated (SQ parts, or parts edited here) show **· modified** after their status. A freshly generated unit has none.
+- Parts no rule in `materials_config.json` covers are not verified and not listed.
+- Right-click a part for **Copy part number** (all selected rows), **Preview part**, and **Open in Inventor**.
+- **Re-check unit** (footer) runs every check again and shows a summary banner with **Go to first issue**.
+- The splitter between the surface list and the detail pane can be dragged.
 
 ### Wireframe preview
 
-- Opens a separate **modeless** preview window.
+- **Preview part** is enabled once a part is selected. The preview opens beside the verifier, on whichever side
+  fits on screen, as a separate **modeless** window.
 - Middle-drag to pan; shows sheet metal cuts and standard hole features.
+
+### Footer
+
+- Short confirmations (saved, copied, copied expectations) appear at the bottom left instead of in a dialog.
+- **Save expectations** keeps expectation changes for this unit in the sidecar file next to the IAM.
+- **⋯** holds **Save snapshot for regression tests…** (see below).
 
 ---
 
@@ -86,13 +114,16 @@ When editing part properties from the verifier:
 - Edited values go to the user-defined iProperties (`Thickness`, `YCMATL`, `INPUT_PARAMETER_*`) **and** the `MOM_DATA` attribute set (`ORIGINAL_SHEET_METAL_THICKNESS`, `MATERIAL_TYPE_CODE`). `MOM_DATA` is read first when present.
 - Every edited part is stamped `IS_HARD_EDITED = TRUE`, `MOM_DATA.PART_SOURCE = SQPart`, `MOM_DATA.DOCUMENT_STATUS = Changed_SQ`, and gets the `EditedAppearance` color from `materials_config.json` (default **Yellow**).
 - Write-back has not yet been signed off on real units; check edited parts in Inventor before releasing them.
-- Use **Edit Mode** flows in the UI as documented in the window — apply only after reviewing the grid.
-- Part values can be edited only while **Edit Mode** is on, and only on rows whose checked parameter can be written back (thickness, gauge & material, base/formed-channel material). Other rows stay read-only, and **Sync** skips them.
+- Turn on **Edit parts**, then double-click a value in **In part**, or use **Use expected for selected / for all
+  mismatches**. Edits are staged: the footer tray shows how many, and nothing is written until
+  **Review & write to parts…**. **Discard** drops them. The tray stays visible while edits are staged, even if
+  you turn **Edit parts** off.
+- Part values can be edited only while **Edit parts** is on, and only on rows whose checked parameter can be written back (thickness, gauge & material, base/formed-channel material). Other rows stay read-only, and **Sync** skips them.
 - If a staged edit cannot be written, the confirmation lists it as skipped instead of dropping it silently.
 
 ### Unsaved changes
 
-- Changing an expectation (or the lip/curb settings) shows **● Unsaved expectation changes** in the footer until you click **Save Overrides**.
+- Changing an expectation (or the lip/curb settings) shows **● Unsaved expectation changes** in the footer until you click **Save expectations**.
 - Closing the verifier with unsaved expectation changes or staged part edits asks first: **Yes** saves expectations and closes, **No** closes without saving, **Cancel** keeps the window open. Staged part edits are never written on close.
 - Expectation dropdowns always show the surface's stored value, even when it is not in the standard list (it appears at the top of the list). A blank value stays blank; Thermal Break no longer shows "No" for a blank value.
 
@@ -100,7 +131,7 @@ When editing part properties from the verifier:
 
 ## Save Snapshot (regression baselines)
 
-**Save Snapshot** in the footer writes `<unit>.unit_snapshot.json` (default: next to the IAM) with the scan data the verifier built its expectations from. Use it on units you know are correct, then add them to the tests as described in `UnitConstructionVerifier.Tests/Snapshots/README.md`. It does not change any Inventor files.
+**Save snapshot for regression tests…** (footer **⋯** menu) writes `<unit>.unit_snapshot.json` (default: next to the IAM) with the scan data the verifier built its expectations from. Use it on units you know are correct, then add them to the tests as described in `UnitConstructionVerifier.Tests/Snapshots/README.md`. It does not change any Inventor files.
 
 ---
 
@@ -118,7 +149,7 @@ Default highlight uses a **locator box**, not Inventor’s selection set.
 - **Ctrl+C in the verifier does not** put the highlighted row on Inventor’s assembly clipboard.
 - If the unit IAM is active, **Ctrl+V in Inventor** may still paste an **older** Inventor copy and trigger missing-reference dialogs.
 
-**Workaround:** Use **⧉** for part/surface numbers. Avoid Ctrl+V in Inventor while verifying unless you know what’s on the clipboard.
+**Workaround:** Right-click a part or surface and use **Copy part number / Copy surface number**. Ctrl+C on a selected row copies its number too, unless Inventor intercepts the shortcut first. Avoid Ctrl+V in Inventor while verifying unless you know what’s on the clipboard.
 
 Full notes: `Docs/known_issues.md`
 

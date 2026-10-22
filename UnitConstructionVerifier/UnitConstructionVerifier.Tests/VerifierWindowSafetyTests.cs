@@ -131,7 +131,7 @@ namespace UnitConstructionVerifier.Tests
         public void Actual_Columns_Start_Read_Only()
         {
             var columns = WindowXaml().Descendants(Wpf + "DataGridTextColumn")
-                .Where(c => (string?)c.Attribute("Header") == "Actual Part Spec")
+                .Where(c => (string?)c.Attribute("Header") == "In part")
                 .ToList();
 
             Assert.AreEqual(3, columns.Count);

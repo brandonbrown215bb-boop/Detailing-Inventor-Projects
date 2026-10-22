@@ -4,7 +4,7 @@
         Title="Part Wireframe Preview"
         Width="520" Height="440" MinWidth="360" MinHeight="320"
         WindowStartupLocation="Manual"
-        Background="#1E1E2E">
+        Background="#191B22">
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -20,7 +20,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="TitleLabel"
                        Grid.Column="0"
-                       Foreground="#F8F8F2"
+                       Foreground="#E7E9EF"
                        FontSize="13"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"
@@ -38,7 +38,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="PreviewSwatchBorder"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="#44445A"
+                                BorderBrush="#4A5163"
                                 BorderThickness="1"
                                 CornerRadius="4"/>
                         <ControlTemplate.Triggers>
@@ -54,8 +54,8 @@
                    Placement="Bottom"
                    StaysOpen="False"
                    AllowsTransparency="True">
-                <Border Background="#2A2A3E"
-                        BorderBrush="#44445A"
+                <Border Background="#20232B"
+                        BorderBrush="#4A5163"
                         BorderThickness="1"
                         CornerRadius="6"
                         Padding="4">
@@ -65,8 +65,8 @@
         </Grid>
 
         <Border Grid.Row="1"
-                Background="#12121A"
-                BorderBrush="#44445A"
+                Background="#15171D"
+                BorderBrush="#4A5163"
                 BorderThickness="1"
                 CornerRadius="6"
                 ClipToBounds="True">
@@ -81,7 +81,7 @@
 
         <TextBlock Grid.Row="2"
                    Margin="0,8,0,0"
-                   Foreground="#AAAACC"
+                   Foreground="#98A0B1"
                    FontSize="11"
                    Text="Drag: rotate · Wheel: zoom · Middle-drag: pan · Updates when surface/part selection changes"/>
     </Grid>

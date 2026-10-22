@@ -34,14 +34,31 @@ namespace UnitConstructionVerifier.UI
         private bool _keepVerifierAboveInventor;
         private bool _pendingVerifierStackRestore;
         private bool _pendingVerifierFocusRestore;
+        private HighlightMode _highlightMode = HighlightMode.Box;
+        private readonly SurfaceStatusBoard _statusBoard;
+        private readonly System.Windows.Threading.DispatcherTimer _statusTimer;
+        private readonly System.Windows.Threading.DispatcherTimer _noticeTimer;
+        private readonly Dictionary<DataGrid, string> _partsFilters = new Dictionary<DataGrid, string>();
+
+        private enum HighlightMode { Box, XRay, Off }
 
         public VerifierWindow(UnitConstructionData data, string iamPath, Inventor.Application inventorApp)
         {
+            // Must exist before the XAML loads: the surface list templates reference it as a StaticResource.
+            _statusBoard = new SurfaceStatusBoard();
+            Resources["StatusBoard"] = _statusBoard;
+
             InitializeComponent();
 
             _data    = data;
             _iamPath = iamPath;
             _inventorApp = inventorApp;
+
+            // Expectation edits re-run the whole-unit check after typing pauses.
+            _statusTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _statusTimer.Tick += (_, __) => { _statusTimer.Stop(); RefreshUnitStatus(); };
+            _noticeTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _noticeTimer.Tick += (_, __) => { _noticeTimer.Stop(); NoticeText.Text = string.Empty; };
 
             IamPathLabel.Text = Path.GetFileName(iamPath);
 
@@ -49,12 +66,23 @@ namespace UnitConstructionVerifier.UI
             MaterialsConfig.Initialize();
 
             // Populate dropdowns with standard config options
-            PopulateDropdowns(MaterialsConfig.Gauges, MaterialsConfig.Materials);
+            PopulateDropdowns(WindowLayout.OrderGauges(MaterialsConfig.Gauges), MaterialsConfig.Materials);
 
             // Populate list boxes
             RoofSurfaceList.ItemsSource = _data.RoofRows;
             WallSurfaceList.ItemsSource = _data.WallRows;
             BaseSurfaceList.ItemsSource = _data.BaseRows;
+
+            foreach (DataGrid grid in new[] { RoofPartsGrid, WallPartsGrid, BasePartsGrid })
+            {
+                _partsFilters[grid] = "All";
+                grid.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, OnCopyPartNumbersCommand));
+            }
+
+            foreach (ListBox list in new[] { RoofSurfaceList, WallSurfaceList, BaseSurfaceList })
+            {
+                list.CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, OnCopySurfaceNumberCommand));
+            }
 
             // Load global other specs
             PopulateGlobalSpecs();
@@ -62,11 +90,24 @@ namespace UnitConstructionVerifier.UI
 
             Activated += (_, __) => _keepVerifierAboveInventor = true;
             Closing += OnVerifierWindowClosing;
+
+            // Inventor hosts this window without a WPF Application, so an uncaught exception in any handler
+            // terminates Inventor. Log it and keep running instead.
+            Dispatcher.UnhandledException += OnDispatcherUnhandledException;
+            Closed += (_, __) => Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+        }
+
+        private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            DebugLogger.Log(e.Exception, "VerifierWindow (unhandled)");
+            e.Handled = true;
+            try { ShowNotice($"Something went wrong: {e.Exception.Message} (details in ucv_debug.txt)"); } catch { }
         }
 
         public void SetIptScanResult(IptScanResult iptResult)
         {
             _iptResult = iptResult;
+            RefreshUnitStatus();
         }
 
         public void SetSnapshot(UnitSnapshot snapshot)
@@ -132,6 +173,7 @@ namespace UnitConstructionVerifier.UI
         {
             _overridesDirty = true;
             UnsavedOverridesLabel.Visibility = Visibility.Visible;
+            ScheduleStatusRefresh();
         }
 
         private void ClearOverridesDirty()
@@ -228,7 +270,7 @@ namespace UnitConstructionVerifier.UI
         private void OnApplyRoofToAll(object sender, RoutedEventArgs e)
         {
             var selected = RoofSurfaceList.SelectedItem as RoofSurfaceRow;
-            if (selected == null) return;
+            if (selected == null || !ConfirmCopyToAll("roof", "roofs", _data.RoofRows.Count - 1)) return;
 
             foreach (var row in _data.RoofRows)
             {
@@ -247,7 +289,7 @@ namespace UnitConstructionVerifier.UI
             }
 
             MarkOverridesDirty();
-            MessageBox.Show("Casing specifications copied to all Roof surfaces.", "Apply Casing Specs", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowNotice($"Copied expectations from {selected.PartNumber} to {_data.RoofRows.Count - 1} other roofs.");
         }
 
         // ── Wall Tab Event Handlers ───────────────────────────────────────────
@@ -326,7 +368,7 @@ namespace UnitConstructionVerifier.UI
         private void OnApplyWallToAll(object sender, RoutedEventArgs e)
         {
             var selected = WallSurfaceList.SelectedItem as WallSurfaceRow;
-            if (selected == null) return;
+            if (selected == null || !ConfirmCopyToAll("wall", "walls", _data.WallRows.Count - 1)) return;
 
             foreach (var row in _data.WallRows)
             {
@@ -344,7 +386,7 @@ namespace UnitConstructionVerifier.UI
             }
 
             MarkOverridesDirty();
-            MessageBox.Show("Casing specifications copied to all Wall surfaces.", "Apply Casing Specs", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowNotice($"Copied expectations from {selected.PartNumber} to {_data.WallRows.Count - 1} other walls.");
         }
 
         // ── Base Tab Event Handlers ───────────────────────────────────────────
@@ -453,11 +495,60 @@ namespace UnitConstructionVerifier.UI
         private void RefreshPartsGridCore(object surfaceRow)
         {
             if (surfaceRow is RoofSurfaceRow roof)
-                RoofPartsGrid.ItemsSource = BuildPartsGridRows(roof.SourceSurfaceIam, "Roof", VerificationEngine.BuildRowFields(roof));
+                ShowPartsRows(RoofPartsGrid, BuildPartsGridRows(roof.SourceSurfaceIam, "Roof", VerificationEngine.BuildRowFields(roof)));
             else if (surfaceRow is WallSurfaceRow wall)
-                WallPartsGrid.ItemsSource = BuildPartsGridRows(wall.SourceSurfaceIam, "Wall", VerificationEngine.BuildRowFields(wall));
+                ShowPartsRows(WallPartsGrid, BuildPartsGridRows(wall.SourceSurfaceIam, "Wall", VerificationEngine.BuildRowFields(wall)));
             else if (surfaceRow is BaseSurfaceRow bs)
-                BasePartsGrid.ItemsSource = BuildPartsGridRows(bs.SourceSurfaceIam, "Base", VerificationEngine.BuildRowFields(bs));
+                ShowPartsRows(BasePartsGrid, BuildPartsGridRows(bs.SourceSurfaceIam, "Base", VerificationEngine.BuildRowFields(bs)));
+        }
+
+        private void ShowPartsRows(DataGrid grid, List<IptVerificationRow> rows)
+        {
+            grid.ItemsSource = rows;
+            ApplyPartsFilter(grid);
+
+            var (all, issues, notChecked) = FilterChipsFor(grid);
+            all.Content = $"All {rows.Count}";
+            issues.Content = $"Issues {rows.Count(r => r.IsMismatch)}";
+            notChecked.Content = $"Not checked {rows.Count(r => r.IsNotChecked)}";
+            UpdatePreviewButtons();
+        }
+
+        private (RadioButton All, RadioButton Issues, RadioButton NotChecked) FilterChipsFor(DataGrid grid)
+        {
+            if (ReferenceEquals(grid, WallPartsGrid)) return (WallFilterAll, WallFilterIssues, WallFilterNotChecked);
+            if (ReferenceEquals(grid, BasePartsGrid)) return (BaseFilterAll, BaseFilterIssues, BaseFilterNotChecked);
+            return (RoofFilterAll, RoofFilterIssues, RoofFilterNotChecked);
+        }
+
+        private void ApplyPartsFilter(DataGrid grid)
+        {
+            if (grid.ItemsSource == null) return;
+
+            string filter = _partsFilters.TryGetValue(grid, out string? f) ? f : "All";
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(grid.ItemsSource);
+            view.Filter = filter switch
+            {
+                "Issues" => item => item is IptVerificationRow r && (r.IsMismatch || r.IsEditPending),
+                "NotChecked" => item => item is IptVerificationRow r && r.IsNotChecked,
+                _ => null
+            };
+        }
+
+        private void OnPartsFilterChanged(object sender, RoutedEventArgs e)
+        {
+            // Checked fires while the XAML loads, before the grids exist.
+            if (!IsInitialized || sender is not RadioButton chip || chip.Tag is not string filter) return;
+
+            DataGrid grid = chip.GroupName switch
+            {
+                "WallFilter" => WallPartsGrid,
+                "BaseFilter" => BasePartsGrid,
+                _ => RoofPartsGrid
+            };
+
+            _partsFilters[grid] = filter;
+            ApplyPartsFilter(grid);
         }
 
         /// <summary>
@@ -489,8 +580,7 @@ namespace UnitConstructionVerifier.UI
         {
             PersistenceManager.SaveOverrides(_iamPath, _data);
             ClearOverridesDirty();
-            MessageBox.Show($"Overrides saved to:\n{PersistenceManager.GetSidecarPath(_iamPath)}",
-                "Saved Overrides", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowNotice($"Expectations saved to {Path.GetFileName(PersistenceManager.GetSidecarPath(_iamPath))}.");
         }
 
         private void OnSaveSnapshot(object sender, RoutedEventArgs e)
@@ -528,43 +618,141 @@ namespace UnitConstructionVerifier.UI
 
         private void OnVerify(object sender, RoutedEventArgs e)
         {
-            if (_iptResult is null)
-            {
-                MessageBox.Show("IPT scan data not available — cannot verify.",
-                    "Verify", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            RefreshUnitStatus();
+            UnitStatus status = _statusBoard.Status;
 
-            var engine = new VerificationEngine(_data, _iptResult);
-            VerificationResult result = engine.Run();
+            CheckBannerText.Text = status.BannerText();
+            CheckBanner.Background = (Brush)FindResource(status.Mismatches > 0 ? "FailTint" : status.Scanned ? "PassTint" : "MutedTint");
+            BannerNextIssueButton.Visibility = status.Mismatches > 0 ? Visibility.Visible : Visibility.Collapsed;
+            CheckBanner.Visibility = Visibility.Visible;
 
-            int passed     = result.CountOf(PartCheckStatus.Pass);
-            int notChecked = result.CountOf(PartCheckStatus.NotChecked);
-            int modified   = result.Checks.Count(c => c.IsModified);
-            string coverage = $"\n\nChecked: {passed + result.Mismatches.Count} parts" +
-                              (notChecked > 0 ? $"\nNot checked: {notChecked} parts (shown in grey in the surface grids; hover for the reason)" : string.Empty) +
-                              (modified > 0 ? $"\nModified after generation (SQ or edited): {modified} parts, marked \"modified\" in the grids" : string.Empty);
-
-            if (result.IsPass && notChecked == 0)
-            {
-                MessageBox.Show("✓  All checks passed! No mismatches found across any surfaces." + coverage,
-                    "Verification Passed", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            else if (result.IsPass)
-            {
-                MessageBox.Show("✓  No mismatches found, but some parts could not be checked." + coverage,
-                    "Verification Incomplete", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            else
-            {
-                MessageBox.Show($"✗  Verification complete. Found {result.Mismatches.Count} mismatches in this assembly. Review individual surface grids to see discrepancies highlighted in red." + coverage,
-                    "Verification Mismatches", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-
-            // Force refresh current selection parts grid
             if (RoofSurfaceList.SelectedItem != null) RefreshPartsGrid(RoofSurfaceList.SelectedItem);
             if (WallSurfaceList.SelectedItem != null) RefreshPartsGrid(WallSurfaceList.SelectedItem);
             if (BaseSurfaceList.SelectedItem != null) RefreshPartsGrid(BaseSurfaceList.SelectedItem);
+        }
+
+        private void OnCloseBannerClick(object sender, RoutedEventArgs e)
+        {
+            CheckBanner.Visibility = Visibility.Collapsed;
+        }
+
+        // ── Unit Status ───────────────────────────────────────────────────────
+
+        private void ScheduleStatusRefresh()
+        {
+            _statusTimer.Stop();
+            _statusTimer.Start();
+        }
+
+        /// <summary>Re-runs every check and updates the header pill, tab badges and surface dots.</summary>
+        private void RefreshUnitStatus()
+        {
+            _statusTimer.Stop();
+            UnitStatus status = _iptResult is null
+                ? UnitStatus.Empty
+                : UnitStatus.From(new VerificationEngine(_data, _iptResult).Run());
+            _statusBoard.Update(status);
+
+            OverallStatusText.Text = status.HeaderText();
+            string tone = !status.Scanned ? "Muted" : status.Mismatches > 0 ? "Fail" : "Pass";
+            OverallStatusPill.Background = (Brush)FindResource(tone + "Tint");
+            OverallStatusText.Foreground = (Brush)FindResource(tone switch
+            {
+                "Fail" => "AccentRed",
+                "Pass" => "AccentGreen",
+                _ => "TextSecondary"
+            });
+
+            NotCheckedText.Text = $"{status.NotChecked} not checked";
+            NotCheckedPill.Visibility = status.NotChecked > 0 ? Visibility.Visible : Visibility.Collapsed;
+            NextIssueButton.Visibility = status.Mismatches > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            SetTabBadge(RoofTabBadge, RoofTabBadgeText, status, _data.RoofRows.Select(r => r.SourceSurfaceIam));
+            SetTabBadge(WallTabBadge, WallTabBadgeText, status, _data.WallRows.Select(r => r.SourceSurfaceIam));
+            SetTabBadge(BaseTabBadge, BaseTabBadgeText, status, _data.BaseRows.Select(r => r.SourceSurfaceIam));
+        }
+
+        private void SetTabBadge(Border badge, TextBlock text, UnitStatus status, IEnumerable<string> surfaceIams)
+        {
+            var iams = surfaceIams.ToList();
+            if (!status.Scanned || iams.Count == 0)
+            {
+                badge.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            int mismatches = status.MismatchesIn(iams);
+            badge.Visibility = Visibility.Visible;
+            text.Text = mismatches > 0 ? mismatches.ToString(CultureInfo.InvariantCulture) : "✓";
+            badge.Background = (Brush)FindResource(mismatches > 0 ? "FailTint" : "PassTint");
+            text.Foreground = (Brush)FindResource(mismatches > 0 ? "AccentRed" : "AccentGreen");
+        }
+
+        private void OnNextIssueClick(object sender, RoutedEventArgs e) => GoToNextIssue();
+
+        /// <summary>Selects the next surface, in tab order after the current one, that has a mismatch.</summary>
+        private void GoToNextIssue()
+        {
+            UnitStatus status = _statusBoard.Status;
+            var lists = new[] { RoofSurfaceList, WallSurfaceList, BaseSurfaceList };
+            var stops = new List<(int Tab, object Row)>();
+            for (int tab = 0; tab < lists.Length; tab++)
+            {
+                foreach (object row in lists[tab].Items)
+                {
+                    if (status.For(SurfaceStatusBoard.SurfaceIamOf(row)).Mismatches > 0)
+                        stops.Add((tab, row));
+                }
+            }
+
+            if (stops.Count == 0)
+            {
+                ShowNotice("No mismatches left on this unit.");
+                return;
+            }
+
+            int currentTab = Math.Max(0, MainTabControl.SelectedIndex);
+            object? current = lists[currentTab].SelectedItem;
+            int at = stops.FindIndex(s => s.Tab == currentTab && ReferenceEquals(s.Row, current));
+            int next = at >= 0 ? (at + 1) % stops.Count : Math.Max(0, stops.FindIndex(s => s.Tab >= currentTab));
+            (int nextTab, object nextRow) = stops[next];
+
+            MainTabControl.SelectedIndex = nextTab;
+            ListBox list = lists[nextTab];
+            list.SelectedItem = nextRow;
+            list.ScrollIntoView(nextRow);
+
+            DataGrid grid = new[] { RoofPartsGrid, WallPartsGrid, BasePartsGrid }[nextTab];
+            var firstIssue = (grid.ItemsSource as IEnumerable<IptVerificationRow>)?.FirstOrDefault(r => r.IsMismatch);
+            if (firstIssue != null)
+            {
+                grid.SelectedItem = firstIssue;
+                grid.ScrollIntoView(firstIssue);
+            }
+        }
+
+        // ── Notices ───────────────────────────────────────────────────────────
+
+        /// <summary>Shows a short confirmation in the footer instead of a dialog.</summary>
+        private void ShowNotice(string message)
+        {
+            NoticeText.Text = message;
+            _noticeTimer.Stop();
+            _noticeTimer.Start();
+        }
+
+        private bool ConfirmCopyToAll(string one, string many, int otherCount)
+        {
+            if (otherCount <= 0)
+            {
+                ShowNotice($"There are no other {many} to copy to.");
+                return false;
+            }
+
+            return MessageBox.Show(this,
+                $"Replace the expectations of the other {otherCount} {(otherCount == 1 ? one : many)} with the values on this {one}?\n\n" +
+                "Their current expectations are overwritten. Nothing is written to part files.",
+                "Copy Expectations", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         }
 
         // ── Edit Mode Actions & Handlers ─────────────────────────────────────
@@ -620,6 +808,8 @@ namespace UnitConstructionVerifier.UI
                 {
                     _pendingEdits.Remove(key);
                 }
+
+                UpdateEditFooter();
             }
         }
 
@@ -627,19 +817,28 @@ namespace UnitConstructionVerifier.UI
         {
             bool isEdit = EditModeCheckBox.IsChecked == true;
 
-            // Enable/disable column editing
-            if (RoofPartsGrid.Columns.Count > 6) RoofPartsGrid.Columns[6].IsReadOnly = !isEdit;
-            if (WallPartsGrid.Columns.Count > 6) WallPartsGrid.Columns[6].IsReadOnly = !isEdit;
-            if (BasePartsGrid.Columns.Count > 6) BasePartsGrid.Columns[6].IsReadOnly = !isEdit;
+            RoofActualColumn.IsReadOnly = !isEdit;
+            WallActualColumn.IsReadOnly = !isEdit;
+            BaseActualColumn.IsReadOnly = !isEdit;
 
-            // Show/hide sync panels
             RoofSyncButtonsPanel.Visibility = isEdit ? Visibility.Visible : Visibility.Collapsed;
             WallSyncButtonsPanel.Visibility = isEdit ? Visibility.Visible : Visibility.Collapsed;
             BaseSyncButtonsPanel.Visibility = isEdit ? Visibility.Visible : Visibility.Collapsed;
 
-            // Show/hide footers
-            EditModeFooterPanel.Visibility = isEdit ? Visibility.Visible : Visibility.Collapsed;
-            NormalModeFooterPanel.Visibility = isEdit ? Visibility.Collapsed : Visibility.Visible;
+            UpdateEditFooter();
+        }
+
+        /// <summary>
+        /// The staging tray stays visible while Edit parts is on or any edit is staged, so turning the
+        /// switch off never hides edits that still need writing or discarding.
+        /// </summary>
+        private void UpdateEditFooter()
+        {
+            int staged = _pendingEdits.Count;
+            EditModeFooterPanel.Visibility = EditModeCheckBox.IsChecked == true || staged > 0 ? Visibility.Visible : Visibility.Collapsed;
+            StagedEditsText.Text = staged == 0
+                ? "No part changes staged"
+                : staged == 1 ? "1 part change staged" : $"{staged} part changes staged";
         }
 
         private void OnSyncSelectedRoof(object sender, RoutedEventArgs e) => SyncSelectedRows(RoofPartsGrid);
@@ -680,13 +879,18 @@ namespace UnitConstructionVerifier.UI
 
         private void OnCancelChanges(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Are you sure you want to discard all unsaved edits?", "Discard Changes", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (_pendingEdits.Count == 0) return;
+
+            var result = MessageBox.Show(this, $"Discard {_pendingEdits.Count} staged part change(s)? Nothing has been written to the part files.",
+                "Discard Changes", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
                 _pendingEdits.Clear();
                 if (RoofSurfaceList.SelectedItem != null) RefreshPartsGrid(RoofSurfaceList.SelectedItem);
                 if (WallSurfaceList.SelectedItem != null) RefreshPartsGrid(WallSurfaceList.SelectedItem);
                 if (BaseSurfaceList.SelectedItem != null) RefreshPartsGrid(BaseSurfaceList.SelectedItem);
+                UpdateEditFooter();
+                ShowNotice("Staged part changes discarded.");
             }
         }
 
@@ -706,7 +910,7 @@ namespace UnitConstructionVerifier.UI
 
             if (_pendingEdits.Count == 0)
             {
-                MessageBox.Show("No pending edits to write.", "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowNotice("No part changes are staged.");
                 return;
             }
 
@@ -861,8 +1065,9 @@ namespace UnitConstructionVerifier.UI
                     }
 
                     _pendingEdits.Clear();
+                    UpdateEditFooter();
 
-                    MessageBox.Show($"Successfully updated {successCount} parts.", "Write Changes Completed", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowNotice($"Updated {successCount} part file(s). Re-scanned the assembly.");
 
                     ReScanAndRefresh();
                 }
@@ -1080,6 +1285,7 @@ namespace UnitConstructionVerifier.UI
 
             if (sender is DataGrid grid)
             {
+                UpdatePreviewButtons();
                 CaptureStackStateBeforeInventor();
                 HighlightSelectedPartInGrid(grid);
                 TryRefreshWireframePreview();
@@ -1087,9 +1293,16 @@ namespace UnitConstructionVerifier.UI
             }
         }
 
+        private void UpdatePreviewButtons()
+        {
+            RoofPreviewButton.IsEnabled = RoofPartsGrid.SelectedItem is IptVerificationRow;
+            WallPreviewButton.IsEnabled = WallPartsGrid.SelectedItem is IptVerificationRow;
+            BasePreviewButton.IsEnabled = BasePartsGrid.SelectedItem is IptVerificationRow;
+        }
+
         private void HighlightSelectedPartInGrid(DataGrid grid)
         {
-            if (grid.SelectedItem is not IptVerificationRow row)
+            if (_highlightMode == HighlightMode.Off || grid.SelectedItem is not IptVerificationRow row)
             {
                 return;
             }
@@ -1112,25 +1325,51 @@ namespace UnitConstructionVerifier.UI
                 surfaceIamPath,
                 row.PartNumber,
                 row.FilePath,
-                XRayCheckBox.IsChecked == true);
+                _highlightMode == HighlightMode.XRay);
         }
 
-        private void OnXRayChanged(object sender, RoutedEventArgs e)
+        private void OnHighlightModeChanged(object sender, RoutedEventArgs e)
         {
-            if (_isUpdatingUi)
+            // Checked fires for the default option while the XAML loads.
+            if (!IsInitialized)
             {
                 return;
             }
 
+            _highlightMode = ReferenceEquals(sender, HighlightOffRadio) ? HighlightMode.Off
+                : ReferenceEquals(sender, HighlightXRayRadio) ? HighlightMode.XRay
+                : HighlightMode.Box;
+
+            if (_highlightMode == HighlightMode.Off)
+            {
+                InventorSelectionHelper.RestoreNormal(_inventorApp);
+                return;
+            }
+
+            CaptureStackStateBeforeInventor();
             DataGrid? activeGrid = GetActivePartsGrid();
             if (activeGrid != null)
             {
                 HighlightSelectedPartInGrid(activeGrid);
-                return;
             }
-
-            InventorSelectionHelper.ClearHighlight(_inventorApp);
+            else if (GetSelectedSurfaceForCurrentTab() is object surface)
+            {
+                HighlightSurfaceInInventor(surface);
+            }
+            else
+            {
+                InventorSelectionHelper.ClearHighlight(_inventorApp);
+            }
+            RestoreStackAfterInventor();
         }
+
+        private object? GetSelectedSurfaceForCurrentTab() => MainTabControl.SelectedIndex switch
+        {
+            0 => RoofSurfaceList.SelectedItem,
+            1 => WallSurfaceList.SelectedItem,
+            2 => BaseSurfaceList.SelectedItem,
+            _ => null
+        };
 
         private void InitializeXRayColorPicker()
         {
@@ -1149,6 +1388,7 @@ namespace UnitConstructionVerifier.UI
                 XRayHighlightColor captured = option;
                 var row = new Button
                 {
+                    Style = (Style)FindResource("ColorOptionButton"),
                     Height = 26,
                     Margin = new Thickness(0, 0, 0, 2),
                     Padding = new Thickness(6, 0, 8, 0),
@@ -1284,21 +1524,6 @@ namespace UnitConstructionVerifier.UI
             }
         }
 
-        private void OnNormalSelectionClick(object sender, RoutedEventArgs e)
-        {
-            _isUpdatingUi = true;
-            try
-            {
-                XRayCheckBox.IsChecked = false;
-            }
-            finally
-            {
-                _isUpdatingUi = false;
-            }
-
-            InventorSelectionHelper.RestoreNormal(_inventorApp);
-        }
-
         private void OnVerifierWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             string? message = UnsavedWorkPrompt.BuildMessage(_overridesDirty, _pendingEdits.Count);
@@ -1340,7 +1565,7 @@ namespace UnitConstructionVerifier.UI
 
         private void OnPartsGridPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+            if (TreeSearch.FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
             {
                 return;
             }
@@ -1441,22 +1666,17 @@ namespace UnitConstructionVerifier.UI
         {
             if (!TryBuildWireframePreview(out string title, out WireframeData? wireframe))
             {
-                MessageBox.Show(
-                    "Select a part row in the active tab and surface first.",
-                    "Wireframe Preview",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                ShowNotice("No wireframe for this row. Select a part on the open surface first.");
                 return;
             }
 
             if (_partPreviewWindow == null)
             {
-                _partPreviewWindow = new PartPreviewWindow
-                {
-                    Owner = this,
-                    Left = Left + Width + 12,
-                    Top = Top
-                };
+                _partPreviewWindow = new PartPreviewWindow { Owner = this };
+                _partPreviewWindow.Left = WindowLayout.CompanionLeft(Left, ActualWidth, _partPreviewWindow.Width,
+                    SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenWidth);
+                _partPreviewWindow.Top = WindowLayout.CompanionTop(Top, _partPreviewWindow.Height,
+                    SystemParameters.VirtualScreenTop, SystemParameters.VirtualScreenHeight);
                 _partPreviewWindow.Closed += (_, __) => _partPreviewWindow = null;
             }
 
@@ -1502,7 +1722,7 @@ namespace UnitConstructionVerifier.UI
                 _ => null
             };
 
-            if (string.IsNullOrWhiteSpace(surfaceIamPath))
+            if (_highlightMode == HighlightMode.Off || string.IsNullOrWhiteSpace(surfaceIamPath))
             {
                 return;
             }
@@ -1518,12 +1738,12 @@ namespace UnitConstructionVerifier.UI
             }
 
             // Ignore copy-button clicks in the row template.
-            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+            if (TreeSearch.FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
             {
                 return;
             }
 
-            ListBoxItem? listBoxItem = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+            ListBoxItem? listBoxItem = TreeSearch.FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
             if (listBoxItem?.DataContext == null)
             {
                 return;
@@ -1541,63 +1761,134 @@ namespace UnitConstructionVerifier.UI
             RestoreStackAfterInventor();
         }
 
-        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        // ── Copy, Search, Keys, Overflow ──────────────────────────────────────
+
+        private void OnCopyPartNumberMenu(object sender, RoutedEventArgs e)
         {
-            while (current != null)
+            // The row the menu opened on, plus any other selected rows in that grid.
+            if (sender is MenuItem { DataContext: IptVerificationRow row })
             {
-                if (current is T match)
-                {
-                    return match;
-                }
-
-                current = VisualTreeHelper.GetParent(current);
+                DataGrid? grid = GetActivePartsGridForCurrentTab();
+                var selected = grid?.SelectedItems.OfType<IptVerificationRow>().ToList() ?? new List<IptVerificationRow>();
+                CopyPartNumbers(selected.Contains(row) ? selected : new List<IptVerificationRow> { row });
             }
-
-            return null;
         }
 
-        private void OnCopyPartNumberClick(object sender, RoutedEventArgs e)
+        private void OnCopyPartNumbersCommand(object sender, ExecutedRoutedEventArgs e)
         {
-            if (sender is Button button)
+            if (sender is DataGrid grid)
             {
-                string? text = button.Tag as string;
-                if (string.IsNullOrWhiteSpace(text) && button.DataContext is IptVerificationRow row)
-                {
-                    text = row.PartNumber;
-                }
-
-                CopyTextToClipboard(text);
+                CopyPartNumbers(grid.SelectedItems.OfType<IptVerificationRow>().ToList());
+                e.Handled = true;
             }
-
-            e.Handled = true;
         }
 
-        private void OnCopySurfaceNumberClick(object sender, RoutedEventArgs e)
+        private void CopyPartNumbers(List<IptVerificationRow> rows)
         {
-            if (sender is Button button)
-            {
-                CopyTextToClipboard(button.Tag as string);
-            }
+            var numbers = rows.Select(r => r.PartNumber).Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (numbers.Count == 0) return;
 
-            e.Handled = true;
+            if (CopyTextToClipboard(string.Join(Environment.NewLine, numbers)))
+                ShowNotice(numbers.Count == 1 ? $"Copied {numbers[0]}." : $"Copied {numbers.Count} part numbers.");
         }
 
-        private static void CopyTextToClipboard(string? text)
+        private void OnCopySurfaceNumberMenu(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem)
+                CopySurfaceNumber(menuItem.DataContext);
+        }
+
+        private void OnCopySurfaceNumberCommand(object sender, ExecutedRoutedEventArgs e)
+        {
+            if (sender is ListBox list)
+            {
+                CopySurfaceNumber(list.SelectedItem);
+                e.Handled = true;
+            }
+        }
+
+        private void CopySurfaceNumber(object? surfaceRow)
+        {
+            string? number = surfaceRow switch
+            {
+                RoofSurfaceRow roof => roof.PartNumber,
+                WallSurfaceRow wall => wall.PartNumber,
+                BaseSurfaceRow baseRow => baseRow.PartNumber,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(number) && CopyTextToClipboard(number))
+                ShowNotice($"Copied {number!.Trim()}.");
+        }
+
+        private bool CopyTextToClipboard(string? text)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                return;
+                return false;
             }
 
             try
             {
-                Clipboard.SetText(text.Trim());
+                Clipboard.SetText(text!.Trim());
+                return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Could not copy to clipboard:\n{ex.Message}", "Copy Failed",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowNotice($"Could not copy to the clipboard: {ex.Message}");
+                return false;
             }
+        }
+
+        private void OnSurfaceSearchChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!IsInitialized || sender is not TextBox box) return;
+
+            ListBox list = ReferenceEquals(box, WallSearchBox) ? WallSurfaceList
+                : ReferenceEquals(box, BaseSearchBox) ? BaseSurfaceList
+                : RoofSurfaceList;
+            string query = box.Text.Trim();
+
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(list.ItemsSource);
+            if (view == null) return;
+            view.Filter = query.Length == 0 ? null : item => SurfaceMatches(item, query);
+        }
+
+        /// <summary>A surface matches on its number, its segments, or the number of any part inside it.</summary>
+        private bool SurfaceMatches(object surfaceRow, string query)
+        {
+            static bool Has(string? text, string q) => text?.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
+
+            (string? number, string? segments) = surfaceRow switch
+            {
+                RoofSurfaceRow roof => (roof.PartNumber, roof.Segments),
+                WallSurfaceRow wall => (wall.PartNumber, wall.Segments),
+                BaseSurfaceRow baseRow => (baseRow.PartNumber, baseRow.Segments),
+                _ => (null, null)
+            };
+            if (Has(number, query) || Has(segments, query)) return true;
+
+            string? iam = SurfaceStatusBoard.SurfaceIamOf(surfaceRow);
+            return _iptResult != null && _iptResult.Parts.Any(p =>
+                string.Equals(p.OwnerIamPath, iam, StringComparison.OrdinalIgnoreCase) && Has(p.PartNumber, query));
+        }
+
+        private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F8)
+            {
+                GoToNextIssue();
+                e.Handled = true;
+            }
+        }
+
+        private void OnOverflowClick(object sender, RoutedEventArgs e)
+        {
+            var menu = (ContextMenu)FindResource("OverflowMenu");
+            menu.PlacementTarget = OverflowButton;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            menu.IsOpen = true;
         }
     }
 
@@ -1614,6 +1905,14 @@ namespace UnitConstructionVerifier.UI
         public string Reason        { get; set; } = string.Empty;
         public bool   IsMismatch    => CheckStatus == PartCheckStatus.Mismatch;
         public bool   IsNotChecked  => CheckStatus == PartCheckStatus.NotChecked;
+        public bool   IsDisplayOnly => CheckStatus == PartCheckStatus.DisplayOnly;
+        /// <summary>Why a part was not checked, shown after its description.</summary>
+        public string ReasonSuffix  => IsNotChecked && !string.IsNullOrWhiteSpace(Reason) ? "  · " + Reason : string.Empty;
+        public string DescriptionTooltip => string.IsNullOrWhiteSpace(ReasonSuffix) ? Description : Description + "\n" + Reason;
+        public string StatusTooltip => IsEditPending
+            ? $"Staged: {Actual} → {NewValue}. Not written yet."
+            : !string.IsNullOrWhiteSpace(Reason) ? Reason
+            : IsModified ? "Changed after the unit was generated (SQ part or a verifier edit)." : Status;
         /// <summary>SQ part or verifier-edited part; never present on a freshly generated unit.</summary>
         public bool   IsModified    { get; set; }
         /// <summary>True when an edit to <see cref="Parameter"/> can be written back to the part.</summary>
@@ -1647,6 +1946,7 @@ namespace UnitConstructionVerifier.UI
                     OnPropertyChanged(nameof(NewValue));
                     OnPropertyChanged(nameof(IsEditPending));
                     OnPropertyChanged(nameof(StatusText));
+                    OnPropertyChanged(nameof(StatusTooltip));
                 }
             }
         }
@@ -1666,7 +1966,7 @@ namespace UnitConstructionVerifier.UI
             }
         }
 
-        public string StatusText => IsEditPending ? "* Unsaved" : Status;
+        public string StatusText => IsEditPending ? "● Staged" : Status;
 
         public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
