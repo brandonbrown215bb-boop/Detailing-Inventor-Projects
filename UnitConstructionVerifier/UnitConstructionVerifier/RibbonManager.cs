@@ -16,7 +16,8 @@ namespace UnitConstructionVerifier
         private const string PanelInternalName = "UCV_Panel";
         private const string PanelDisplayName  = "Construction";
 
-        internal static void CreateUI(Inventor.Application app, VerifierCommand verifierCmd, Operations.ThicknessHoverCommand hoverCmd)
+        internal static void CreateUI(Inventor.Application app, VerifierCommand verifierCmd, Operations.ThicknessHoverCommand hoverCmd,
+            Spike.DockTestCommand? dockTestCmd = null)
         {
             try
             {
@@ -24,6 +25,14 @@ namespace UnitConstructionVerifier
 
                 // Setup Assembly ribbon (contains both commands)
                 ConfigureRibbon(app, ribbons, "Assembly", verifierCmd, hoverCmd);
+
+                // Docking spike (dev only, spike/dockable-window branch).
+                if (dockTestCmd != null && TryGetRibbon(ribbons, "Assembly") is Inventor.Ribbon assembly)
+                {
+                    Inventor.RibbonPanel panel = FindOrCreatePanel(FindOrCreateTab(assembly, TabInternalName, TabDisplayName), PanelInternalName, PanelDisplayName);
+                    try { panel.CommandControls.AddButton(dockTestCmd.CreateDefinition(app), false, true, string.Empty, false); }
+                    catch (Exception ex) { DebugLogger.Log(ex, "RibbonManager dock test button"); }
+                }
 
                 // Setup Part ribbon (contains only Thickness Hover command)
                 ConfigureRibbon(app, ribbons, "Part", null, hoverCmd);

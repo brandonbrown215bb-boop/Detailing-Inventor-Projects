@@ -18,7 +18,6 @@ namespace UnitConstructionVerifier.UI
         private const int VkControl = 0x11;
         private const int VkShift = 0x10;
         private const int VkMenu = 0x12;
-        private const uint GaRoot = 2;
 
         private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
 
@@ -38,7 +37,7 @@ namespace UnitConstructionVerifier.UI
         private static extern IntPtr GetFocus();
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+        private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
@@ -125,12 +124,12 @@ namespace UnitConstructionVerifier.UI
             return CallNextHookEx(_hook, code, wParam, lParam);
         }
 
-        private bool FocusIsInOwner()
-        {
-            IntPtr owner = _ownerHandle();
-            IntPtr focus = GetFocus();
-            return owner != IntPtr.Zero && focus != IntPtr.Zero && GetAncestor(focus, GaRoot) == owner;
-        }
+        private bool FocusIsInOwner() => IsInside(_ownerHandle(), GetFocus());
+
+        /// <summary>True when <paramref name="hwnd"/> is <paramref name="owner"/> or one of its child windows. Works for a
+        /// top-level window and for a window docked inside Inventor's frame, whose root is Inventor's main window.</summary>
+        internal static bool IsInside(IntPtr owner, IntPtr hwnd) =>
+            owner != IntPtr.Zero && hwnd != IntPtr.Zero && (hwnd == owner || IsChild(owner, hwnd));
 
         private static bool IsDown(int virtualKey) => (GetKeyState(virtualKey) & 0x8000) != 0;
     }
