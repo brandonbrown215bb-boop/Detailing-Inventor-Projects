@@ -1,0 +1,150 @@
+================================================================================
+UNIT PROGRESS TRACKER — TESTER PLAYBOOK & SIGN-OFF SHEET
+================================================================================
+
+WHAT IS THIS APPLICATION?
+The Unit Progress Tracker is a Windows desktop application used by Inventor
+detailers to track manufacturing progress on Air Handling Unit (AHU) panels and
+skids. It shows 3D models of unit surfaces, lets detailers check off completion
+tasks, keep notes, filter panels by status, and manage Bills of Materials (BOM).
+
+WHAT IS THE GOAL OF THIS TEST?
+We want to verify that the software is 100% reliable for daily work: it should
+never lose your work, crash on bad files, or erase notes when CAD files update.
+
+DEPENDENCIES: NONE
+This version is fully self-contained. You do NOT need to install .NET, Inventor,
+or any software to run this test.
+
+================================================================================
+HOW TO START THE APP
+================================================================================
+1. Extract all files in this ZIP archive to a folder on your computer.
+2. Double-click "UnitProgressTracker.Wpf.exe" to launch the program.
+
+================================================================================
+TEST STEPS
+================================================================================
+
+--------------------------------------------------------------------------------
+PHASE 1: LAUNCH, OPEN A MODEL & TEST OFFLINE MODE
+--------------------------------------------------------------------------------
+Goal: Verify you can open a model, make changes, save your project file, and
+view it even if the CAD folder is disconnected or moved.
+
+Step 1 — Start the App
+  - Double-click UnitProgressTracker.Wpf.exe.
+  - Expected Result: App opens cleanly without error prompts.
+
+Step 2 — Load a Unit Model
+  - Click "Open Folder / Model" and select a unit folder or CAD file (.iam).
+  - Expected Result: 3D shapes load in the center viewport, panel list on the
+    left, detail information on the right.
+
+Step 3 — Make Edits
+  - Select a panel. Change its status (e.g. "In Progress" or "Complete").
+  - Check off a checklist box and type a short note in the notes field.
+  - Expected Result: Status color updates in 3D, and an asterisk (*) appears
+    in the title bar indicating unsaved changes.
+
+Step 4 — Save Project
+  - Go to File -> Save Project and save as "TestUnit.uptproj".
+  - Expected Result: File saves successfully; the unsaved (*) marker clears.
+
+Step 5 — Test Offline Mode
+  - Close the app. Rename or move your original CAD folder (to simulate being
+    disconnected from the CAD server).
+  - Re-launch the app and open "TestUnit.uptproj".
+  - Expected Result: The project opens in Offline Mode. 3D shapes, notes, and
+    statuses are all intact.
+
+--------------------------------------------------------------------------------
+PHASE 2: SAFETY & PROTECTING UNSAVED WORK
+--------------------------------------------------------------------------------
+Goal: Ensure the app prevents accidental data loss.
+
+Step 6 — Unsaved Changes Prompt
+  - Make a small edit (e.g. add a note). Without saving, try to open another
+    project or click "New".
+  - Expected Result: Pop-up asks if you want to save your changes. Click CANCEL.
+    Verify your current project and unsaved changes stay on screen.
+
+Step 7 — Bad File Handling
+  - Try opening an invalid/corrupt file.
+  - Expected Result: App displays a clear warning message. It does NOT crash
+    or replace your active project.
+
+--------------------------------------------------------------------------------
+PHASE 3: CAD UPDATES & RE-SCANNING MODELS
+--------------------------------------------------------------------------------
+Goal: Verify updating CAD files doesn't wipe out your progress or notes.
+
+Step 8 — Rescan CAD Model
+  - Click "Rescan Model".
+  - Expected Result: 3D geometry refreshes without clearing existing statuses,
+    checklist checks, or notes.
+
+Step 9 — Renumbering a Panel
+  - If a CAD rescan suggests a new panel number:
+    * Decline once -> Confirm no change.
+    * Accept -> Confirm panel receives the new number and preserves all history.
+
+Step 10 — Replace / Add Single Panels
+  - Use "Replace Surface" to update one panel.
+  - Use "Add Surfaces" to add new panels from a folder.
+  - Expected Result: Only target panels change; all other data remains intact.
+
+--------------------------------------------------------------------------------
+PHASE 4: VISIBILITY, FILTERS & OPTIONS
+--------------------------------------------------------------------------------
+Goal: Make sure on-screen controls work accurately.
+
+Step 11 — Status Legend Filters
+  - Click a status color in the top/bottom legend.
+  - Expected Result: Panel list and 3D view show only matching items. Click
+    the legend box again to clear the filter.
+
+Step 12 — Hide / Show Eyeball Toggles
+  - Click the Eye Icon next to a panel or panel group ("Walls", "Roof").
+  - Expected Result: Selected items become hidden/visible in 3D.
+
+Step 13 — Retire and Restore a Panel
+  - Select a panel and click "Remove / Retire Surface".
+  - Save and reopen -> Panel is in "Removed Surfaces".
+  - Click "Restore Surface" -> Panel returns to active list with notes intact.
+
+Step 14 — Options Dialog Cancel
+  - Go to Options, edit settings, click Save -> Settings apply immediately.
+  - Re-open Options, change settings, click CANCEL -> Discards unsaved edits.
+
+--------------------------------------------------------------------------------
+PHASE 5: BILL OF MATERIALS (BOM) & REPORTS
+--------------------------------------------------------------------------------
+Goal: Confirm part lists and exports function properly.
+
+Step 15 — Edit the BOM
+  - In the BOM tab, add, edit, or remove a row, then save the project.
+  - Expected Result: Reopening the project preserves your exact BOM edits.
+
+Step 16 — Export Report
+  - Click "Export Audit Report".
+  - Expected Result: Summary Markdown file is generated with correct totals.
+
+================================================================================
+TESTER SIGN-OFF SHEET
+================================================================================
+
+Please mark each test area as PASS or FAIL:
+
+[ ] 1. Launch & Offline Project       (Pass / Fail)  Notes: ____________________
+[ ] 2. Unsaved Work Protection        (Pass / Fail)  Notes: ____________________
+[ ] 3. Rescan & Model Updates         (Pass / Fail)  Notes: ____________________
+[ ] 4. Legend & Eye Toggles           (Pass / Fail)  Notes: ____________________
+[ ] 5. Retire & Restore Panels        (Pass / Fail)  Notes: ____________________
+[ ] 6. Options & Settings Cancel      (Pass / Fail)  Notes: ____________________
+[ ] 7. BOM Edits & Export             (Pass / Fail)  Notes: ____________________
+
+TESTER NAME: ____________________________________
+DATE: _______________________
+MACHINE / WINDOWS VERSION: _______________________
+================================================================================

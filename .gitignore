@@ -244,3 +244,6 @@ ehthumbs.db
 .agents/e2e_testing_orch/
 .agents/test_writer_*/
 .agents/ORIGINAL_REQUEST.md
+Pigeon/UnitProgressTracker/UnitProgressTracker_v4_TesterPackage.zip
+# Separate git repository (no remote); kept out of this repo.
+Inventor.DetailComposer/

@@ -28,24 +28,26 @@ because the application continued after silently skipping data.
 
 ## A. Fresh launch and portable project
 
-- [ ] Launch the self-contained executable on the clean target without installing a
+- [*] Launch the self-contained executable on the clean target without installing a
       separate .NET runtime. Record startup time and any Windows security prompt.
-- [ ] Open a supported unit IAM/folder. Confirm non-empty geometry, surface list,
+- [*] Open a supported unit IAM/folder. Confirm non-empty geometry, surface list,
       statuses, and source diagnostics.
-- [ ] Change status, checklist, note, display number, visibility, list/view options,
+- [x] Change status, checklist, note, display number, visibility, list/view options,
       BOM data, and camera. Save a v4 `.uptproj`.
-- [ ] Copy the project away from the source and disconnect/rename the source folder.
+	- Change status removes surface from view (Turned out to be status state filtering, need visual indicator that filter is on so surfaces don't look like they're being deleted. Renumbering surface changes surface number, but does not immediately display under surface history what changed. Clicking off and clicking back updates history.
+	- KIT, PAINT needs to be removed from EXCEL BOM GRP import.
+- [*] Copy the project away from the source and disconnect/rename the source folder.
       Reopen it. Confirm offline mode and that embedded geometry plus all edited state
       remains usable (`UPT-C-001`).
-- [ ] With unsaved edits active, attempt to open another project and Cancel. Confirm the
+- [*] With unsaved edits active, attempt to open another project and Cancel. Confirm the
       current project and dirty marker remain unchanged (`UPT-C-002`).
 
 ## B. Rejection and failure preservation
 
-- [ ] Open a Pigeon v2 fixture, an Esmund v3 fixture, corrupt JSON, and a newer-version
+- [*] Open a Pigeon v2 fixture, an Esmund v3 fixture, corrupt JSON, and a newer-version
       fixture. Each message must identify the problem/action; none may replace the
       active project (`UPT-C-003` through `UPT-C-005`).
-- [ ] Point a scan at one unreadable/bad source among valid sources. Confirm scanned,
+- [*] Point a scan at one unreadable/bad source among valid sources. Confirm scanned,
       accepted, skipped, and failed identifiers are reviewable and the last usable
       project remains intact (`UPT-C-011`).
 
@@ -64,7 +66,7 @@ because the application continued after silently skipping data.
 - [ ] Replace one surface from IAM and add surfaces from a folder containing a valid
       source, duplicate, and failing source. Confirm only accepted geometry changes and
       every conflict is named (`UPT-C-015`, `UPT-C-016`).
-- [ ] Use protruding geometry in rescan/add/replace. Confirm the action is allowed, both
+- [?] Use protruding geometry in rescan/add/replace. Confirm the action is allowed, both
       surfaces are named, and the unresolved warning survives save/reopen until a clean
       recheck resolves it (`UPT-C-021`).
 
