@@ -83,9 +83,18 @@ marks the part "Changed Part [SQ]" (`CPartWrapper.IsChanged_SQ`) and counts the 
 
 ### 4.1 `Operations/YcShellBridge.cs`: the only place that knows YCShell's internals
 
-- `static YcShellBridge? TryConnect(Application app, out string problem)`
-  - `app.ApplicationAddIns.ItemById["{8056411E-F31D-4EC5-A172-4A874BBEA3AA}"]` must be present and activated. Take
-    `.AddInServer`. It is the real .NET object because both add-ins run in Inventor's process.
+- `static YcShellBridge? Connect(Application app, trace, out string problem, ...)`
+  - The YCShell add-in (`{8056411E-F31D-4EC5-A172-4A874BBEA3AA}`) must be installed and activated.
+  - **Correction (spike build):** Inventor's `ApplicationAddIn` has **no `AddInServer` property**, and YCShell's
+    `Automation` returns null, so the earlier idea (also in `library_part_writeback_implementation_plan.md`) does not
+    compile. `YcShellLocator` finds the server object through the event handlers YCShell attached to Inventor
+    objects instead: its Regenerate / Upload buttons' `OnExecute` and `ApplicationEvents`. In one AppDomain, UCV
+    fetches the same COM wrappers YCShell holds. The interop event provider kept on each wrapper
+    (`Marshal.GetComObjectData`) lists the delegates, and YCShell's delegates have its `StandardAddInServer` as
+    `Target`. This depends on both add-ins sharing an AppDomain, which the spike checks. **If it fails**, the fallback
+    is to activate each surface for in-place editing and run YCShell's button with
+    `ControlDefinition.Execute2(true)`. That covers Regenerate one surface at a time, but not a single multi-surface
+    upload.
   - Resolve every member listed in section 3 with `BindingFlags.NonPublic | Instance`, plus the nested delegate
     types `CommonUI.CFrmRunOperation+DelegateOperation` and
     `Upload.CFrmUploadChanges+DelegateSetSuppressDocumentEvents`. Check each parameter list.
@@ -179,6 +188,9 @@ existing surface list. The summary is also written to the UCV debug log.
 
 ## 6. Questions for the spike (Step 0)
 
+0. Can UCV reach YCShell's server object at all (same AppDomain, event-handler route)? See section 4.1. The spike
+   checklist is `ycshell_spike_checklist.md`.
+
 1. With the unit IAM open, does `m_OpenAssemblyList` contain every surface, or only documents opened on their own?
    The `OnOpenDocument` code suggests every surface, but this needs checking.
 2. Is the unit IAM a composite assembly (`IsCompositeAssembly`)? Does passing it to the upload window make
@@ -191,8 +203,62 @@ existing surface list. The summary is also written to the UCV debug log.
 5. Time per surface, to set expectations for a 40-surface unit.
 6. Should parts with status `New` or `Changed_Parameter` also make a surface count as changed? Product owner to
    decide. The default is `Changed_SQ` only.
-7. After a successful upload, does YCShell reset `DOCUMENT_STATUS` on the uploaded parts, so the surface drops off the
-   changed list? If not, UCV needs another way to tell "changed and uploaded" from "changed, not uploaded yet".
+7. ~~After a successful upload, does YCShell reset `DOCUMENT_STATUS`?~~ **Yes**: uploaded parts go back to
+   `NoChange` (section 6.1).
+
+### 6.1 Test unit
+
+`C:\Users\jbrow263\ISG\ISG Test Units\Hole Pattern Tiger Team\Unit` (the "Hole Pattern Tiger Team" FINAL unit).
+Read-only inspection through Apprentice on 2026-10-22:
+
+- **Unit assembly:** `FINAL.IAM` has `MOM_DATA.IS_COMPOSITE_ASSEMBLY = 1`, so the first half of question 2 is
+  answered. It references 32 surface IAMs directly. `Base\FINAL.IAM` is a second composite, referencing the 5 base
+  surfaces.
+- **Changed surfaces:** 11 surfaces have `Changed_SQ` parts (42 parts in all). Every other part reads `NoChange`.
+
+  | Surface | Changed_SQ | NoChange |
+  |---|---|---|
+  | 0003 | 2 | 12 |
+  | 0006 | 2 | 12 |
+  | 0009 | 3 | 12 |
+  | 0055 | 1 | 11 |
+  | 0059 | 1 | 11 |
+  | 0065 | 2 | 9 |
+  | 0068 folder, `391Z010068-0091.IAM` | 4 | 12 |
+  | 0073 | 6 | 7 |
+  | 0074 | 8 | 3 |
+  | 0078 | 5 | 5 |
+  | 0080 | 8 | 8 |
+
+- **Orphaned surface:** folder `391Z010068-0068` holds `391Z010068-0091.IAM`, not `-0068.IAM`. The product owner
+  uploaded this surface on its own on 2026-10-22 (about 07:58) to check that changes reached MOM. MOM gave it a new
+  part number. YCShell saved it as `-0091.IAM` and deleted `-0068.IAM`, but `FINAL.IAM` was not part of that upload,
+  so FINAL still points at the missing `-0068`. **This is normal today:** after uploading a renamed surface, the
+  detailer relinks it in the unit by hand and saves. It has not been relinked here, so opening FINAL will not load
+  this surface, and the batch would report it as "not loaded".
+  - **What it means for the batch:** passing `FINAL.IAM` (composite) to the upload window should make YCShell do
+    that relink itself (`occ.Replace(new location)` in `DoUpload`). That would save the detailer a manual step per
+    renamed surface. The spike must confirm this on the copy. If it does not work, the batch summary must list every
+    renamed surface as "relink in FINAL and save".
+- **Duplicate names:** `391Z010068-0067.IAM` and `-0071.IAM` exist both at the top level and under `Base\`. Check
+  which copy FINAL resolves to before matching surfaces by path.
+- **Upload resets the change marker (answers question 7):** the copies of the 4 SQ parts that the 07:58 upload saved
+  (kept in `391Z010068-0068\OldVersions`, `*.0074.IPT`) read `DOCUMENT_STATUS = NoChange`, with `PART_SOURCE = SQPart`
+  kept. So after a successful upload, a surface drops off the changed list on its own. The same 4 parts read
+  `Changed_SQ` again today because they were rewritten at 10:29, after the upload, by a UCV write.
+- **No backup:** the unit is not under version control, and Regenerate rewrites channels. Upload writes to MOM /
+  MAPICS, so do not press Upload during the spike without agreeing which MOM environment it points at.
+
+**Spike copy:** `C:\Users\jbrow263\ISG\ISG Test Units\Hole Pattern Tiger Team\Unit - Spike Copy`, made 2026-10-22
+with robocopy (1,124 files, 440 MB, timestamps kept). The original stays untouched. Checked with Apprentice under
+`ISG.ipj`:
+
+- The copy's `FINAL.IAM` resolves all 428 referenced documents **inside the copy**, with no missing references. Its
+  `0067` and `0071` resolve to the top-level folders, not `Base\`.
+- The copy's `Base\FINAL.IAM` resolves all 74 references to the **original** unit's `Base\` folder, because it stores
+  absolute paths. **Do not open or save the copy's `Base\FINAL.IAM` during the spike**, or the original base
+  surfaces will change. None of the 11 changed surfaces is under `Base\`, so the spike only needs the copy's top-level
+  `FINAL.IAM`.
 
 ## 7. Steps
 

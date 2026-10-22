@@ -15,6 +15,7 @@ namespace UnitConstructionVerifier
         private Application? _inventorApp;
         private VerifierCommand? _verifierCommand;
         private Operations.ThicknessHoverCommand? _hoverCommand;
+        private Operations.YcShellSpikeCommand? _spikeCommand;
 
         // ── ApplicationAddInServer ────────────────────────────────────────────
 
@@ -24,8 +25,9 @@ namespace UnitConstructionVerifier
             _inventorApp = addInSiteObject.Application;
             _verifierCommand = new VerifierCommand(_inventorApp);
             _hoverCommand = new Operations.ThicknessHoverCommand(_inventorApp);
+            _spikeCommand = new Operations.YcShellSpikeCommand(_inventorApp);
 
-            RibbonManager.CreateUI(_inventorApp, _verifierCommand, _hoverCommand);
+            RibbonManager.CreateUI(_inventorApp, _verifierCommand, _hoverCommand, _spikeCommand);
         }
 
         public void Deactivate()
@@ -35,6 +37,9 @@ namespace UnitConstructionVerifier
 
             _hoverCommand?.Dispose();
             _hoverCommand = null;
+
+            _spikeCommand?.Dispose();
+            _spikeCommand = null;
 
             _inventorApp = null;
         }
