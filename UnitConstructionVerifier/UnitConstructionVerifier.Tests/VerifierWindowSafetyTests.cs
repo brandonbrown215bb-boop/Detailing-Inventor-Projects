@@ -161,7 +161,7 @@ namespace UnitConstructionVerifier.Tests
 
         private static XDocument WindowXaml([CallerFilePath] string thisFile = "")
         {
-            string path = Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "UnitConstructionVerifier", "UI", "VerifierWindow.xaml");
+            string path = Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "UnitConstructionVerifier", "UI", "VerifierView.xaml");
             return XDocument.Load(path);
         }
     }

@@ -188,7 +188,7 @@ namespace UnitConstructionVerifier.Tests
         {
             // Inventor runs WPF with AreInactiveSelectionHighlightBrushKeysSupported = false, where these keys
             // equal ControlBrushKey / ControlTextBrushKey; defining both threw "Item has already been added".
-            string path = Path.Combine(Path.GetDirectoryName(ThisFile())!, "..", "UnitConstructionVerifier", "UI", "VerifierWindow.xaml");
+            string path = Path.Combine(Path.GetDirectoryName(ThisFile())!, "..", "UnitConstructionVerifier", "UI", "VerifierView.xaml");
             string xaml = File.ReadAllText(path);
 
             StringAssert.DoesNotContain("{x:Static SystemColors.InactiveSelectionHighlightBrushKey}", xaml);
@@ -201,7 +201,7 @@ namespace UnitConstructionVerifier.Tests
 
         private static XDocument WindowXaml([CallerFilePath] string thisFile = "")
         {
-            string path = Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "UnitConstructionVerifier", "UI", "VerifierWindow.xaml");
+            string path = Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "UnitConstructionVerifier", "UI", "VerifierView.xaml");
             return XDocument.Load(path);
         }
     }

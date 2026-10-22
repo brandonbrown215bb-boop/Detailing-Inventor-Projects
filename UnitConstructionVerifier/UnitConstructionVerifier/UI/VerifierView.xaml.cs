@@ -14,7 +14,7 @@ using UnitConstructionVerifier.Persistence;
 
 namespace UnitConstructionVerifier.UI
 {
-    public partial class VerifierWindow : Window
+    public partial class VerifierView : UserControl
     {
         private readonly UnitConstructionData _data;
         private readonly string               _iamPath;
@@ -38,13 +38,12 @@ namespace UnitConstructionVerifier.UI
         private HighlightMode _highlightMode = HighlightMode.Box;
         private readonly SurfaceStatusBoard _statusBoard;
         private readonly System.Windows.Threading.DispatcherTimer _statusTimer;
-        private ShortcutHook? _shortcutHook;
         private readonly System.Windows.Threading.DispatcherTimer _noticeTimer;
         private readonly Dictionary<DataGrid, string> _partsFilters = new Dictionary<DataGrid, string>();
 
         private enum HighlightMode { Box, XRay, Off }
 
-        public VerifierWindow(UnitConstructionData data, string iamPath, Inventor.Application inventorApp)
+        public VerifierView(UnitConstructionData data, string iamPath, Inventor.Application inventorApp)
         {
             // Must exist before the XAML loads: the surface list templates reference it as a StaticResource.
             _statusBoard = new SurfaceStatusBoard();
@@ -90,29 +89,50 @@ namespace UnitConstructionVerifier.UI
             PopulateGlobalSpecs();
             InitializeXRayColorPicker();
 
-            Activated += (_, __) => _keepVerifierAboveInventor = true;
-            Closing += OnVerifierWindowClosing;
-
-            // Inventor hosts this window without a WPF Application, so an uncaught exception in any handler
-            // terminates Inventor. Log it and keep running instead.
+            // Inventor hosts this view without a WPF Application, so an uncaught exception in any handler
+            // terminates Inventor. Log it and keep running instead. Removed in Shutdown.
             Dispatcher.UnhandledException += OnDispatcherUnhandledException;
-            Closed += (_, __) => Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+        }
 
-            // Inventor takes Ctrl+C, Ctrl+V and F8 before PreviewKeyDown sees them; the hook gets them first.
-            SourceInitialized += (_, __) =>
+        /// <summary>The unit assembly this view checks.</summary>
+        public string IamPath => _iamPath;
+
+        /// <summary>The pop-out window was activated: keep it above Inventor after COM selection calls.</summary>
+        public void NoteHostActivated() => _keepVerifierAboveInventor = true;
+
+        /// <summary>
+        /// Asks about unsaved expectations and staged part edits before the view closes. False means the user
+        /// cancelled and the view must stay open.
+        /// </summary>
+        public bool ConfirmClose()
+        {
+            string? message = UnsavedWorkPrompt.BuildMessage(_overridesDirty, _pendingEdits.Count);
+            if (message == null) return true;
+
+            MessageBoxResult answer = Dialogs.Show(this, message, "Unsaved Changes",
+                _overridesDirty ? MessageBoxButton.YesNoCancel : MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (answer == MessageBoxResult.Cancel) return false;
+
+            if (answer == MessageBoxResult.Yes)
             {
-                IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-                _shortcutHook = new ShortcutHook(() => handle, shortcut =>
-                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
-                        new Action(() => RunShortcut(shortcut))));
-                _shortcutHook.Install();
-            };
-            Closed += (_, __) => _shortcutHook?.Dispose();
+                PersistenceManager.SaveOverrides(_iamPath, _data);
+                ClearOverridesDirty();
+            }
+
+            return true;
+        }
+
+        /// <summary>Called once when the view is closed for good, after <see cref="ConfirmClose"/>.</summary>
+        public void Shutdown()
+        {
+            Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+            try { _partPreviewWindow?.Close(); } catch { }
+            InventorSelectionHelper.RestoreNormal(_inventorApp);
         }
 
         private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
-            DebugLogger.Log(e.Exception, "VerifierWindow (unhandled)");
+            DebugLogger.Log(e.Exception, "VerifierView (unhandled)");
             e.Handled = true;
             try { ShowNotice($"Something went wrong: {e.Exception.Message} (details in ucv_debug.txt)"); } catch { }
         }
@@ -592,7 +612,7 @@ namespace UnitConstructionVerifier.UI
         {
             if (_snapshot is null)
             {
-                MessageBox.Show("Scan data not available — cannot save a snapshot.",
+                Dialogs.Show(this, "Scan data not available — cannot save a snapshot.",
                     "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -605,18 +625,18 @@ namespace UnitConstructionVerifier.UI
                 InitialDirectory = Path.GetDirectoryName(defaultPath),
                 Filter           = "Unit snapshot (*" + SnapshotSerializer.FileSuffix + ")|*" + SnapshotSerializer.FileSuffix,
             };
-            if (dialog.ShowDialog(this) != true) return;
+            if (Dialogs.ShowDialog(this, dialog) != true) return;
 
             try
             {
                 SnapshotSerializer.Save(dialog.FileName, _snapshot);
-                MessageBox.Show($"Snapshot saved to:\n{dialog.FileName}\n\nCopy it into UnitConstructionVerifier.Tests\\Snapshots to use it as a regression baseline.",
+                Dialogs.Show(this, $"Snapshot saved to:\n{dialog.FileName}\n\nCopy it into UnitConstructionVerifier.Tests\\Snapshots to use it as a regression baseline.",
                     "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 DebugLogger.Log(ex, "OnSaveSnapshot");
-                MessageBox.Show($"Could not save snapshot:\n{ex.Message}",
+                Dialogs.Show(this, $"Could not save snapshot:\n{ex.Message}",
                     "Save Snapshot", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -770,8 +790,7 @@ namespace UnitConstructionVerifier.UI
             int matching = others - changes.Count;
             string intro = $"Copy this {one}'s expectations to {changes.Count} other {(changes.Count == 1 ? one : many)}?" +
                 (matching > 0 ? $" ({matching} already match.)" : string.Empty);
-            if (MessageBox.Show(this,
-                    intro + "\n\n" + CopyToAllPreview.Describe(changes, name) + "\n\nNothing is written to part files.",
+            if (Dialogs.Show(this, intro + "\n\n" + CopyToAllPreview.Describe(changes, name) + "\n\nNothing is written to part files.",
                     "Copy Expectations", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             {
                 return;
@@ -907,7 +926,7 @@ namespace UnitConstructionVerifier.UI
         {
             if (_pendingEdits.Count == 0) return;
 
-            var result = MessageBox.Show(this, $"Discard {_pendingEdits.Count} staged part change(s)? Nothing has been written to the part files.",
+            var result = Dialogs.Show(this, $"Discard {_pendingEdits.Count} staged part change(s)? Nothing has been written to the part files.",
                 "Discard Changes", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
@@ -1008,7 +1027,7 @@ namespace UnitConstructionVerifier.UI
                     lockSb.AppendLine($" - {lf}");
                 }
                 lockSb.AppendLine("\nPlease check them out of Vault first.");
-                MessageBox.Show(lockSb.ToString(), "Files Locked", MessageBoxButton.OK, MessageBoxImage.Error);
+                Dialogs.Show(this, lockSb.ToString(), "Files Locked", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -1068,7 +1087,7 @@ namespace UnitConstructionVerifier.UI
                     {
                         errSb.AppendLine($" - {err}");
                     }
-                    MessageBox.Show(errSb.ToString(), "Error Writing Changes", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Dialogs.Show(this, errSb.ToString(), "Error Writing Changes", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
@@ -1097,7 +1116,7 @@ namespace UnitConstructionVerifier.UI
                 {
                     try { trans.Abort(); } catch {}
                 }
-                MessageBox.Show($"Unexpected error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Dialogs.Show(this, $"Unexpected error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -1122,7 +1141,7 @@ namespace UnitConstructionVerifier.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to re-scan assembly after update: {ex.Message}", "Error Refreshing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Dialogs.Show(this, $"Failed to re-scan assembly after update: {ex.Message}", "Error Refreshing", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -1286,12 +1305,12 @@ namespace UnitConstructionVerifier.UI
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to open document in Inventor:\n{ex.Message}", "Error Opening Document", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Dialogs.Show(this, $"Failed to open document in Inventor:\n{ex.Message}", "Error Opening Document", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
             else
             {
-                MessageBox.Show($"File does not exist or path is invalid:\n{filePath}", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Dialogs.Show(this, $"File does not exist or path is invalid:\n{filePath}", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -1519,11 +1538,15 @@ namespace UnitConstructionVerifier.UI
         private void CaptureStackStateBeforeInventor()
         {
             _partPreviewWindow?.CaptureStackState();
-            InventorWindowStackHelper.Capture(
-                this,
-                ref _keepVerifierAboveInventor,
-                ref _pendingVerifierStackRestore,
-                ref _pendingVerifierFocusRestore);
+            // Only the pop-out window can fall behind Inventor; a docked view is part of Inventor's frame.
+            if (Window.GetWindow(this) is Window host)
+            {
+                InventorWindowStackHelper.Capture(
+                    host,
+                    ref _keepVerifierAboveInventor,
+                    ref _pendingVerifierStackRestore,
+                    ref _pendingVerifierFocusRestore);
+            }
         }
 
         private void RestoreStackAfterInventor()
@@ -1537,38 +1560,11 @@ namespace UnitConstructionVerifier.UI
             if (InventorWindowStackHelper.TakePending(
                     ref _pendingVerifierStackRestore,
                     ref _pendingVerifierFocusRestore,
-                    out bool verifierFocus))
+                    out bool verifierFocus) &&
+                Window.GetWindow(this) is Window host)
             {
-                InventorWindowStackHelper.ScheduleRestore(this, verifierFocus);
+                InventorWindowStackHelper.ScheduleRestore(host, verifierFocus);
             }
-        }
-
-        private void OnVerifierWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
-        {
-            string? message = UnsavedWorkPrompt.BuildMessage(_overridesDirty, _pendingEdits.Count);
-            if (message != null)
-            {
-                MessageBoxResult answer = MessageBox.Show(
-                    this,
-                    message,
-                    "Unsaved Changes",
-                    _overridesDirty ? MessageBoxButton.YesNoCancel : MessageBoxButton.OKCancel,
-                    MessageBoxImage.Warning);
-
-                if (answer == MessageBoxResult.Cancel)
-                {
-                    e.Cancel = true;
-                    return;
-                }
-
-                if (answer == MessageBoxResult.Yes)
-                {
-                    PersistenceManager.SaveOverrides(_iamPath, _data);
-                    ClearOverridesDirty();
-                }
-            }
-
-            InventorSelectionHelper.RestoreNormal(_inventorApp);
         }
 
         private void OnPartsGridBeginningEdit(object sender, DataGridBeginningEditEventArgs e)
@@ -1691,10 +1687,12 @@ namespace UnitConstructionVerifier.UI
 
             if (_partPreviewWindow == null)
             {
-                _partPreviewWindow = new PartPreviewWindow { Owner = this };
-                _partPreviewWindow.Left = WindowLayout.CompanionLeft(Left, ActualWidth, _partPreviewWindow.Width,
+                _partPreviewWindow = new PartPreviewWindow();
+                Dialogs.SetOwner(this, _partPreviewWindow);
+                Rect bounds = ScreenBounds();
+                _partPreviewWindow.Left = WindowLayout.CompanionLeft(bounds.Left, bounds.Width, _partPreviewWindow.Width,
                     SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenWidth);
-                _partPreviewWindow.Top = WindowLayout.CompanionTop(Top, _partPreviewWindow.Height,
+                _partPreviewWindow.Top = WindowLayout.CompanionTop(bounds.Top, _partPreviewWindow.Height,
                     SystemParameters.VirtualScreenTop, SystemParameters.VirtualScreenHeight);
                 _partPreviewWindow.Closed += (_, __) => _partPreviewWindow = null;
             }
@@ -1709,6 +1707,23 @@ namespace UnitConstructionVerifier.UI
             {
                 _partPreviewWindow.Activate();
             }
+        }
+
+        /// <summary>Where the view is on screen, in WPF units: its window, or the dock it sits in.</summary>
+        private Rect ScreenBounds()
+        {
+            if (Window.GetWindow(this) is Window window)
+            {
+                return new Rect(window.Left, window.Top, window.ActualWidth, window.ActualHeight);
+            }
+
+            if (PresentationSource.FromVisual(this)?.CompositionTarget is CompositionTarget target)
+            {
+                Point topLeft = target.TransformFromDevice.Transform(PointToScreen(new Point(0, 0)));
+                return new Rect(topLeft, new Size(ActualWidth, ActualHeight));
+            }
+
+            return new Rect(0, 0, ActualWidth, ActualHeight);
         }
 
         private string? GetSurfaceIamPathForPartsGrid(DataGrid grid)
@@ -1893,45 +1908,34 @@ namespace UnitConstructionVerifier.UI
                 string.Equals(p.OwnerIamPath, iam, StringComparison.OrdinalIgnoreCase) && Has(p.PartNumber, query));
         }
 
-        private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.F8)
-            {
-                GoToNextIssue();
-                e.Handled = true;
-            }
-        }
-
         /// <summary>
-        /// Runs a shortcut that <see cref="ShortcutHook"/> took from Inventor. Text fields get normal copy and paste;
-        /// elsewhere Ctrl+C copies the selected part or surface numbers, and Ctrl+V does nothing so Inventor cannot
-        /// paste an old copied component into the model while the verifier has focus.
+        /// Keys reach the view through <see cref="KeyPassthroughHook"/> in either host. Text fields keep normal copy and
+        /// paste. Elsewhere Ctrl+C copies the selected part or surface numbers (not the grid's own row text), and Ctrl+V
+        /// does nothing, so Inventor cannot paste an old copied component while the verifier has focus. F8 is Next issue.
         /// </summary>
-        private void RunShortcut(VerifierShortcut shortcut)
+        private void OnViewPreviewKeyDown(object sender, KeyEventArgs e)
         {
             var focused = Keyboard.FocusedElement as DependencyObject;
             bool inText = focused is System.Windows.Controls.Primitives.TextBoxBase;
+            ModifierKeys modifiers = Keyboard.Modifiers;
 
-            switch (shortcut)
+            if (e.Key == Key.F8 && modifiers == ModifierKeys.None)
             {
-                case VerifierShortcut.NextIssue when WriteReviewOverlay.Visibility != Visibility.Visible:
-                    GoToNextIssue();
-                    break;
-                case VerifierShortcut.Copy when inText:
-                    ApplicationCommands.Copy.Execute(null, (IInputElement)focused!);
-                    break;
-                case VerifierShortcut.Copy:
-                    if (TreeSearch.FindAncestor<DataGrid>(focused) is DataGrid grid)
-                        CopyPartNumbers(grid.SelectedItems.OfType<IptVerificationRow>().ToList());
-                    else if (TreeSearch.FindAncestor<ListBox>(focused) is ListBox list)
-                        CopySurfaceNumber(list.SelectedItem);
-                    break;
-                case VerifierShortcut.Paste when inText:
-                    ApplicationCommands.Paste.Execute(null, (IInputElement)focused!);
-                    break;
-                case VerifierShortcut.Paste:
-                    ShowNotice("Paste works in text fields only, so Inventor does not paste a copied part.");
-                    break;
+                if (WriteReviewOverlay.Visibility != Visibility.Visible) GoToNextIssue();
+                e.Handled = true;
+            }
+            else if (modifiers == ModifierKeys.Control && e.Key == Key.C && !inText)
+            {
+                if (TreeSearch.FindAncestor<DataGrid>(focused) is DataGrid grid)
+                    CopyPartNumbers(grid.SelectedItems.OfType<IptVerificationRow>().ToList());
+                else if (TreeSearch.FindAncestor<ListBox>(focused) is ListBox list)
+                    CopySurfaceNumber(list.SelectedItem);
+                e.Handled = true;
+            }
+            else if (modifiers == ModifierKeys.Control && e.Key == Key.V && !inText)
+            {
+                ShowNotice("Paste works in text fields only, so Inventor does not paste a copied part.");
+                e.Handled = true;
             }
         }
 

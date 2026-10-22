@@ -1,17 +1,16 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
-using UnitConstructionVerifier.UI;
-
-namespace UnitConstructionVerifier.Spike
+namespace UnitConstructionVerifier.UI
 {
     /// <summary>
-    /// Docking spike: gives every key message aimed at our window to WPF directly, before Inventor's message loop can
-    /// treat it as an Inventor shortcut. A thread WH_GETMESSAGE hook sees the message as GetMessage returns it; for keys
+    /// Gives every key message aimed at the verifier to WPF directly, before Inventor's message loop can treat it as
+    /// an Inventor shortcut (ADR 0003). A thread WH_GETMESSAGE hook sees the message as GetMessage returns it; for keys
     /// whose target is inside the owner window it lets WPF preprocess it, translates and dispatches it itself, then turns
-    /// the original into WM_NULL so Inventor's accelerator handling gets nothing.
+    /// the original into WM_NULL so Inventor's accelerator handling gets nothing. Works for the pop-out window and for
+    /// the docked view, whose window is a child of Inventor's frame.
     /// </summary>
-    internal sealed class KeyPassthroughHook : IDisposable
+    public sealed class KeyPassthroughHook : IDisposable
     {
         private const int WhGetMessage = 3;
         private const int PmRemove = 1;
@@ -38,6 +37,9 @@ namespace UnitConstructionVerifier.Spike
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
 
         private readonly Func<IntPtr> _ownerHandle;
         private readonly Action<int, IntPtr>? _onKey;
@@ -66,6 +68,10 @@ namespace UnitConstructionVerifier.Spike
             _hook = IntPtr.Zero;
         }
 
+        /// <summary>True when <paramref name="hwnd"/> is <paramref name="owner"/> or one of its child windows.</summary>
+        internal static bool IsInside(IntPtr owner, IntPtr hwnd) =>
+            owner != IntPtr.Zero && hwnd != IntPtr.Zero && (hwnd == owner || IsChild(owner, hwnd));
+
         private IntPtr HookCallback(int code, IntPtr wParam, IntPtr lParam)
         {
             try
@@ -73,7 +79,7 @@ namespace UnitConstructionVerifier.Spike
                 if (code >= 0 && wParam.ToInt32() == PmRemove)
                 {
                     MSG msg = Marshal.PtrToStructure<MSG>(lParam);
-                    if (msg.message >= WmKeyFirst && msg.message <= WmDeadChar && ShortcutHook.IsInside(_ownerHandle(), msg.hwnd))
+                    if (msg.message >= WmKeyFirst && msg.message <= WmDeadChar && IsInside(_ownerHandle(), msg.hwnd))
                     {
                         _onKey?.Invoke(msg.message, msg.wParam);
 

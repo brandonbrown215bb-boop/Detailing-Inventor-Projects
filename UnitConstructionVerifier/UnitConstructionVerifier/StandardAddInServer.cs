@@ -15,7 +15,6 @@ namespace UnitConstructionVerifier
         private Application? _inventorApp;
         private VerifierCommand? _verifierCommand;
         private Operations.ThicknessHoverCommand? _hoverCommand;
-        private Spike.DockTestCommand? _dockTestCommand;
 
         // ── ApplicationAddInServer ────────────────────────────────────────────
 
@@ -26,9 +25,7 @@ namespace UnitConstructionVerifier
             _verifierCommand = new VerifierCommand(_inventorApp);
             _hoverCommand = new Operations.ThicknessHoverCommand(_inventorApp);
 
-            _dockTestCommand = new Spike.DockTestCommand(_inventorApp);
-
-            RibbonManager.CreateUI(_inventorApp, _verifierCommand, _hoverCommand, _dockTestCommand);
+            RibbonManager.CreateUI(_inventorApp, _verifierCommand, _hoverCommand);
         }
 
         public void Deactivate()
@@ -38,9 +35,6 @@ namespace UnitConstructionVerifier
 
             _hoverCommand?.Dispose();
             _hoverCommand = null;
-
-            _dockTestCommand?.Dispose();
-            _dockTestCommand = null;
 
             _inventorApp = null;
         }

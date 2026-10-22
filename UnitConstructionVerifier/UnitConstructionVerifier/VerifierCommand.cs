@@ -270,9 +270,10 @@ namespace UnitConstructionVerifier
                     }
                 }
 
-                var window = new VerifierWindow(data, iamPath, _app);
-                window.SetIptScanResult(iptResult);
-                window.SetSnapshot(snapshot);
+                var view = new VerifierView(data, iamPath, _app);
+                view.SetIptScanResult(iptResult);
+                view.SetSnapshot(snapshot);
+                var window = new VerifierWindow(view);
                 window.Closed += (_, __) =>
                 {
                     if (ReferenceEquals(_activeWindow, window))

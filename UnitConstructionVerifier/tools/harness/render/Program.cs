@@ -78,8 +78,9 @@ static class Program
         }
         Part(@"C:\Units\B0.iam", "091-30117-056", "0.125", "ALM DIA", "FLOOR SHEET");
 
-        var w0 = new VerifierWindow(data, data.IamPath, null);
-        w0.SetIptScanResult(scan);
+        var v0 = new VerifierView(data, data.IamPath, null);
+        var w0 = new VerifierWindow(v0);
+        v0.SetIptScanResult(scan);
         var dims = size.Split('x').Select(double.Parse).ToArray();
         w0.Width = dims[0]; w0.Height = dims[1];
         w0.Left = -4000; w0.Top = 0; w0.ShowActivated = false;
@@ -88,19 +89,19 @@ static class Program
         Pump();
         Shot(w0, "01-open");
 
-        var roofList = (ListBox)w0.FindName("RoofSurfaceList");
+        var roofList = (ListBox)v0.FindName("RoofSurfaceList");
         roofList.SelectedIndex = 1;
         Pump();
-        var grid = (DataGrid)w0.FindName("RoofPartsGrid");
+        var grid = (DataGrid)v0.FindName("RoofPartsGrid");
         grid.SelectedIndex = 1;
         Pump();
         Shot(w0, "02-roof-selected");
 
-        ((ButtonBase)w0.FindName("BannerNextIssueButton")).GetType();
-        w0.GetType().GetMethod("OnVerify", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-            .Invoke(w0, new object[] { w0, new RoutedEventArgs() });
-        ((RadioButton)w0.FindName("RoofFilterIssues")).IsChecked = true;
-        ((CheckBox)w0.FindName("EditModeCheckBox")).IsChecked = true;
+        ((ButtonBase)v0.FindName("BannerNextIssueButton")).GetType();
+        v0.GetType().GetMethod("OnVerify", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(v0, new object[] { v0, new RoutedEventArgs() });
+        ((RadioButton)v0.FindName("RoofFilterIssues")).IsChecked = true;
+        ((CheckBox)v0.FindName("EditModeCheckBox")).IsChecked = true;
         Pump();
         var rows = grid.ItemsSource.Cast<IptVerificationRow>().ToList();
         var mm = rows.FirstOrDefault(r => r.IsMismatch && r.IsWritable);
@@ -109,34 +110,34 @@ static class Program
         Shot(w0, "03-recheck-edit-issues");
 
         var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-        w0.GetType().GetMethod("OnWriteChanges", flags)!.Invoke(w0, new object[] { w0, new RoutedEventArgs() });
+        v0.GetType().GetMethod("OnWriteChanges", flags)!.Invoke(v0, new object[] { v0, new RoutedEventArgs() });
         Pump();
-        var review = (System.Collections.Generic.List<WriteReviewItem>)w0.GetType().GetField("_reviewItems", flags)!.GetValue(w0)!;
+        var review = (System.Collections.Generic.List<WriteReviewItem>)v0.GetType().GetField("_reviewItems", flags)!.GetValue(v0)!;
         Console.WriteLine($"review items: {review.Count}");
         if (review.Count > 1) review[1].IsIncluded = false;
         Pump();
         Shot(w0, "06-write-review");
-        w0.GetType().GetMethod("OnWriteReviewCancel", flags)!.Invoke(w0, new object[] { w0, new RoutedEventArgs() });
+        v0.GetType().GetMethod("OnWriteReviewCancel", flags)!.Invoke(v0, new object[] { v0, new RoutedEventArgs() });
         Pump();
 
-        ((TabControl)w0.FindName("MainTabControl")).SelectedIndex = 2;
+        ((TabControl)v0.FindName("MainTabControl")).SelectedIndex = 2;
         Pump();
-        ((ListBox)w0.FindName("BaseSurfaceList")).SelectedIndex = 0;
+        ((ListBox)v0.FindName("BaseSurfaceList")).SelectedIndex = 0;
         Pump();
         Shot(w0, "04-base");
 
-        ((TabControl)w0.FindName("MainTabControl")).SelectedIndex = 1;
-        ((TextBox)w0.FindName("WallSearchBox")).Text = "0203";
+        ((TabControl)v0.FindName("MainTabControl")).SelectedIndex = 1;
+        ((TextBox)v0.FindName("WallSearchBox")).Text = "0203";
         Pump();
-        ((ListBox)w0.FindName("WallSurfaceList")).SelectedIndex = 0;
-        ((RadioButton)w0.FindName("HighlightXRayRadio")).IsChecked = true;
+        ((ListBox)v0.FindName("WallSurfaceList")).SelectedIndex = 0;
+        ((RadioButton)v0.FindName("HighlightXRayRadio")).IsChecked = true;
         Pump();
         Shot(w0, "05-walls-search");
 
         // Re-check staged edits then close prompt text is out of scope here; skip closing prompt.
-        w0.GetType().GetField("_overridesDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(w0, false);
-        w0.GetType().GetField("_pendingEdits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-            .FieldType.GetMethod("Clear")!.Invoke(w0.GetType().GetField("_pendingEdits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(w0), null);
+        v0.GetType().GetField("_overridesDirty", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(v0, false);
+        v0.GetType().GetField("_pendingEdits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .FieldType.GetMethod("Clear")!.Invoke(v0.GetType().GetField("_pendingEdits", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(v0), null);
         w0.Close();
         Console.WriteLine("ok");
     }

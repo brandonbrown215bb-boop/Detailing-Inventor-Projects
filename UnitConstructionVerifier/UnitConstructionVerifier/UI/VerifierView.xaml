@@ -1,16 +1,13 @@
-<Window x:Class="UnitConstructionVerifier.UI.VerifierWindow"
+<UserControl x:Class="UnitConstructionVerifier.UI.VerifierView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Unit Construction Verifier"
-        Width="1180" Height="800" MinWidth="1080" MinHeight="660"
-        WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BgPrimary}"
         Foreground="{DynamicResource TextPrimary}"
         FontFamily="Segoe UI" FontSize="12"
         TextOptions.TextFormattingMode="Display"
-        PreviewKeyDown="OnWindowPreviewKeyDown">
+        PreviewKeyDown="OnViewPreviewKeyDown">
 
-    <Window.Resources>
+    <UserControl.Resources>
         <!-- ── Palette ── -->
         <SolidColorBrush x:Key="BgPrimary"      Color="#191B22"/>
         <SolidColorBrush x:Key="BgSurface"      Color="#20232B"/>
@@ -853,7 +850,7 @@
                 <Run Text="{Binding Description, Mode=OneWay}"/><Run Text="{Binding ReasonSuffix, Mode=OneWay}" Foreground="{StaticResource TextSecondary}"/>
             </TextBlock>
         </DataTemplate>
-    </Window.Resources>
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -1450,7 +1447,7 @@
         <!-- Write review: every staged change; untick to leave it staged. Covers the window until Write or Cancel. -->
         <Grid x:Name="WriteReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
             <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
-                    Width="820" MaxHeight="560" Margin="40" Padding="18,14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    MaxWidth="820" MaxHeight="560" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
@@ -1522,4 +1519,4 @@
             </Border>
         </Grid>
     </Grid>
-</Window>
+</UserControl>
