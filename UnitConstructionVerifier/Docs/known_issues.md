@@ -7,7 +7,7 @@ Operational notes for the Unit Construction Verifier add-in. Not code defects un
 ## Ctrl+V in Verifier pastes old Inventor clipboard (v1.0.18.0+)
 
 **Reported:** 2026-07-23  
-**Status:** Expected behavior with modeless UI; no fix unless users report it often.
+**Status:** Mitigated in v1.0.26.0: while the Verifier has focus it takes Ctrl+C, Ctrl+V and F8 before Inventor (see *Fix* below). The description below is how it behaved before.
 
 ### Symptom
 
@@ -35,9 +35,17 @@ With the Verifier window open, the user selects a surface or part in the list (l
 - If paste was accidental, cancel Inventor’s resolve/paste dialog; no change was made by the Verifier itself.
 - Right-click a row and use **Copy part number / Copy surface number** when you need the number on the text clipboard.
 
-### Possible future mitigations (not implemented)
+### Fix (v1.0.26.0)
 
-- Swallow **Ctrl+V** (and optionally **Ctrl+C**) on the Verifier window so shortcuts do not reach Inventor while it has focus.
+Inventor handles its shortcuts in its own message loop before the key is dispatched to the WPF window, so `PreviewKeyDown`
+never saw Ctrl+C or F8 (confirmed in Inventor 2020, 2026-10-22). `UI/ShortcutHook.cs` installs a thread `WH_KEYBOARD` hook
+while the Verifier is open. When keyboard focus is inside the Verifier window it removes Ctrl+C, Ctrl+V and F8 from the
+queue and runs them in the window: copy/paste text in text fields, copy part or surface numbers elsewhere, Ctrl+V does
+nothing outside text fields, F8 is **Next issue**. All other keys, and these keys while focus is in Inventor, pass through.
+
+### Possible further mitigations (not implemented)
+
+- Take more Inventor shortcuts the same way if they cause trouble while the Verifier has focus (Ctrl+X, Ctrl+Z, Delete).
 - Avoid **document.Activate()** on every list selection when the user is working entirely in the Verifier.
 - Show a one-line hint in the UI that assembly paste is Inventor-driven, not list-driven.
 
@@ -46,7 +54,8 @@ With the Verifier window open, the user selects a surface or part in the list (l
 | Version | Highlight behavior | Ctrl+C in Verifier + Inventor active |
 |---------|-------------------|--------------------------------------|
 | ≤ v1.0.17.0 | Native `SelectSet` | Could copy highlighted occurrence into Inventor clipboard (accidental duplicate paste risk) |
-| v1.0.18.0+ | Locator box / X-Ray | Ctrl+C does not refresh Inventor assembly clipboard; Ctrl+V may paste **previous** Inventor copy |
+| v1.0.18.0–v1.0.25.0 | Locator box / X-Ray | Ctrl+C does not refresh Inventor assembly clipboard; Ctrl+V may paste **previous** Inventor copy |
+| v1.0.26.0+ | Locator box / X-Ray | Verifier takes Ctrl+C (copies numbers as text) and Ctrl+V (text fields only) while it has focus |
 
 See also: `HOW_TO_USE.md` and `RELEASE_NOTES.md`.
 

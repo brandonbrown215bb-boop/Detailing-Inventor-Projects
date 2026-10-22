@@ -2,6 +2,14 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.26.0 (2026-10-22) — keyboard shortcuts inside Inventor
+
+- **Fixed:** Ctrl+C and F8 did nothing in the verifier inside Inventor, because Inventor took the keys first.
+  The verifier now takes **Ctrl+C**, **Ctrl+V** and **F8** while it has focus. Ctrl+C copies the selected part or
+  surface numbers (or selected text in a text field); F8 is **Next issue**.
+- **Ctrl+V** pastes into text fields only. Elsewhere in the verifier it does nothing, so Inventor no longer pastes an
+  old copied component into the model while you are working in the verifier.
+
 ## v1.0.25.0 (2026-10-21) — window redesign (UI review Option A)
 
 The verifier window keeps its layout but shows problems before you go looking and stops interrupting with dialogs.

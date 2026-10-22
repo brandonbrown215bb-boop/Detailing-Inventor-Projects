@@ -37,6 +37,7 @@ namespace UnitConstructionVerifier.UI
         private HighlightMode _highlightMode = HighlightMode.Box;
         private readonly SurfaceStatusBoard _statusBoard;
         private readonly System.Windows.Threading.DispatcherTimer _statusTimer;
+        private ShortcutHook? _shortcutHook;
         private readonly System.Windows.Threading.DispatcherTimer _noticeTimer;
         private readonly Dictionary<DataGrid, string> _partsFilters = new Dictionary<DataGrid, string>();
 
@@ -95,6 +96,17 @@ namespace UnitConstructionVerifier.UI
             // terminates Inventor. Log it and keep running instead.
             Dispatcher.UnhandledException += OnDispatcherUnhandledException;
             Closed += (_, __) => Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+
+            // Inventor takes Ctrl+C, Ctrl+V and F8 before PreviewKeyDown sees them; the hook gets them first.
+            SourceInitialized += (_, __) =>
+            {
+                IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                _shortcutHook = new ShortcutHook(() => handle, shortcut =>
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
+                        new Action(() => RunShortcut(shortcut))));
+                _shortcutHook.Install();
+            };
+            Closed += (_, __) => _shortcutHook?.Dispose();
         }
 
         private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
@@ -1880,6 +1892,39 @@ namespace UnitConstructionVerifier.UI
             {
                 GoToNextIssue();
                 e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs a shortcut that <see cref="ShortcutHook"/> took from Inventor. Text fields get normal copy and paste;
+        /// elsewhere Ctrl+C copies the selected part or surface numbers, and Ctrl+V does nothing so Inventor cannot
+        /// paste an old copied component into the model while the verifier has focus.
+        /// </summary>
+        private void RunShortcut(VerifierShortcut shortcut)
+        {
+            var focused = Keyboard.FocusedElement as DependencyObject;
+            bool inText = focused is System.Windows.Controls.Primitives.TextBoxBase;
+
+            switch (shortcut)
+            {
+                case VerifierShortcut.NextIssue:
+                    GoToNextIssue();
+                    break;
+                case VerifierShortcut.Copy when inText:
+                    ApplicationCommands.Copy.Execute(null, (IInputElement)focused!);
+                    break;
+                case VerifierShortcut.Copy:
+                    if (TreeSearch.FindAncestor<DataGrid>(focused) is DataGrid grid)
+                        CopyPartNumbers(grid.SelectedItems.OfType<IptVerificationRow>().ToList());
+                    else if (TreeSearch.FindAncestor<ListBox>(focused) is ListBox list)
+                        CopySurfaceNumber(list.SelectedItem);
+                    break;
+                case VerifierShortcut.Paste when inText:
+                    ApplicationCommands.Paste.Execute(null, (IInputElement)focused!);
+                    break;
+                case VerifierShortcut.Paste:
+                    ShowNotice("Paste works in text fields only, so Inventor does not paste a copied part.");
+                    break;
             }
         }
 

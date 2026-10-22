@@ -49,7 +49,7 @@ The verifier window is **modeless** — you can pan and rotate the model in Inve
   It updates on its own whenever an expectation changes; there is nothing to run first.
 - **N not checked** appears when a rule covers a part but it could not be checked.
 - **Next issue** jumps to the next surface with a mismatch, opens its tab, and selects the first
-  mismatched part. (The **F8** shortcut does not work yet inside Inventor; use the button.)
+  mismatched part.
 - **Highlight** chooses how the selected surface or part is shown in Inventor:
 
 | Mode | Behavior |
@@ -146,10 +146,11 @@ When editing part properties from the verifier:
 
 Default highlight uses a **locator box**, not Inventor’s selection set.
 
-- **Ctrl+C in the verifier does not** put the highlighted row on Inventor’s assembly clipboard.
-- If the unit IAM is active, **Ctrl+V in Inventor** may still paste an **older** Inventor copy and trigger missing-reference dialogs.
+While the verifier window has focus, it handles **Ctrl+C**, **Ctrl+V** and **F8** itself; Inventor does not see them.
 
-**Workaround:** Right-click a part or surface and use **Copy part number / Copy surface number**. Ctrl+C on a selected row does not work yet: Inventor takes the shortcut before the verifier sees it. Avoid Ctrl+V in Inventor while verifying unless you know what’s on the clipboard.
+- **Ctrl+C** on a selected part row or surface copies its number as text (same as right-click **Copy part number / Copy surface number**). In a text field it copies the selected text.
+- **Ctrl+V** pastes only into text fields. Anywhere else in the verifier it does nothing, so Inventor cannot paste an old copied component into the model.
+- Neither puts assembly occurrences on Inventor’s clipboard. Once you click back into Inventor, **Ctrl+V there** still pastes whatever Inventor last copied.
 
 Full notes: `Docs/known_issues.md`
 
