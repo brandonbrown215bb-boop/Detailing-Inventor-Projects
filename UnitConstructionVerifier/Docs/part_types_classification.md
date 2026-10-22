@@ -15,13 +15,13 @@ The classification categories, expectation sources, and checked parameters are s
 | **Skin** | Casing | `091-30117-081/083/177`; "skin", "panel", "post" | The surface's own side in the config (roofs: Top; walls: their side) |
 | **Liner** | Casing | `091-30117-082/084`; "liner" | The surface's own side's liner |
 | **Channel** | Casing | `091-30117-064/065/085/086` and others; "C:SC" | Standard parts (`064/065/085/086`): 16 GA `STL GALV2/3/4` by panel thickness. Sloped outdoor roof channels (`068/069/070`), brackets (`046/077/078`) and `048`: plain 16 GA `STL GALV`. The config's `formedChannelMaterialType` is not used, so an Outdoor-configured unit with standard roof channels is flagged |
-| **Roof Cap** | Casing (roof) | `091-30117-001/058/074`; "roof corner cap", "roof cap" | `Roof_RoofCap_MaterialGauge_Default` (16) in the **wall exterior** material; 20 GA when that is `ALM EMB` |
+| **Roof Cap** (detailers: "roof trim") | Casing (roof) | `091-30117-001/058/074`; "roof corner cap", "roof cap" | The roof's **Trim** row (check: *Roof Trim Gauge & Material*). It starts as `Roof_RoofCap_MaterialGauge_Default` (16) in the **wall exterior** material; 20 GA whenever the trim material is `ALM EMB` |
 | **Roof Accessory** | Casing (roof) | `091-30117-022/076`, `091-30119-007`; "roof super angle", "peaked roof split cover", "roof seal-off angle" | `Roof_RoofSealOffAngle_*` engineering defaults (16 GA STL GALV) |
 | **Tiering Angle** | Casing (roof) | `091-30117-057`; "tiering angle" | 14 GA STL GALV |
 | **Attachment Angle** | Casing (wall) | `091-30117-049/053`; "attachment angle", "angle, formed" | 16 GA in the liner material |
 | **Seal-Off Angle** | Casing (wall) | `091-30119-006`; "seal-off angle" | The wall's exterior skin gauge and material |
 | **Wall Corner Cap / Liner** | Casing (wall) | `091-30117-072` / `073` | 16 GA (cap: 20 ALM EMB, 14 ALM SHT) in the skin / liner material |
-| **Trim** | Casing | `091-30117-011/195/196`; remaining roof/wall trim keywords | Row trim (roofs: roof cap values) or exterior skin |
+| **Trim** | Casing | `091-30117-011/195/196`; remaining roof/wall trim keywords | Display only (not automated) |
 | **Misc Trim / Split Cover** | Casing | `091-30117-075/087/089`; "misc trim" | Display only |
 | **Floor Sheet** | Base | `091-30117-056/124`; "floor", "deck" | `defaultConstructionOptions_FloorMaterialGauge/Type` |
 | **Sub-Floor** | Base | `091-30117-080/061/062`; "subfloor", "sub-floor", "sub floor" | `unitBase.unitBaseGeometryList[].subFloorMaterialGauge/Type` |

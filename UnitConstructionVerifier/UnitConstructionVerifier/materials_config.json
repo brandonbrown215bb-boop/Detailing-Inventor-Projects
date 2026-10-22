@@ -163,9 +163,7 @@
         "091-30117-195",
         "091-30117-196"
       ],
-      "GaugeSource": "borrow:TrimSkinGauge || borrow:ExteriorSkinGauge",
-      "MaterialSource": "borrow:TrimSkinMaterial || borrow:ExteriorSkinMaterial",
-      "VerificationMode": "mismatch",
+      "VerificationMode": "display",
       "Section": "Casing",
       "FieldName": "Trim Gauge & Material"
     },
@@ -180,11 +178,11 @@
         "091-30117-058",
         "091-30117-074"
       ],
-      "GaugeSource": "if:RoofCapMaterial=ALM EMB?fixed:20:borrow:RoofCapGauge",
-      "MaterialSource": "borrow:RoofCapMaterial",
+      "GaugeSource": "if:TrimSkinMaterial=ALM EMB?fixed:20:borrow:TrimSkinGauge",
+      "MaterialSource": "borrow:TrimSkinMaterial",
       "VerificationMode": "mismatch",
       "Section": "Casing",
-      "FieldName": "Roof Cap Gauge & Material"
+      "FieldName": "Roof Trim Gauge & Material"
     },
     {
       "Classification": "Roof Accessory",

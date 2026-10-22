@@ -127,7 +127,7 @@ namespace UnitConstructionVerifier.Extraction
 
                 if (isRoof)
                 {
-                    // Roof caps follow the wall exterior (the roof's side skins), not the roof top skin.
+                    // Roof trim (roof caps) starts from the wall exterior (the roof's side skins), not the roof top skin.
                     // Roofs without segments (sequence-fallback surfaces) borrow the unit's wall exterior.
                     string wallExteriorMat = SideSkinMaterial(config) ?? UnitWallExteriorMaterial() ?? string.Empty;
                     string capGauge = wallExteriorMat.Length == 0 ? string.Empty
@@ -149,8 +149,6 @@ namespace UnitConstructionVerifier.Extraction
                         ChannelSkinMaterial = channelMat,
                         TrimSkinGauge = capGauge,
                         TrimSkinMaterial = wallExteriorMat,
-                        RoofCapGauge = capGauge,
-                        RoofCapMaterial = wallExteriorMat,
                         RoofAccessoryGauge = accessoryGauge,
                         RoofAccessoryMaterial = accessoryMat,
                         InsulationThicknessAndMaterial = insulStr,

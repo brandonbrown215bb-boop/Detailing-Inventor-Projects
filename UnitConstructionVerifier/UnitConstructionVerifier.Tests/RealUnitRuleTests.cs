@@ -204,8 +204,8 @@ namespace UnitConstructionVerifier.Tests
 
             var row = new ConstructionDataBuilder(new List<ConfigData> { roof, wall }, null, new IptScanResult()).Build().RoofRows.Single();
 
-            Assert.AreEqual("16", row.RoofCapGauge);
-            Assert.AreEqual("STL GALV PPC", row.RoofCapMaterial);
+            Assert.AreEqual("16", row.TrimSkinGauge);
+            Assert.AreEqual("STL GALV PPC", row.TrimSkinMaterial);
         }
 
         [Test]

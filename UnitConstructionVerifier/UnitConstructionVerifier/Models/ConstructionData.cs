@@ -46,8 +46,6 @@ namespace UnitConstructionVerifier.Models
         public string ChannelSkinMaterial       { get; set; } = string.Empty;
         public string TrimSkinGauge             { get; set; } = string.Empty;
         public string TrimSkinMaterial          { get; set; } = string.Empty;
-        public string RoofCapGauge              { get; set; } = string.Empty; // roof caps / corner caps: engineering gauge
-        public string RoofCapMaterial           { get; set; } = string.Empty; //   ... in the wall exterior material
         public string RoofAccessoryGauge        { get; set; } = string.Empty; // seal-off / super angle / peaked split cover
         public string RoofAccessoryMaterial     { get; set; } = string.Empty;
         public string InsulationThicknessAndMaterial { get; set; } = string.Empty;

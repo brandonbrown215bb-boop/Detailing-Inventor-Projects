@@ -1045,7 +1045,8 @@
                                             <TextBlock Grid.Row="2" Text="Channel" Style="{StaticResource FieldLabel}"/>
                                             <ComboBox Grid.Row="2" Grid.Column="1" x:Name="RoofChannelGaugeCombo" SelectionChanged="OnRoofExpectationsChanged" TabIndex="14"/>
                                             <ComboBox Grid.Row="2" Grid.Column="2" x:Name="RoofChannelMaterialCombo" SelectionChanged="OnRoofExpectationsChanged" Margin="6,0,0,0" TabIndex="15"/>
-                                            <TextBlock Grid.Row="2" Grid.Column="4" Text="Trim" Style="{StaticResource FieldLabel}"/>
+                                            <TextBlock Grid.Row="2" Grid.Column="4" Text="Trim" Style="{StaticResource FieldLabel}"
+                                                       ToolTip="Roof trim: roof caps and roof corner caps (091-30117-001/058/074). ALM EMB is always 20 GA."/>
                                             <ComboBox Grid.Row="2" Grid.Column="5" x:Name="RoofTrimGaugeCombo" SelectionChanged="OnRoofExpectationsChanged" TabIndex="16"/>
                                             <ComboBox Grid.Row="2" Grid.Column="6" x:Name="RoofTrimMaterialCombo" SelectionChanged="OnRoofExpectationsChanged" Margin="6,0,0,0" TabIndex="17"/>
 

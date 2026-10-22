@@ -74,6 +74,9 @@ The verifier window is **modeless** — you can pan and rotate the model in Inve
 
 - Gauge and material sit in labelled columns that do not move when the window is resized. Click the
   **Expected construction** heading to collapse the block and give the parts grid more room.
+- On the Roof tab, **Trim** is roof trim: the roof caps and roof corner caps. Changing it changes what those parts
+  are checked against (shown as *Roof Trim Gauge & Material*). It starts from the wall exterior, the roof's side
+  skins. Other trim stock parts (091-30117-011/195/196) are not automated and are listed as **Display only**.
 - **Copy to all roofs… / Copy to all walls…** lists which other surfaces would change and which fields
   (for example `Exterior gauge 16 → 18`) before copying. Surfaces that already match are left alone; if they all
   match, nothing is asked and the footer says so.

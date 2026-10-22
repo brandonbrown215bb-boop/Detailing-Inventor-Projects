@@ -2,6 +2,15 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.28.0 (2026-10-22) — roof Trim row drives roof caps
+
+- **Fixed:** changing a roof's **Trim** gauge or material did not change what roof caps (091-30117-001/058/074) were
+  checked against. They used a hidden roof cap value taken from the wall exterior, so they never flagged and were never
+  staged (seen on 091Z010068-0105). Roof caps are what detailers call roof trim, so they now follow the roof's Trim row
+  (check name *Roof Trim Gauge & Material*); `ALM EMB` is still always 20 GA. The Trim row starts with the same values
+  as before, so existing units check the same until you change it.
+- The trim stock parts 091-30117-011/195/196 are not automated and are now **Display only** instead of checked.
+
 ## v1.0.27.0 (2026-10-22) — review before writing (UI review Option B)
 
 - **Review & write to parts…** now opens a review listing each staged change (part, property, now, will be)

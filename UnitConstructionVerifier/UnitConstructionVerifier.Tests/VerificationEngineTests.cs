@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.Linq;
 using UnitConstructionVerifier.Engine;
 using UnitConstructionVerifier.Models;
 
@@ -317,6 +318,63 @@ namespace UnitConstructionVerifier.Tests
             // Passes because Misc Trim is ignored/exempt from standard Trim checks
             Assert.IsTrue(result.IsPass);
             Assert.AreEqual(0, result.Mismatches.Count);
+        }
+
+        [Test]
+        public void RoofCap_Follows_Roof_Trim_Row()
+        {
+            // Detailers call roof caps "roof trim": editing the roof's Trim row must move what roof caps are checked against.
+            var userData = new UnitConstructionData
+            {
+                RoofRows = new List<RoofSurfaceRow>
+                {
+                    new RoofSurfaceRow { SourceSurfaceIam = "Roof.iam", TrimSkinGauge = "18", TrimSkinMaterial = "STL GALV" }
+                }
+            };
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties
+                    {
+                        OwnerIamPath = "Roof.iam", PartNumber = "091Z010068-0105", ModelNumber = "091-30117-058",
+                        Description = "ROOF CAP, VARIABLE 41.063 x 4", MtlGauge = "16", YCMATL = "STL GALV PPC"
+                    }
+                }
+            };
+
+            var check = new VerificationEngine(userData, iptData).Run().Checks.Single();
+
+            Assert.AreEqual(PartCheckStatus.Mismatch, check.Status);
+            StringAssert.Contains("18", check.ExpectedValue);
+            StringAssert.Contains("STL GALV", check.ExpectedValue);
+        }
+
+        [TestCase("091-30117-011")]
+        [TestCase("091-30117-195")]
+        [TestCase("091-30117-196")]
+        public void Trim_Stock_Parts_Are_Display_Only(string model)
+        {
+            // Not automated, so never flagged, whatever the roof Trim row says.
+            var userData = new UnitConstructionData
+            {
+                RoofRows = new List<RoofSurfaceRow>
+                {
+                    new RoofSurfaceRow { SourceSurfaceIam = "Roof.iam", TrimSkinGauge = "16", TrimSkinMaterial = "STL GALV PPC" }
+                }
+            };
+            var iptData = new IptScanResult
+            {
+                Parts = new List<IptProperties>
+                {
+                    new IptProperties { OwnerIamPath = "Roof.iam", PartNumber = "T-1", ModelNumber = model, MtlGauge = "20", YCMATL = "ALM SHT" }
+                }
+            };
+
+            var result = new VerificationEngine(userData, iptData).Run();
+
+            Assert.AreEqual(0, result.Mismatches.Count);
+            Assert.That(result.Checks.All(c => c.Status == PartCheckStatus.DisplayOnly));
         }
 
         [Test]

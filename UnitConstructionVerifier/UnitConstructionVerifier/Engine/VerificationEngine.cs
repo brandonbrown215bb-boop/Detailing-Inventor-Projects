@@ -154,8 +154,6 @@ namespace UnitConstructionVerifier.Engine
                 ["ChannelSkinMaterial"]   = row.ChannelSkinMaterial,
                 ["TrimSkinGauge"]         = row.TrimSkinGauge,
                 ["TrimSkinMaterial"]      = row.TrimSkinMaterial,
-                ["RoofCapGauge"]          = row.RoofCapGauge,
-                ["RoofCapMaterial"]       = row.RoofCapMaterial,
                 ["RoofAccessoryGauge"]    = row.RoofAccessoryGauge,
                 ["RoofAccessoryMaterial"] = row.RoofAccessoryMaterial,
             };

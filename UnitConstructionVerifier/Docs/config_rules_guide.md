@@ -107,9 +107,7 @@ When using `borrow:`, you can reference the following field names:
 - **`InteriorLinerMaterial`**
 - **`ChannelSkinGauge`**
 - **`ChannelSkinMaterial`**
-- **`TrimSkinGauge`** *(Roof only; same as `RoofCapGauge`)*
-- **`TrimSkinMaterial`** *(Roof only; same as `RoofCapMaterial`)*
-- **`RoofCapGauge`** / **`RoofCapMaterial`** *(Roof only: engineering roof cap gauge in the wall exterior material)*
+- **`TrimSkinGauge`** / **`TrimSkinMaterial`** *(Roof only: the **Trim** row on the Roof tab, i.e. roof trim = roof caps and corner caps. Starts as the engineering roof cap gauge in the wall exterior material; editable.)*
 - **`RoofAccessoryGauge`** / **`RoofAccessoryMaterial`** *(Roof only: engineering roof seal-off angle defaults, normally 16 GA STL GALV)*
 
 Skin and liner fields are the surface's **own side** of the unit (roofs: Top). Channel fields are 16 GA
