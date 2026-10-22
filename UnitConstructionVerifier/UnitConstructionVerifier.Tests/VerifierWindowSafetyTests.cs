@@ -130,12 +130,15 @@ namespace UnitConstructionVerifier.Tests
         [Test]
         public void Actual_Columns_Start_Read_Only()
         {
-            var columns = WindowXaml().Descendants(Wpf + "DataGridTextColumn")
+            var columns = WindowXaml().Descendants()
+                .Where(c => c.Name.LocalName.StartsWith("DataGrid") && c.Name.LocalName.EndsWith("Column"))
                 .Where(c => (string?)c.Attribute("Header") == "In part")
                 .ToList();
 
             Assert.AreEqual(3, columns.Count);
             Assert.That(columns.All(c => (string?)c.Attribute("IsReadOnly") == "True"));
+            // Staged rows show "now → new", so the editing template must still edit the staged value.
+            Assert.That(columns.All(c => (string?)c.Attribute("CellEditingTemplate") == "{StaticResource InPartEditingTemplate}"));
         }
 
         [Test]

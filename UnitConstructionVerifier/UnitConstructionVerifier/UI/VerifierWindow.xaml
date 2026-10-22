@@ -808,6 +808,20 @@
             <Setter Property="FontFamily" Value="Consolas"/>
         </Style>
 
+        <!-- In part: the part's value, or "now → staged" while an edit is staged. Editing still edits the staged value. -->
+        <DataTemplate x:Key="InPartCellTemplate">
+            <TextBlock x:Name="InPartText" Text="{Binding InPartText}" Style="{StaticResource MonoCellText}" VerticalAlignment="Center"/>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsEditPending}" Value="True">
+                    <Setter TargetName="InPartText" Property="Foreground" Value="{StaticResource AccentPending}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+        <DataTemplate x:Key="InPartEditingTemplate">
+            <TextBox Text="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DataGridEditingTextBox}"
+                     FocusManager.FocusedElement="{Binding RelativeSource={RelativeSource Self}}"/>
+        </DataTemplate>
+
         <!-- Status chip: colour and wording never depend on the row background. -->
         <DataTemplate x:Key="StatusCellTemplate">
             <Border x:Name="Chip" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left"
@@ -1079,8 +1093,8 @@
                                             <DataGridTextColumn Header="Type" Binding="{Binding PartType}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="0.8*" MinWidth="70"/>
                                             <DataGridTextColumn Header="Checks" Binding="{Binding Parameter}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="1.4*" MinWidth="100"/>
                                             <DataGridTextColumn Header="Expected" Binding="{Binding Expected}" ElementStyle="{StaticResource MonoCellText}" IsReadOnly="True" Width="1.4*" MinWidth="110"/>
-                                            <DataGridTextColumn x:Name="RoofActualColumn" Header="In part" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                ElementStyle="{StaticResource MonoCellText}" EditingElementStyle="{StaticResource DataGridEditingTextBox}"
+                                            <DataGridTemplateColumn x:Name="RoofActualColumn" Header="In part" SortMemberPath="Actual"
+                                                                CellTemplate="{StaticResource InPartCellTemplate}" CellEditingTemplate="{StaticResource InPartEditingTemplate}"
                                                                 IsReadOnly="True" Width="1.4*" MinWidth="110"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
@@ -1228,8 +1242,8 @@
                                             <DataGridTextColumn Header="Type" Binding="{Binding PartType}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="0.8*" MinWidth="70"/>
                                             <DataGridTextColumn Header="Checks" Binding="{Binding Parameter}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="1.4*" MinWidth="100"/>
                                             <DataGridTextColumn Header="Expected" Binding="{Binding Expected}" ElementStyle="{StaticResource MonoCellText}" IsReadOnly="True" Width="1.4*" MinWidth="110"/>
-                                            <DataGridTextColumn x:Name="WallActualColumn" Header="In part" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                ElementStyle="{StaticResource MonoCellText}" EditingElementStyle="{StaticResource DataGridEditingTextBox}"
+                                            <DataGridTemplateColumn x:Name="WallActualColumn" Header="In part" SortMemberPath="Actual"
+                                                                CellTemplate="{StaticResource InPartCellTemplate}" CellEditingTemplate="{StaticResource InPartEditingTemplate}"
                                                                 IsReadOnly="True" Width="1.4*" MinWidth="110"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
@@ -1381,8 +1395,8 @@
                                             <DataGridTextColumn Header="Type" Binding="{Binding PartType}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="0.8*" MinWidth="70"/>
                                             <DataGridTextColumn Header="Checks" Binding="{Binding Parameter}" ElementStyle="{StaticResource ReadOnlyCellText}" IsReadOnly="True" Width="1.4*" MinWidth="100"/>
                                             <DataGridTextColumn Header="Expected" Binding="{Binding Expected}" ElementStyle="{StaticResource MonoCellText}" IsReadOnly="True" Width="1.4*" MinWidth="110"/>
-                                            <DataGridTextColumn x:Name="BaseActualColumn" Header="In part" Binding="{Binding NewValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                ElementStyle="{StaticResource MonoCellText}" EditingElementStyle="{StaticResource DataGridEditingTextBox}"
+                                            <DataGridTemplateColumn x:Name="BaseActualColumn" Header="In part" SortMemberPath="Actual"
+                                                                CellTemplate="{StaticResource InPartCellTemplate}" CellEditingTemplate="{StaticResource InPartEditingTemplate}"
                                                                 IsReadOnly="True" Width="1.4*" MinWidth="110"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
@@ -1431,5 +1445,80 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Write review: every staged change; untick to leave it staged. Covers the window until Write or Cancel. -->
+        <Grid x:Name="WriteReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
+            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
+                    Width="820" MaxHeight="560" Margin="40" Padding="18,14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    KeyboardNavigation.TabNavigation="Cycle">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Text="Review part changes" Style="{StaticResource SectionHeader}" FontSize="15"/>
+                        <TextBlock x:Name="WriteReviewSummary" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                        <Grid Margin="8,0,8,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28"/>
+                                <ColumnDefinition Width="1.3*"/>
+                                <ColumnDefinition Width="1.2*"/>
+                                <ColumnDefinition Width="1*"/>
+                                <ColumnDefinition Width="24"/>
+                                <ColumnDefinition Width="1*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="1" Text="Part" Style="{StaticResource ColumnLabel}"/>
+                            <TextBlock Grid.Column="2" Text="Property" Style="{StaticResource ColumnLabel}"/>
+                            <TextBlock Grid.Column="3" Text="Now" Style="{StaticResource ColumnLabel}"/>
+                            <TextBlock Grid.Column="5" Text="Will be" Style="{StaticResource ColumnLabel}"/>
+                        </Grid>
+                    </StackPanel>
+                    <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="False">
+                        <Button x:Name="WriteReviewConfirmButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="14,5"
+                                Background="{StaticResource AccentPending}" Content="Write changes" Click="OnWriteReviewConfirm"/>
+                        <Button x:Name="WriteReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                Content="Cancel" IsCancel="True" Click="OnWriteReviewCancel"/>
+                        <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"
+                                   Text="Part files must be checked out of Vault. Ticked changes are written in one transaction."/>
+                    </DockPanel>
+                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="WriteReviewList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid x:Name="ReviewRow" Margin="8,0" MinHeight="30">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="28"/>
+                                                <ColumnDefinition Width="1.3*"/>
+                                                <ColumnDefinition Width="1.2*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="24"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay}" IsEnabled="{Binding CanWrite}" VerticalAlignment="Center"
+                                                      ToolTip="Untick to leave this change staged"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding PartNumber}" ToolTip="{Binding FileTooltip}" FontFamily="Consolas"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Parameter}" Style="{StaticResource ReadOnlyCellText}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding Current}" Style="{StaticResource MonoCellText}"
+                                                       Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="4" Text="→" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="NewText" Grid.Column="5" Text="{Binding NewValue}" ToolTip="{Binding NewValueTooltip}" FontFamily="Consolas"
+                                                       Foreground="{StaticResource AccentPending}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsIncluded}" Value="False">
+                                                <Setter TargetName="ReviewRow" Property="Opacity" Value="0.5"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CanWrite}" Value="False">
+                                                <Setter TargetName="NewText" Property="TextDecorations" Value="Strikethrough"/>
+                                                <Setter TargetName="NewText" Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </DockPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

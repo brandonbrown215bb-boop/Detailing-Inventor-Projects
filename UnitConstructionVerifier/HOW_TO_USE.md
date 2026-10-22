@@ -74,7 +74,9 @@ The verifier window is **modeless** — you can pan and rotate the model in Inve
 
 - Gauge and material sit in labelled columns that do not move when the window is resized. Click the
   **Expected construction** heading to collapse the block and give the parts grid more room.
-- **Copy to all roofs… / Copy to all walls…** asks before replacing the other surfaces' expectations.
+- **Copy to all roofs… / Copy to all walls…** lists which other surfaces would change and which fields
+  (for example `Exterior gauge 16 → 18`) before copying. Surfaces that already match are left alone; if they all
+  match, nothing is asked and the footer says so.
 - **Upturned lip** and **Curb rest** are unit-wide settings, under **Unit** on the Base & Floor tab.
 - Expectations come from the unit's own configuration and engineering data: each roof/wall uses its own side of the unit, sub-floor comes from the base configuration, and perimeter angles on bases with an upturned lip (UTL) are 10 GA aluminum/stainless or 12 GA STL GALV by floor type (16 GA STL GALV otherwise). On a base whose lip runs on only some sides, the standard angles on the non-lip sides show as mismatches by design; see `Docs/known_issues.md`. See `Docs/part_types_classification.md`.
 
@@ -83,6 +85,8 @@ The verifier window is **modeless** — you can pan and rotate the model in Inve
 - **All / Issues / Not checked** filter the grid; each shows its count.
 - **Status** is a colored chip: **✓ Pass**, **✗ Mismatch**, **Display only**, **– Not checked**, or **● Staged**.
   Hover the chip for the reason or, on a staged row, the old and new value.
+- On a staged row, **In part** shows the part's current value and the staged one: `20 GA STL GALV → 18 GA STL GALV`
+  (hover if the cell is too narrow). Double-clicking it in Edit parts still edits the staged value.
 - A not-checked part shows its reason after the description: no expected value, the part sits in the wrong
   surface type, or its IAM has no surface row.
 - Parts changed after the unit was generated (SQ parts, or parts edited here) show **· modified** after their status. A freshly generated unit has none.
@@ -119,7 +123,11 @@ When editing part properties from the verifier:
   **Review & write to parts…**. **Discard** drops them. The tray stays visible while edits are staged, even if
   you turn **Edit parts** off.
 - Part values can be edited only while **Edit parts** is on, and only on rows whose checked parameter can be written back (thickness, gauge & material, base/formed-channel material). Other rows stay read-only, and **Sync** skips them.
-- If a staged edit cannot be written, the confirmation lists it as skipped instead of dropping it silently.
+- **Review & write to parts…** opens a review over the window listing every staged change: part, property, the
+  value now, and the value it will be. Untick any change you do not want written yet; unticked changes stay
+  staged. **Write N changes** writes the ticked ones in one Inventor transaction (part files must be checked out
+  of Vault); **Cancel** writes nothing.
+- If a staged edit cannot be written to a part property, the review shows it struck through and unticked.
 
 ### Unsaved changes
 

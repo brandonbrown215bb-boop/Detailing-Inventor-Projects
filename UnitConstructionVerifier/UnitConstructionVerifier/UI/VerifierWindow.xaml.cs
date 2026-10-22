@@ -22,7 +22,8 @@ namespace UnitConstructionVerifier.UI
         private UnitSnapshot?                 _snapshot;
         private bool                          _isUpdatingUi;
         private readonly Inventor.Application _inventorApp;
-        private readonly Dictionary<string, string> _pendingEdits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, StagedEdit> _pendingEdits = new Dictionary<string, StagedEdit>(StringComparer.OrdinalIgnoreCase);
+        private List<WriteReviewItem> _reviewItems = new List<WriteReviewItem>();
         private byte _xRayColorR = XRayHighlightColors.Default.R;
         private byte _xRayColorG = XRayHighlightColors.Default.G;
         private byte _xRayColorB = XRayHighlightColors.Default.B;
@@ -279,29 +280,25 @@ namespace UnitConstructionVerifier.UI
             RefreshPartsGrid(selected);
         }
 
+        private static readonly ExpectationField<RoofSurfaceRow>[] RoofCopyFields =
+        {
+            new ExpectationField<RoofSurfaceRow>("Panel thickness", r => r.Thickness, (r, v) => r.Thickness = v),
+            new ExpectationField<RoofSurfaceRow>("Exterior gauge", r => r.ExteriorSkinGauge, (r, v) => r.ExteriorSkinGauge = v),
+            new ExpectationField<RoofSurfaceRow>("Exterior material", r => r.ExteriorSkinMaterial, (r, v) => r.ExteriorSkinMaterial = v),
+            new ExpectationField<RoofSurfaceRow>("Interior gauge", r => r.InteriorLinerGauge, (r, v) => r.InteriorLinerGauge = v),
+            new ExpectationField<RoofSurfaceRow>("Interior material", r => r.InteriorLinerMaterial, (r, v) => r.InteriorLinerMaterial = v),
+            new ExpectationField<RoofSurfaceRow>("Channel gauge", r => r.ChannelSkinGauge, (r, v) => r.ChannelSkinGauge = v),
+            new ExpectationField<RoofSurfaceRow>("Channel material", r => r.ChannelSkinMaterial, (r, v) => r.ChannelSkinMaterial = v),
+            new ExpectationField<RoofSurfaceRow>("Trim gauge", r => r.TrimSkinGauge, (r, v) => r.TrimSkinGauge = v),
+            new ExpectationField<RoofSurfaceRow>("Trim material", r => r.TrimSkinMaterial, (r, v) => r.TrimSkinMaterial = v),
+            new ExpectationField<RoofSurfaceRow>("Insulation", r => r.InsulationThicknessAndMaterial, (r, v) => r.InsulationThicknessAndMaterial = v),
+            new ExpectationField<RoofSurfaceRow>("Thermal break", r => r.ThermalBreak, (r, v) => r.ThermalBreak = v),
+        };
+
         private void OnApplyRoofToAll(object sender, RoutedEventArgs e)
         {
-            var selected = RoofSurfaceList.SelectedItem as RoofSurfaceRow;
-            if (selected == null || !ConfirmCopyToAll("roof", "roofs", _data.RoofRows.Count - 1)) return;
-
-            foreach (var row in _data.RoofRows)
-            {
-                if (row == selected) continue;
-                row.Thickness = selected.Thickness;
-                row.ExteriorSkinGauge = selected.ExteriorSkinGauge;
-                row.ExteriorSkinMaterial = selected.ExteriorSkinMaterial;
-                row.InteriorLinerGauge = selected.InteriorLinerGauge;
-                row.InteriorLinerMaterial = selected.InteriorLinerMaterial;
-                row.ChannelSkinGauge = selected.ChannelSkinGauge;
-                row.ChannelSkinMaterial = selected.ChannelSkinMaterial;
-                row.TrimSkinGauge = selected.TrimSkinGauge;
-                row.TrimSkinMaterial = selected.TrimSkinMaterial;
-                row.InsulationThicknessAndMaterial = selected.InsulationThicknessAndMaterial;
-                row.ThermalBreak = selected.ThermalBreak;
-            }
-
-            MarkOverridesDirty();
-            ShowNotice($"Copied expectations from {selected.PartNumber} to {_data.RoofRows.Count - 1} other roofs.");
+            if (RoofSurfaceList.SelectedItem is RoofSurfaceRow selected)
+                CopyToAll(selected, _data.RoofRows, RoofCopyFields, r => r.PartNumber, "roof", "roofs");
         }
 
         // ── Wall Tab Event Handlers ───────────────────────────────────────────
@@ -377,28 +374,24 @@ namespace UnitConstructionVerifier.UI
             RefreshPartsGrid(selected);
         }
 
+        private static readonly ExpectationField<WallSurfaceRow>[] WallCopyFields =
+        {
+            new ExpectationField<WallSurfaceRow>("Panel thickness", r => r.Thickness, (r, v) => r.Thickness = v),
+            new ExpectationField<WallSurfaceRow>("Exterior paint", r => r.ExteriorPaint, (r, v) => r.ExteriorPaint = v),
+            new ExpectationField<WallSurfaceRow>("Exterior gauge", r => r.ExteriorSkinGauge, (r, v) => r.ExteriorSkinGauge = v),
+            new ExpectationField<WallSurfaceRow>("Exterior material", r => r.ExteriorSkinMaterial, (r, v) => r.ExteriorSkinMaterial = v),
+            new ExpectationField<WallSurfaceRow>("Interior gauge", r => r.InteriorLinerGauge, (r, v) => r.InteriorLinerGauge = v),
+            new ExpectationField<WallSurfaceRow>("Interior material", r => r.InteriorLinerMaterial, (r, v) => r.InteriorLinerMaterial = v),
+            new ExpectationField<WallSurfaceRow>("Channel gauge", r => r.ChannelSkinGauge, (r, v) => r.ChannelSkinGauge = v),
+            new ExpectationField<WallSurfaceRow>("Channel material", r => r.ChannelSkinMaterial, (r, v) => r.ChannelSkinMaterial = v),
+            new ExpectationField<WallSurfaceRow>("Insulation", r => r.InsulationThicknessAndMaterial, (r, v) => r.InsulationThicknessAndMaterial = v),
+            new ExpectationField<WallSurfaceRow>("Thermal break", r => r.ThermalBreak, (r, v) => r.ThermalBreak = v),
+        };
+
         private void OnApplyWallToAll(object sender, RoutedEventArgs e)
         {
-            var selected = WallSurfaceList.SelectedItem as WallSurfaceRow;
-            if (selected == null || !ConfirmCopyToAll("wall", "walls", _data.WallRows.Count - 1)) return;
-
-            foreach (var row in _data.WallRows)
-            {
-                if (row == selected) continue;
-                row.Thickness = selected.Thickness;
-                row.ExteriorPaint = selected.ExteriorPaint;
-                row.ExteriorSkinGauge = selected.ExteriorSkinGauge;
-                row.ExteriorSkinMaterial = selected.ExteriorSkinMaterial;
-                row.InteriorLinerGauge = selected.InteriorLinerGauge;
-                row.InteriorLinerMaterial = selected.InteriorLinerMaterial;
-                row.ChannelSkinGauge = selected.ChannelSkinGauge;
-                row.ChannelSkinMaterial = selected.ChannelSkinMaterial;
-                row.InsulationThicknessAndMaterial = selected.InsulationThicknessAndMaterial;
-                row.ThermalBreak = selected.ThermalBreak;
-            }
-
-            MarkOverridesDirty();
-            ShowNotice($"Copied expectations from {selected.PartNumber} to {_data.WallRows.Count - 1} other walls.");
+            if (WallSurfaceList.SelectedItem is WallSurfaceRow selected)
+                CopyToAll(selected, _data.WallRows, WallCopyFields, r => r.PartNumber, "wall", "walls");
         }
 
         // ── Base Tab Event Handlers ───────────────────────────────────────────
@@ -753,18 +746,40 @@ namespace UnitConstructionVerifier.UI
             _noticeTimer.Start();
         }
 
-        private bool ConfirmCopyToAll(string one, string many, int otherCount)
+        /// <summary>
+        /// Copies one surface's expectations to the others of its kind. The prompt lists exactly what changes;
+        /// when every other surface already matches there is nothing to ask.
+        /// </summary>
+        private void CopyToAll<T>(T source, IList<T> rows, IReadOnlyList<ExpectationField<T>> fields, Func<T, string> name,
+            string one, string many) where T : class
         {
-            if (otherCount <= 0)
+            int others = rows.Count - 1;
+            if (others <= 0)
             {
                 ShowNotice($"There are no other {many} to copy to.");
-                return false;
+                return;
             }
 
-            return MessageBox.Show(this,
-                $"Replace the expectations of the other {otherCount} {(otherCount == 1 ? one : many)} with the values on this {one}?\n\n" +
-                "Their current expectations are overwritten. Nothing is written to part files.",
-                "Copy Expectations", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            List<SurfaceChange<T>> changes = CopyToAllPreview.Diff(source, rows, fields);
+            if (changes.Count == 0)
+            {
+                ShowNotice($"The other {(others == 1 ? one : many)} already match this {one}.");
+                return;
+            }
+
+            int matching = others - changes.Count;
+            string intro = $"Copy this {one}'s expectations to {changes.Count} other {(changes.Count == 1 ? one : many)}?" +
+                (matching > 0 ? $" ({matching} already match.)" : string.Empty);
+            if (MessageBox.Show(this,
+                    intro + "\n\n" + CopyToAllPreview.Describe(changes, name) + "\n\nNothing is written to part files.",
+                    "Copy Expectations", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            CopyToAllPreview.Apply(source, changes, fields);
+            MarkOverridesDirty();
+            ShowNotice($"Copied expectations from {name(source)} to {changes.Count} other {(changes.Count == 1 ? one : many)}.");
         }
 
         // ── Edit Mode Actions & Handlers ─────────────────────────────────────
@@ -798,10 +813,9 @@ namespace UnitConstructionVerifier.UI
             };
             row.PropertyChanged += OnRowPropertyChanged;
 
-            string key = $"{row.FilePath}|{row.Parameter}";
-            if (_pendingEdits.TryGetValue(key, out string pendingVal))
+            if (_pendingEdits.TryGetValue(StagedEdit.KeyFor(row.FilePath, row.Parameter), out StagedEdit pending))
             {
-                row.NewValue = pendingVal;
+                row.NewValue = pending.NewValue;
             }
 
             gridRows.Add(row);
@@ -811,10 +825,10 @@ namespace UnitConstructionVerifier.UI
         {
             if (sender is IptVerificationRow row && e.PropertyName == nameof(IptVerificationRow.NewValue))
             {
-                string key = $"{row.FilePath}|{row.Parameter}";
+                string key = StagedEdit.KeyFor(row.FilePath, row.Parameter);
                 if (row.IsEditPending && row.IsWritable)
                 {
-                    _pendingEdits[key] = row.NewValue;
+                    _pendingEdits[key] = new StagedEdit(row.FilePath, row.Parameter, row.PartNumber, row.Actual, row.NewValue);
                 }
                 else
                 {
@@ -926,62 +940,50 @@ namespace UnitConstructionVerifier.UI
                 return;
             }
 
-            // Group edits by file
-            var groupedEdits = new Dictionary<string, Operations.PartPropertyEdits>(StringComparer.OrdinalIgnoreCase);
-            var unwritable = new List<string>();
-            foreach (var kvp in _pendingEdits)
+            _reviewItems = WriteReview.BuildItems(_pendingEdits.Values);
+            foreach (WriteReviewItem item in _reviewItems)
             {
-                string[] parts = kvp.Key.Split('|');
-                if (parts.Length < 2) continue;
-                string filePath = parts[0];
-                string parameter = parts[1];
-                string value = kvp.Value;
-
-                if (!groupedEdits.TryGetValue(filePath, out var edits))
-                {
-                    edits = new Operations.PartPropertyEdits();
-                    groupedEdits[filePath] = edits;
-                }
-
-                if (!Operations.PartPropertyEditsMapper.TryApply(edits, parameter, value))
-                {
-                    unwritable.Add($"{Path.GetFileName(filePath)}: {parameter} = {value}");
-                }
+                item.PropertyChanged += (_, __) => UpdateWriteReview();
             }
 
-            var emptyFiles = groupedEdits
-                .Where(kvp => !Operations.PartPropertyEditsMapper.HasAnyValue(kvp.Value))
-                .Select(kvp => kvp.Key)
-                .ToList();
-            foreach (string filePath in emptyFiles)
-            {
-                groupedEdits.Remove(filePath);
-            }
+            WriteReviewList.ItemsSource = _reviewItems;
+            UpdateWriteReview();
+            WriteReviewOverlay.Visibility = Visibility.Visible;
+            WriteReviewCancelButton.Focus();
+        }
 
-            string unwritableNote = unwritable.Count == 0
-                ? string.Empty
-                : "These edits cannot be written to part properties and are skipped:\n" +
-                  string.Join("\n", unwritable.Select(u => $" - {u}")) + "\n\n";
+        private void UpdateWriteReview()
+        {
+            int ticked = _reviewItems.Count(i => i.IsIncluded);
+            WriteReviewSummary.Text = WriteReview.Summary(_reviewItems);
+            WriteReviewConfirmButton.Content = ticked == 0 ? "Write changes" : $"Write {WriteReview.Plural(ticked, "change")}";
+            WriteReviewConfirmButton.IsEnabled = ticked > 0;
+        }
 
+        private void CloseWriteReview()
+        {
+            WriteReviewOverlay.Visibility = Visibility.Collapsed;
+            WriteReviewList.ItemsSource = null;
+        }
+
+        private void OnWriteReviewCancel(object sender, RoutedEventArgs e) => CloseWriteReview();
+
+        private void OnWriteReviewConfirm(object sender, RoutedEventArgs e)
+        {
+            var included = _reviewItems.Where(i => i.IsIncluded).ToList();
+            CloseWriteReview();
+            WriteStagedEdits(included);
+        }
+
+        /// <summary>Writes the ticked changes in one Inventor transaction; unticked ones stay staged.</summary>
+        private void WriteStagedEdits(List<WriteReviewItem> included)
+        {
+            Dictionary<string, Operations.PartPropertyEdits> groupedEdits = WriteReview.GroupByFile(included);
             if (groupedEdits.Count == 0)
             {
-                MessageBox.Show(unwritableNote + "No staged edits map to writable part properties. Nothing was written.",
-                    "Write Changes", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowNotice("Nothing ticked maps to a writable part property. Nothing was written.");
                 return;
             }
-
-            // Confirm modifications
-            var sb = new System.Text.StringBuilder();
-            sb.Append(unwritableNote);
-            sb.AppendLine("The following part files will be modified in Inventor:");
-            foreach (var path in groupedEdits.Keys)
-            {
-                sb.AppendLine($" - {Path.GetFileName(path)}");
-            }
-            sb.AppendLine("\nDo you want to proceed?");
-
-            var confirm = MessageBox.Show(sb.ToString(), "Confirm Write Changes", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (confirm != MessageBoxResult.Yes) return;
 
             // Pre-flight read-only check
             var lockedFiles = new List<string>();
@@ -1076,10 +1078,15 @@ namespace UnitConstructionVerifier.UI
                         trans = null;
                     }
 
-                    _pendingEdits.Clear();
+                    foreach (WriteReviewItem item in included)
+                    {
+                        _pendingEdits.Remove(item.Edit.Key);
+                    }
                     UpdateEditFooter();
 
-                    ShowNotice($"Updated {successCount} part file(s). Re-scanned the assembly.");
+                    string stillStaged = _pendingEdits.Count == 0 ? string.Empty
+                        : $" {WriteReview.Plural(_pendingEdits.Count, "change")} still staged.";
+                    ShowNotice($"Updated {WriteReview.Plural(successCount, "part file")}. Re-scanned the assembly.{stillStaged}");
 
                     ReScanAndRefresh();
                 }
@@ -1907,7 +1914,7 @@ namespace UnitConstructionVerifier.UI
 
             switch (shortcut)
             {
-                case VerifierShortcut.NextIssue:
+                case VerifierShortcut.NextIssue when WriteReviewOverlay.Visibility != Visibility.Visible:
                     GoToNextIssue();
                     break;
                 case VerifierShortcut.Copy when inText:
@@ -1990,6 +1997,7 @@ namespace UnitConstructionVerifier.UI
 
                     OnPropertyChanged(nameof(NewValue));
                     OnPropertyChanged(nameof(IsEditPending));
+                    OnPropertyChanged(nameof(InPartText));
                     OnPropertyChanged(nameof(StatusText));
                     OnPropertyChanged(nameof(StatusTooltip));
                 }
@@ -2012,6 +2020,9 @@ namespace UnitConstructionVerifier.UI
         }
 
         public string StatusText => IsEditPending ? "● Staged" : Status;
+
+        /// <summary>What the In part cell shows: the part's value, then the staged value while one is staged.</summary>
+        public string InPartText => IsEditPending ? $"{Actual} → {NewValue}" : Actual;
 
         public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));

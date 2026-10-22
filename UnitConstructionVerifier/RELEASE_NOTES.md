@@ -2,6 +2,16 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.27.0 (2026-10-22) — review before writing (UI review Option B)
+
+- **Review & write to parts…** now opens a review listing each staged change (part, property, now, will be)
+  instead of a message box that named only the files. Untick a change to leave it staged; only ticked changes
+  are written. Changes that cannot be written show struck through.
+- **Staged rows** show the part's current value next to the staged one in **In part** (`20 → 22`), so the real
+  value no longer disappears until you hover the status chip.
+- **Copy to all roofs/walls** lists the surfaces and fields that would change, copies only to surfaces that differ,
+  and skips the prompt when every other surface already matches.
+
 ## v1.0.26.0 (2026-10-22) — keyboard shortcuts inside Inventor
 
 - **Fixed:** Ctrl+C and F8 did nothing in the verifier inside Inventor, because Inventor took the keys first.
