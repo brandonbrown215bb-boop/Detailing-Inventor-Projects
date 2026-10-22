@@ -28,7 +28,7 @@ namespace UnitConstructionVerifier
         private readonly InvApp _app;
         private InvBtnDef?      _buttonDef;
         private InvBtnSink?     _onExecuteHandler;
-        private VerifierWindow? _activeWindow;
+        private VerifierPresenter? _presenter;
 
         internal VerifierCommand(InvApp app) => _app = app;
 
@@ -212,6 +212,19 @@ namespace UnitConstructionVerifier
                     return;
                 }
 
+                // One verifier at a time. Same unit: bring it forward. Another unit: close the open one first
+                // (it asks about unsaved work), then scan this one.
+                string iamPath = asmDoc.FullFileName;
+                _presenter ??= new VerifierPresenter(_app);
+                if (_presenter.Current is VerifierView open)
+                {
+                    if (string.Equals(open.IamPath, iamPath, StringComparison.OrdinalIgnoreCase) || !_presenter.Close())
+                    {
+                        _presenter.BringForward();
+                        return;
+                    }
+                }
+
                 // Extract data from the active assembly and all referenced sub-assemblies
                 var extractor    = new ConfigJsonExtractor();
                 var engExtractor = new EngineeringJsonExtractor();
@@ -236,7 +249,6 @@ namespace UnitConstructionVerifier
                 DebugLogger.Log($"Built model: RoofRows={data.RoofRows.Count}, WallRows={data.WallRows.Count}, BaseRows={data.BaseRows.Count}");
 
                 // Capture builder inputs before overrides change the model, for snapshot regression tests
-                string iamPath = asmDoc.FullFileName;
                 var snapshot = new UnitSnapshot
                 {
                     SourceIamPath = iamPath,
@@ -251,39 +263,12 @@ namespace UnitConstructionVerifier
                 DebugLogger.Log($"Loading overrides for {iamPath}");
                 PersistenceManager.LoadOverrides(iamPath, data);
 
-                // Show modeless so Inventor pan/rotate still works while verifying.
-                DebugLogger.Log("Showing VerifierWindow");
-                if (_activeWindow != null)
-                {
-                    try
-                    {
-                        if (_activeWindow.IsLoaded)
-                        {
-                            _activeWindow.Activate();
-                            _activeWindow.Focus();
-                            return;
-                        }
-                    }
-                    catch
-                    {
-                        _activeWindow = null;
-                    }
-                }
-
+                // Modeless, docked or popped out (last choice), so Inventor pan/rotate still works while verifying.
                 var view = new VerifierView(data, iamPath, _app);
                 view.SetIptScanResult(iptResult);
                 view.SetSnapshot(snapshot);
-                var window = new VerifierWindow(view);
-                window.Closed += (_, __) =>
-                {
-                    if (ReferenceEquals(_activeWindow, window))
-                    {
-                        _activeWindow = null;
-                    }
-                };
-                _activeWindow = window;
-                window.Show();
-                DebugLogger.Log("VerifierWindow opened (modeless)");
+                _presenter.Show(view);
+                DebugLogger.Log($"Verifier opened ({(_presenter.IsDocked ? "docked" : "window")})");
             }
             catch (Exception ex)
             {
@@ -297,6 +282,8 @@ namespace UnitConstructionVerifier
 
         public void Dispose()
         {
+            _presenter?.Dispose();
+            _presenter = null;
             if (_buttonDef is not null && _onExecuteHandler is not null)
                 _buttonDef.OnExecute -= _onExecuteHandler;
             _buttonDef        = null;

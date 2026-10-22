@@ -37,7 +37,20 @@ If deploy fails because the DLL is locked, close Inventor and run again.
 
 After Inventor loads the add-in, run the **Unit Construction Verifier** command from the Add-Ins tab (exact ribbon label depends on your `.addin` manifest).
 
-The verifier window is **modeless** — you can pan and rotate the model in Inventor while it stays open.
+The verifier is **modeless** — you can pan and rotate the model in Inventor while it stays open.
+
+### Docked or in its own window
+
+- **Dock** (header, right end) moves the verifier into a panel inside Inventor, on the right of the model the first
+  time. Drag the panel's title bar to dock it left or at the bottom, or to float it; Inventor remembers where.
+  **Pop out** moves it back to its own window. The selected surface, filters, staged edits and unsaved expectations
+  move with it. The next unit opens the way you last left it.
+- Narrower than about 1040 px (a side dock, or a small window) the verifier switches to one column: surfaces on top,
+  **Expected construction** collapsed until you click it (its fields read top to bottom), and the parts grid shows
+  Status, Part, Expected and In part. Description, Type and Checks come back when it is wider.
+- The dock's own ✕ only hides it. Run the command again on the same unit to bring it back as it was. Running it on a
+  different unit closes the open one first, asking about unsaved changes.
+- Closing Inventor does not ask about unsaved changes in a docked verifier. Click **Save expectations** first.
 
 ---
 
@@ -157,7 +170,9 @@ When editing part properties from the verifier:
 
 Default highlight uses a **locator box**, not Inventor’s selection set.
 
-While the verifier window has focus, it handles **Ctrl+C**, **Ctrl+V** and **F8** itself; Inventor does not see them.
+While the verifier has focus, docked or in its own window, every key goes to the verifier: typing, arrows, Tab,
+**Ctrl+C**, **Ctrl+V** and **F8** work as they would in any window, and Inventor's own shortcuts do not fire. Alt
+shortcuts still go to Inventor.
 
 - **Ctrl+C** on a selected part row or surface copies its number as text (same as right-click **Copy part number / Copy surface number**). In a text field it copies the selected text.
 - **Ctrl+V** pastes only into text fields. Anywhere else in the verifier it does nothing, so Inventor cannot paste an old copied component into the model.

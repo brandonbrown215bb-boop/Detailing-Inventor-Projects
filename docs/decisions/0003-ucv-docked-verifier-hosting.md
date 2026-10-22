@@ -1,6 +1,6 @@
 # 3. Unit Construction Verifier: docked and pop-out hosting
 
-* **Status**: Accepted (hosting and keyboard). Narrow-layout scope still open.
+* **Status**: Accepted. Shipped in UCV v1.0.29.0.
 * **Date**: 2026-10-22
 
 ## Context and Problem Statement
@@ -37,9 +37,11 @@ Ctrl+V and F8 could be rescued by the shortcut hook.
 
 ## Consequences
 
-* With Ctrl+C now reaching WPF, the `DataGrid` built-in copy runs unless the view handles Ctrl+C itself. The view
-  must keep copying part numbers, as `RunShortcut` does today.
+* With Ctrl+C now reaching WPF, the `DataGrid` built-in copy runs unless the view handles Ctrl+C itself.
+  `VerifierView.OnViewPreviewKeyDown` copies part numbers instead.
 * Inventor single-key shortcuts do not fire while the user types in the verifier. That is intended.
 * Ctrl+V and Ctrl+Z were not captured in the spike's log. Confirm both once the real view is docked.
-* The current window has a minimum width of 1080 px, which does not fit a side dock. Whether to build a narrow
-  layout, or allow only bottom and floating docking at first, is still open.
+* Side docking needs a narrow layout. Brandon chose to build one: below 1040 px the view folds to one column
+  (`UI/ResponsiveLayout`), so left, right, bottom and floating docks are all supported.
+* One verifier at a time (`UI/VerifierPresenter`). The same view moves between hosts, so staged edits survive a
+  Dock / Pop out. The dock's ✕ only hides it, and Inventor gives no chance to ask about unsaved work when it exits.

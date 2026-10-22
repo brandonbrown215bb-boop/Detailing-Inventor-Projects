@@ -97,6 +97,21 @@ namespace UnitConstructionVerifier.UI
             SizeChanged += (_, __) => ApplyResponsiveLayout();
         }
 
+        /// <summary>Raised by the header's Dock / Pop out button; the presenter moves the view.</summary>
+        public event Action? DockToggleRequested;
+
+        /// <summary>Shows the Dock / Pop out button for the host the view is in now.</summary>
+        public void SetHostMode(bool docked)
+        {
+            DockToggleButton.Visibility = Visibility.Visible;
+            DockToggleButton.Content = docked ? "Pop out" : "Dock";
+            DockToggleButton.ToolTip = docked
+                ? "Move the verifier to its own window"
+                : "Dock the verifier inside Inventor, beside the model";
+        }
+
+        private void OnDockToggleClick(object sender, RoutedEventArgs e) => DockToggleRequested?.Invoke();
+
         /// <summary>The unit assembly this view checks.</summary>
         public string IamPath => _iamPath;
 

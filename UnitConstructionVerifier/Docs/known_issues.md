@@ -43,9 +43,12 @@ while the Verifier is open. When keyboard focus is inside the Verifier window it
 queue and runs them in the window: copy/paste text in text fields, copy part or surface numbers elsewhere, Ctrl+V does
 nothing outside text fields, F8 is **Next issue**. All other keys, and these keys while focus is in Inventor, pass through.
 
+**v1.0.29.0:** replaced by `UI/KeyPassthroughHook` (ADR 0003). Every key aimed at the Verifier, docked or in its own
+window, now goes to it before Inventor's shortcuts (Ctrl+X, Ctrl+Z and Delete included); the three keys above behave
+as described. Alt shortcuts still go to Inventor.
+
 ### Possible further mitigations (not implemented)
 
-- Take more Inventor shortcuts the same way if they cause trouble while the Verifier has focus (Ctrl+X, Ctrl+Z, Delete).
 - Avoid **document.Activate()** on every list selection when the user is working entirely in the Verifier.
 - Show a one-line hint in the UI that assembly paste is Inventor-driven, not list-driven.
 

@@ -45,6 +45,9 @@ namespace UnitConstructionVerifier.UI
 
         public VerifierView View { get; }
 
+        /// <summary>True when the window closed only to hand its view to the dock (or to a close the presenter ran).</summary>
+        public bool IsDetached => _detaching;
+
         /// <summary>Closes the window without closing the view, so the view can move to the dock.</summary>
         public VerifierView Detach()
         {

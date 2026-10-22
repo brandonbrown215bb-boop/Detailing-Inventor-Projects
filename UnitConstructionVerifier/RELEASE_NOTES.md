@@ -2,6 +2,19 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.29.0 (2026-10-22) — dock the verifier inside Inventor
+
+- **Dock / Pop out** (header) moves the verifier between its own window and a panel docked inside Inventor (right of
+  the model by default; drag to left, bottom or floating). Nothing is lost when it moves, and the next unit opens the
+  way you last left it.
+- **Narrow layout:** below about 1040 px the verifier uses one column (surfaces above the detail, expectation forms
+  folded and collapsed, a shorter parts grid), so it fits a side dock. The pop-out window can now be made that small too.
+- **Keys:** all keys aimed at the verifier now reach it before Inventor's shortcuts, docked or not (ADR 0003). This
+  replaces the v1.0.26 Ctrl+C / Ctrl+V / F8 hook; behaviour of those three keys is unchanged.
+- Running the command on a different unit while the verifier is open now closes the open one (asking about unsaved
+  changes) and opens the new unit. Before, it brought back the old unit.
+- Known limitation: closing Inventor does not ask about unsaved changes in a docked verifier.
+
 ## v1.0.28.0 (2026-10-22) — roof Trim row drives roof caps
 
 - **Fixed:** changing a roof's **Trim** gauge or material did not change what roof caps (091-30117-001/058/074) were
