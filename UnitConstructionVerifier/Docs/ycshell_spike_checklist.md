@@ -40,10 +40,11 @@ window. The window **never uploads**, and it only regenerates surfaces whose pat
      your clicks).
    - [ ] **Question 3:** compare the "Before/After: active edit document" lines. Did `ReturnToTop` leave you where
      you expected?
-   - [ ] The surface reads `dirty = True` afterwards (YCShell does not save).
+   - [ ] Compare the before and after part status. YCShell saves as it regenerates: replaced channels become `New`
+     parts, and the surface is saved.
    - [ ] In Inventor, look at the regenerated channels on 0055. Do they match what pressing YCShell's own button gives?
 5. Optional: regenerate a larger one (0074, 8 changed parts) for a second timing.
-6. Save or discard in Inventor as you choose. It is the copy, either way.
+6. Regenerated surfaces are already saved by YCShell. That is fine here, because this is the copy.
 
 ## Send back
 

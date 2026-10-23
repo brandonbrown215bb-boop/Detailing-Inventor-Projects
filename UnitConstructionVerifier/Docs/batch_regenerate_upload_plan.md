@@ -42,7 +42,7 @@ All in `InventorAddIn_MOM_YCShell/StandardAddInServer.cs` (class `StandardAddInS
 | Inventor wrapper | `private MOMInventor.CInventorInstance m_InventorInstance` | Upload needs this. |
 | Active surface | `private Types.CAssembly m_ActiveAssembly` | Follows the active / in-place-edited document. Both buttons use it. The batch does **not**: it passes each surface directly. |
 | Regenerate button | `ISGOperations_FoamAndSnaplockHoles_OnExecute` (2314) | `RunOperation(m_ActiveAssembly, RegenerateFoamAndSnaplockHoles)` |
-| Regenerate work | `private void RegenerateFoamAndSnaplockHoles(object item, CUtility.DelegateSetStatus setStatus)` (3602) | Takes the surface as `item`. Calls `ReturnToTop()`. Walls and indoor roofs go through the generator. Sloped roofs go through `RegenerateOutdoorEngagementAndOrientationHoles` (4011). Other surface types are refused with a box. **Does not save.** |
+| Regenerate work | `private void RegenerateFoamAndSnaplockHoles(object item, CUtility.DelegateSetStatus setStatus)` (3602) | Takes the surface as `item`. Calls `ReturnToTop()`. Walls and indoor roofs go through the generator. Sloped roofs go through `RegenerateOutdoorEngagementAndOrientationHoles` (4011). Other surface types are refused with a box. **Saves as it goes** (confirmed by the spike): each new channel part is saved with status `New`, and the surface assembly is saved after each replaced channel is deleted (`finishSetupOfOccurrenceCreatedInGenerator`, `removeOccurrenceReplacedInGenerator`). There is no undo by closing without saving. |
 | Progress window | `private void RunOperation(object item, CFrmRunOperation.DelegateOperation op, bool checkForSuppressedOccurrences = true)` (4967) | Modal progress window. The work runs on a thread-pool thread. Returns when the work ends. Its suppressed check looks at `m_ActiveAssembly`, not `item`, so the batch passes `false` and checks for itself. |
 | Upload button | `MOM_Upload_OnExecute` (2201) | Checks for suppressed parts (`HasSuppressedOccurrences`) and structural parts with holes, then sets `m_InUpload = true`, runs `new Upload.CFrmUploadChanges().Start(m_InventorInstance, assemblies, m_OpenPartList, SetSuppressDocumentEvents)`, then sets `m_InUpload = false`. |
 | Upload window | `Upload/CFrmUploadChanges.xaml.cs` | **Takes a list of assemblies.** A code comment says uploading many at once used to be a feature. Loads the BOM list, then waits for the Upload button. On Upload it saves every dirty part and assembly, then uploads. If MOM gives a surface a new part number, the window saves a copy under that number, closes and reopens it, deletes the old file, and replaces the occurrence in any **composite** assembly that is in the list. |
@@ -78,8 +78,54 @@ marks the part "Changed Part [SQ]" (`CPartWrapper.IsChanged_SQ`) and counts the 
 - **Freshness:** UCV re-scans after it writes parts, so the badge is current right after a write. If someone marks
   parts changed in YCShell directly, the badge is only current after the next UCV scan. The button confirmation
   re-reads the status of the listed surfaces before starting.
-- **Not included by default:** parts with status `New` or `Changed_Parameter`. YCShell's upload treats those as
-  changes too. Whether they should also select a surface is open question 6.
+- **Composites are never surfaces.** YCShell's list includes the unit (`FINAL.IAM`), which reports every changed
+  part below it. It also keeps stale entries from units opened earlier in the session. Select only the
+  non-composite surfaces that the active unit references (spike finding, section 6.2).
+- **Channels added by patterning or copying** (the detailers' easiest way to add channels). YCShell's
+  `AssemblyEvents_OnNewOccurrence` handles a second occurrence of an existing part in one of two ways:
+  - **Library or cut-to-length part** (normal channels): `MakeOccurrenceUnique` copies it to `<name>_N.IPT` with its
+    own calculator spreadsheet and status **`New`**. A rule that only looks at `Changed_SQ` misses these surfaces.
+  - **Any other part:** no new file, and the part's status does not change. A part-status rule misses it.
+  - **Either way, YCShell marks the occurrence:** `OnNewOccurrence` sets the occurrence attribute
+    `MOM_DATA.OCCURRENCE_IS_NEW = 1` before deciding how to handle the part. A successful upload resets it to 0
+    (`CFrmUploadChanges`, `IsNewOccurrence = false`). **Confirmed on the test unit (2026-10-23):** in the spike copy,
+    the product owner patterned a channel on surface 0019. The new occurrence `[0002/B] 091Z010068-0020:2 - NEW`
+    reuses part `091Z010068-0020.IPT`, whose status stayed `NoChange`, but the occurrence carries
+    `OCCURRENCE_IS_NEW = 1`. In the original unit, every surface reads 0 after its upload.
+- **Channels** are identified by the occurrence attribute `MOM_DATA.PART_TYPE = CHANNEL`. YCShell stamps it on
+  every occurrence; other values seen are `SKIN`, `LINER`, `ANGLE`, `SUBFLOOR`, `FLOOR`, `FILLER_PLATE` and so on.
+  Patterned channels carry it too (`USER_ADDED` sub-type).
+- **Two rules (product owner, 2026-10-23).** An SQ change to a skin or liner does not need Regenerate; Upload picks
+  it up on its own. Regenerate is only needed when channels were **added, moved or modified**, because snaplocks
+  (and so insulation on the drawing) follow the channels.
+  - **Upload changed:** a surface is changed when any of these holds. This is YCShell's own idea of a change, plus
+    the new-occurrence marker.
+    - any occurrence has `OCCURRENCE_IS_NEW = 1`;
+    - the surface has `HAS_DELETED_COMPONENTS = 1` or `HAS_TRANSFORMED_COMPONENTS = 1`;
+    - any part is not `NoChange`.
+  - **Regenerate changed:** a surface needs Regenerate when any of these holds.
+    1. **Channel added:** a `CHANNEL` occurrence has `OCCURRENCE_IS_NEW = 1`.
+    2. **Channel modified:** a `CHANNEL` occurrence's part is `Changed_SQ` or `Changed_Parameter`.
+    3. **Channel moved (or deleted):** YCShell only records these per surface (`HAS_TRANSFORMED_COMPONENTS`,
+       `HAS_DELETED_COMPONENTS`; see `AssemblyEvents_OnOccurrenceChange` and `OnDelete`), so a moved skin and a moved
+       channel look the same. UCV closes the gap with its own **channel fingerprint** (below). Without a fingerprint,
+       a surface with only these flags is listed as **"components moved or deleted, may not be channels"** and is
+       **ticked by default**. The product owner prefers regenerating one surface too many to missing one
+       (2026-10-23).
+  - **Example from the test unit:** 0091's changes are 5 `SUBFLOOR` SQ parts and no channels. It needs Upload but
+    not Regenerate.
+- **Channel fingerprint (UCV's own record).** After UCV regenerates a surface, it stores the surface's channel
+  occurrences: occurrence id (`OCCURRENCE_ID`), part file and position (transformation matrix, rounded). The record
+  lives alongside UCV's existing unit persistence. Next time:
+  - **Fingerprint unchanged:** the surface is "already regenerated", even though its replacement channels still carry
+    `OCCURRENCE_IS_NEW` and `New` until upload. This stops a second **Regenerate changed** from redoing it.
+  - **Fingerprint different** (a channel added, removed or moved since): the surface needs Regenerate, with the
+    channel named. This also catches moved channels precisely.
+  - **No fingerprint yet** (never regenerated through UCV, or regenerated with YCShell's own button): rules 1 to 3
+    apply.
+- **Limitation:** YCShell's markers come from its event handlers. Channels added or moved while YCShell is not loaded
+  (or before the detailer logs into the MOM tools) are not marked. A UCV fingerprint still catches them once one
+  exists. List this in `known_issues.md`.
 
 ### 4.1 `Operations/YcShellBridge.cs`: the only place that knows YCShell's internals
 
@@ -131,7 +177,8 @@ Nothing outside the bridge touches reflection.
   2. Before each surface, check whether the detailer pressed **Stop**. Stop takes effect between surfaces, never
      during one.
   3. Call `bridge.Regenerate(s)`. Catch per surface and record the outcome (section 4.4).
-  4. Leave every document unsaved, as YCShell does today. Upload saves them, and the detailer can still undo.
+  4. YCShell saves each surface as it regenerates it, so a finished surface stays finished even if the batch is
+     stopped. The confirmation says so: there is no undo by closing without saving.
 - **Upload changed:**
   1. Refuse if UCV has unsaved verifier edits (reuse `UnsavedWorkPrompt`), or if a regenerate batch is running.
   2. Run `FindUploadBlockers` on every surface. If any surface has blockers, show them all in one list and stop.
@@ -260,12 +307,44 @@ with robocopy (1,124 files, 440 MB, timestamps kept). The original stays untouch
   surfaces will change. None of the 11 changed surfaces is under `Base\`, so the spike only needs the copy's top-level
   `FINAL.IAM`.
 
+### 6.2 Spike results (2026-10-23, `Unit - Spike Copy`)
+
+Log: `%TEMP%\UnitConstructionVerifier\ycshell_spike_20261023_064133.txt`. Installed YCShell build:
+`2022.9.9.1435` (`%LOCALAPPDATA%\Autodesk\ISG\MOM_YCShell\AddIn`).
+
+- **Question 0, reaching YCShell: yes.** Both add-ins run in `DefaultDomain`. The server was found through YCShell's
+  `ApplicationEvents.OnOpenDocument` handler. Every member in section 3 resolved, including
+  `CFrmUploadChanges.Start`. Looking the buttons up by their YCShell IDs failed with `E_FAIL`, so YCShell registers
+  them under other internal names. That does not matter for the bridge, but the `Execute2` fallback would need the
+  real names.
+- **Question 1: yes.** FINAL references 33 sub-assemblies (0091 had been relinked in the copy), and all 33 are in
+  YCShell's list and loaded. The list has 35 entries: the 33 surfaces, FINAL itself (`composite=True`), and a stale
+  unloaded entry from another unit opened earlier (`...\20209\...\391-10018-002.iam<iLogic>`).
+- **Question 2, first half: yes.** YCShell sees FINAL as composite.
+- **Question 3: no effect seen.** The active edit document was FINAL before and after. YCShell's active assembly
+  stayed FINAL.
+- **Question 5:** surface 0055 (1 changed part) took **131.7 s**, including the time to click the one completion box.
+  The box read "4 Channel Features have been recreated/replaced", captioned `Wall : 391Z010068-0055`, which is the
+  format section 4.3 expects. Rough estimate for this unit: about 25 minutes for 11 changed surfaces. Larger
+  surfaces may take longer.
+- **Regenerate saves:** see section 3. Part status on 0055 went from `Changed_SQ=1 NoChange=11` to
+  `Changed_SQ=1 New=4 NoChange=7`: 4 channels were replaced by 4 new parts. The surface was not dirty afterwards.
+- **Second run, unchanged surface 0019** (`NoChange=10`): 58.7 s. Afterwards it read `New=2 NoChange=8`. Regenerate
+  replaces channels even on an untouched surface, and that makes the surface "changed" for upload. This supports
+  regenerating only surfaces with `Changed_SQ` parts.
+- **Part totals stayed the same** on both surfaces (12 and 10), so each new channel replaced an old one rather than
+  being added. The "after" status is read as soon as YCShell returns. The product owner notes that library parts
+  and added channels may show up later: press **Refresh** a minute or two later and compare before trusting the
+  counts.
+- **Still open:** question 2, second half (does passing FINAL to the upload window relink a renamed surface?), and
+  question 6.
+
 ## 7. Steps
 
 | Step | Work | Done when |
 |---|---|---|
 | 0 | Spike on a copy of a real unit: a throwaway harness command in UCV that connects the bridge, lists YCShell's surfaces, and regenerates one surface by reflection. Answer section 6. | Answers recorded in this file; plan adjusted. |
-| 0.5 | Read `MOM_DATA.DOCUMENT_STATUS` in `IptPropertyMapper` / `IptPropertyReader`; add the changed-surface rule and the surface-list badge. Unit tests for the rule. | A unit with UCV-written parts shows the right surfaces as changed. |
+| 0.5 | Read part `DOCUMENT_STATUS`, occurrence `OCCURRENCE_IS_NEW` / `PART_TYPE` / `OCCURRENCE_ID`, and the surface's `HAS_DELETED_COMPONENTS` / `HAS_TRANSFORMED_COMPONENTS` during the scan. Add both rules (section 4.0), the channel fingerprint store, and surface-list badges with reasons. Unit tests for both rules and the fingerprint comparison. | On the spike copy, 0019 needs Regenerate (patterned channel), 0091 needs Upload only (subfloor SQ parts), and untouched surfaces need neither. |
 | 1 | `YcShellBridge` with connect, member checks and `GetOpenSurfaces`. Unit tests use a fake `StandardAddInServer` type with the same private member shapes, to test resolution and the "member missing" path. | Tests green; connecting in Inventor logs the YCShell version and N surfaces. |
 | 2 | `YcShellBatchRunner` regenerate path, Stop, outcomes, summary dialog, header button. | 40-surface unit regenerates with the detailer clicking only YCShell's questions plus each completion box. |
 | 3 | `YcShellPopupWatcher` and its setting. | Same unit: only Yes/No questions need a click; the summary shows each one. |

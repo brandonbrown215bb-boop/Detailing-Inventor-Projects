@@ -204,7 +204,7 @@ namespace UnitConstructionVerifier.UI
             Log($"After: active edit document = {ActiveEditName()}");
             Log($"After: YCShell active assembly = {_bridge.ActiveAssemblyFileName ?? "(none)"}");
             Log($"After: surface dirty = {Show(doc?.Dirty)}, part status = {Statuses(doc)}");
-            Log("YCShell does not save after regenerating. Save or discard in Inventor as you choose.");
+            Log("YCShell saves new channel parts and the surface as it regenerates; closing without saving does not undo it.");
         }
 
         private string ActiveEditName()
