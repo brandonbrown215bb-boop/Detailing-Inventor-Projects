@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace UnitConstructionVerifier.Operations
 {
@@ -34,20 +33,6 @@ namespace UnitConstructionVerifier.Operations
             }
 
             return null;
-        }
-
-        /// <summary>Count of each DOCUMENT_STATUS value over the parts an assembly references, at any depth.</summary>
-        public static IDictionary<string, int> CountByStatus(Inventor.AssemblyDocument assembly)
-        {
-            var counts = new SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (Inventor.Document doc in assembly.AllReferencedDocuments)
-            {
-                if (doc.DocumentType != Inventor.DocumentTypeEnum.kPartDocumentObject) continue;
-                string status = Read(doc) ?? "(none)";
-                counts[status] = counts.TryGetValue(status, out int n) ? n + 1 : 1;
-            }
-
-            return counts;
         }
     }
 }

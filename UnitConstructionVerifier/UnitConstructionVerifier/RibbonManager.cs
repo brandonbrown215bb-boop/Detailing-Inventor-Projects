@@ -16,18 +16,17 @@ namespace UnitConstructionVerifier
         private const string PanelInternalName = "UCV_Panel";
         private const string PanelDisplayName  = "Construction";
 
-        internal static void CreateUI(Inventor.Application app, VerifierCommand verifierCmd, Operations.ThicknessHoverCommand hoverCmd,
-            Operations.YcShellSpikeCommand spikeCmd)
+        internal static void CreateUI(Inventor.Application app, VerifierCommand verifierCmd, Operations.ThicknessHoverCommand hoverCmd)
         {
             try
             {
                 Inventor.Ribbons ribbons = app.UserInterfaceManager.Ribbons;
 
-                // Setup Assembly ribbon (contains both commands, plus the YCShell spike)
-                ConfigureRibbon(app, ribbons, "Assembly", verifierCmd, hoverCmd, spikeCmd);
+                // Setup Assembly ribbon (contains both commands)
+                ConfigureRibbon(app, ribbons, "Assembly", verifierCmd, hoverCmd);
 
                 // Setup Part ribbon (contains only Thickness Hover command)
-                ConfigureRibbon(app, ribbons, "Part", null, hoverCmd, null);
+                ConfigureRibbon(app, ribbons, "Part", null, hoverCmd);
             }
             catch (Exception ex)
             {
@@ -39,9 +38,8 @@ namespace UnitConstructionVerifier
             Inventor.Application app, 
             Inventor.Ribbons ribbons, 
             string ribbonName, 
-            VerifierCommand? verifierCmd,
-            Operations.ThicknessHoverCommand hoverCmd,
-            Operations.YcShellSpikeCommand? spikeCmd)
+            VerifierCommand? verifierCmd, 
+            Operations.ThicknessHoverCommand hoverCmd)
         {
             try
             {
@@ -62,13 +60,6 @@ namespace UnitConstructionVerifier
                 {
                     Inventor.ButtonDefinition hoverDef = hoverCmd.CreateDefinition(app);
                     try { panel.CommandControls.AddButton(hoverDef, true, true, string.Empty, false); }
-                    catch { }
-                }
-
-                if (spikeCmd != null)
-                {
-                    Inventor.ButtonDefinition spikeDef = spikeCmd.CreateDefinition(app);
-                    try { panel.CommandControls.AddButton(spikeDef, true, true, string.Empty, false); }
                     catch { }
                 }
             }

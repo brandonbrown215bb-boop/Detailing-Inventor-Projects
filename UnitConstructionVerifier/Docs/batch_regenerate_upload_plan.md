@@ -530,6 +530,13 @@ IAM (`SurfaceHistoryStore`, `SurfaceHistoryRules`).
 **Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
 MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
 
+### 6.7 Step 5 done: v1.0.31.0 (2026-10-23)
+
+- The YCShell Spike button and window are removed. `YcShellBridge` stays; the buttons use it.
+- `HOW_TO_USE.md` (new section *Regenerate changed and Upload changed*), `RELEASE_NOTES.md` (v1.0.31.0) and
+  `Docs/known_issues.md` (*Regenerate / Upload changed*) describe the shipped behaviour and its limits.
+- Version 1.0.31.0. Not yet merged to `main`.
+
 ## 7. Steps
 
 | Step | Work | Done when |

@@ -1,5 +1,9 @@
 # YCShell Spike: Morning Checklist (Step 0)
 
+> **v1.0.31:** the YCShell Spike button and window were removed; this first part is kept for the record. The
+> *Regenerate changed* and *Upload changed* sections below still apply to the released buttons. User instructions are
+> in `HOW_TO_USE.md`.
+
 Branch `spike/ycshell-bridge`. Plan: `batch_regenerate_upload_plan.md`. Quest `Q-20261022-221452-dd97`.
 
 The spike adds a **YCShell Spike** button to UCV's QA Tools > Construction panel (Assembly ribbon). It opens a report
