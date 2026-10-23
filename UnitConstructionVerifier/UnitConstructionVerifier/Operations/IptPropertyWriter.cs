@@ -17,9 +17,13 @@ namespace UnitConstructionVerifier.Operations
         /// <summary>
         /// Updates specific properties on an Inventor IPT part document.
         /// </summary>
+        /// <summary>What the last successful <see cref="UpdatePartProperties"/> saved, or null when it saved nothing.</summary>
+        public PartWriteRecord? LastWrite { get; private set; }
+
         public bool UpdatePartProperties(string iptPath, PartPropertyEdits edits, out string errorMessage)
         {
             errorMessage = string.Empty;
+            LastWrite = null;
             PartDocument doc = null;
             bool wasOpened = false;
 
@@ -67,6 +71,12 @@ namespace UnitConstructionVerifier.Operations
 
                     return false;
                 }
+
+                // State before this write, so a later scan can tell a gauge / material edit from a reshape. Unsaved
+                // edits already in the document count as a change: this save would carry them.
+                string previousStatus = PartChangeStatus.Read((Inventor.Document)doc) ?? string.Empty;
+                if (doc.Dirty) previousStatus = "UnsavedEdits";
+                string versionBefore = Extraction.SurfaceChangeReader.PartVersion(iptPath);
 
                 PropertySets sets = doc.PropertySets;
                 PropertySet userDefined = sets["Inventor User Defined Properties"];
@@ -197,6 +207,14 @@ namespace UnitConstructionVerifier.Operations
                 {
                     doc.Update();
                     doc.Save();
+                    LastWrite = new PartWriteRecord
+                    {
+                        PartFile = iptPath,
+                        PreviousStatus = previousStatus,
+                        VersionBefore = versionBefore,
+                        VersionAfter = Extraction.SurfaceChangeReader.PartVersion(iptPath),
+                        WrittenAtUtc = DateTime.UtcNow,
+                    };
                     if (wasOpened)
                     {
                         doc.Close(SkipSave: false);

@@ -1180,6 +1180,7 @@ namespace UnitConstructionVerifier.UI
             var writer = new Operations.IptPropertyWriter(_inventorApp);
             int successCount = 0;
             var errorList = new List<string>();
+            var partWrites = new List<PartWriteRecord>();
 
             int fileNumber = 0;
             ShowBusy("Writing part changes…");
@@ -1198,6 +1199,7 @@ namespace UnitConstructionVerifier.UI
                     if (writer.UpdatePartProperties(filePath, edits, out string err))
                     {
                         successCount++;
+                        if (writer.LastWrite is PartWriteRecord write) partWrites.Add(write);
                     }
                     else
                     {
@@ -1228,6 +1230,10 @@ namespace UnitConstructionVerifier.UI
                         trans.End();
                         trans = null;
                     }
+
+                    // Lets Regenerate changed tell these gauge / material edits from channel reshapes.
+                    try { PartWriteStore.Record(_iamPath, partWrites); }
+                    catch (Exception ex) { DebugLogger.Log(ex, "VerifierView: recording part writes"); }
 
                     foreach (WriteReviewItem item in included)
                     {

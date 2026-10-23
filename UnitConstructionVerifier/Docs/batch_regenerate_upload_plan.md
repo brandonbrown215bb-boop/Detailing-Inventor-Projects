@@ -105,7 +105,18 @@ marks the part "Changed Part [SQ]" (`CPartWrapper.IsChanged_SQ`) and counts the 
     - any part is not `NoChange`.
   - **Regenerate changed:** a surface needs Regenerate when any of these holds.
     1. **Channel added:** a `CHANNEL` occurrence has `OCCURRENCE_IS_NEW = 1`.
-    2. **Channel modified:** a `CHANNEL` occurrence's part is `Changed_SQ` or `Changed_Parameter`.
+    2. **Channel reshaped:** a `CHANNEL` occurrence's part is `Changed_SQ` or `Changed_Parameter`, **unless** UCV's
+       write-back changed only gauge / material. Product owner, 2026-10-23: gauge or material edits alone do not
+       need Regenerate. UCV stamps `Changed_SQ` just as YCShell does for a reshape, so UCV keeps a **part write record**
+       (`.ucv_part_writes.json` next to the unit IAM). It holds the status and file version before UCV first wrote the
+       part, and the file version right after UCV's last save. A channel counts as a material-only edit when its file
+       is still at UCV's version **and** it was `NoChange` (and had no unsaved edits) before UCV wrote it. Any later
+       save, or an earlier change, counts as a reshape.
+       - **Parts UCV wrote before these records existed** (`IS_HARD_EDITED`, no record) can't be told apart. They
+         read "channel edited (gauge/material or reshape, can't tell)" and are ticked by default. On the test unit,
+         that is 0073, 0074, 0078 and 0080.
+       - A gauge change made in YCShell's own parameter editor (`Changed_Parameter`) also counts as a reshape. UCV
+         cannot see which parameter changed.
     3. **Channel moved (or deleted):** YCShell only records these per surface (`HAS_TRANSFORMED_COMPONENTS`,
        `HAS_DELETED_COMPONENTS`; see `AssemblyEvents_OnOccurrenceChange` and `OnDelete`), so a moved skin and a moved
        channel look the same. UCV closes the gap with its own **channel fingerprint** (below). Without a fingerprint,
@@ -360,9 +371,9 @@ The compiled rules were run over both test units (markers read with Apprentice, 
 
 Skin, liner and subfloor-only changes (0003, 0006, 0009, 0055 original, 0059, 0065, 0091) go to Upload only.
 
-**Open:** the 4 Regenerate surfaces have channel parts edited through UCV (gauge / material write-back). Does such
-an edit need Regenerate, or only a geometry change? Today's rule says any `Changed_SQ` / `Changed_Parameter` on a
-channel needs it.
+**Answered:** gauge / material edits alone do not need Regenerate (rule 2 above, with UCV's part write record).
+After that change, the 4 surfaces read "can't tell" and are ticked by default, because their parts were written
+before UCV kept records. The suite is now at 181 tests.
 
 **Not done in 0.5:** the surface-list badges. They move to Step 2 with the buttons. The Apprentice scan tool
 (`ucv-scan`) does not fill `Surfaces` yet.

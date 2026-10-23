@@ -20,6 +20,7 @@ namespace UnitConstructionVerifier.Models
         public string PartStatus  { get; set; } = string.Empty;  // part MOM_DATA.DOCUMENT_STATUS: NoChange, Changed_SQ, New, ...
         public string Position    { get; set; } = string.Empty;  // rounded transformation matrix
         public string PartVersion { get; set; } = string.Empty;  // part file last write time (UTC ticks)
+        public bool   PartHardEdited { get; set; }               // IS_HARD_EDITED user property: UCV has written this part
 
         public bool IsChannel => string.Equals(PartType, "CHANNEL", StringComparison.OrdinalIgnoreCase);
 
@@ -53,6 +54,31 @@ namespace UnitConstructionVerifier.Models
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Part write record: what UCV's gauge / material write-back did to a part.
+    // UCV stamps Changed_SQ just as YCShell does for a reshape, so this record is
+    // how a material-only edit is told apart (product owner, 2026-10-23: gauge or
+    // material edits alone do not need Regenerate).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public sealed class PartWriteRecord
+    {
+        public string PartFile       { get; set; } = string.Empty;
+        public string PreviousStatus { get; set; } = string.Empty;  // DOCUMENT_STATUS before UCV first wrote it
+        public string VersionBefore  { get; set; } = string.Empty;  // file version before UCV first wrote it
+        public string VersionAfter   { get; set; } = string.Empty;  // file version right after UCV's last save
+        public DateTime WrittenAtUtc { get; set; }
+
+        /// <summary>
+        /// Folds a later UCV write into this one when nothing else touched the file in between, so a part written
+        /// twice by UCV still remembers its state before UCV.
+        /// </summary>
+        public PartWriteRecord FollowedBy(PartWriteRecord later) =>
+            string.Equals(VersionAfter, later.VersionBefore, StringComparison.Ordinal)
+                ? new PartWriteRecord { PartFile = later.PartFile, PreviousStatus = PreviousStatus, VersionBefore = VersionBefore, VersionAfter = later.VersionAfter, WrittenAtUtc = later.WrittenAtUtc }
+                : later;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Channel fingerprint: UCV's own record of a surface's channels after it
     // regenerated them. Catches channel moves, which YCShell only flags per surface.
     // ─────────────────────────────────────────────────────────────────────────
@@ -83,8 +109,11 @@ namespace UnitConstructionVerifier.Models
                 .ToList(),
         };
 
-        /// <summary>What changed in the channels between this (earlier) fingerprint and <paramref name="current"/>.</summary>
-        public List<string> DifferencesTo(ChannelFingerprint current)
+        /// <summary>
+        /// What changed in the channels between this (earlier) fingerprint and <paramref name="current"/>. A part saved
+        /// again in place is skipped when <paramref name="isMaterialOnlyEdit"/> says UCV's write-back did it.
+        /// </summary>
+        public List<string> DifferencesTo(ChannelFingerprint current, Func<ChannelEntry, ChannelEntry, bool>? isMaterialOnlyEdit = null)
         {
             var differences = new List<string>();
             var before = Channels.GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -100,8 +129,12 @@ namespace UnitConstructionVerifier.Models
                 {
                     differences.Add($"channel moved: {now.Name}");
                 }
-                else if (!string.Equals(then.PartFile, now.PartFile, StringComparison.OrdinalIgnoreCase) ||
-                         !string.Equals(then.PartVersion, now.PartVersion, StringComparison.Ordinal))
+                else if (!string.Equals(then.PartFile, now.PartFile, StringComparison.OrdinalIgnoreCase))
+                {
+                    differences.Add($"channel changed: {now.Name}");
+                }
+                else if (!string.Equals(then.PartVersion, now.PartVersion, StringComparison.Ordinal) &&
+                         isMaterialOnlyEdit?.Invoke(then, now) != true)
                 {
                     differences.Add($"channel changed: {now.Name}");
                 }
@@ -165,32 +198,61 @@ namespace UnitConstructionVerifier.Models
         }
 
         /// <summary>
-        /// Regenerate is needed only when channels were added, moved or modified. With a fingerprint from UCV's last
-        /// regenerate of this surface, the fingerprint decides. Without one, YCShell's markers decide.
+        /// Regenerate is needed only when channels were added, moved or reshaped; a gauge or material edit alone does
+        /// not need it. With a fingerprint from UCV's last regenerate of this surface, the fingerprint decides. Without
+        /// one, YCShell's markers decide. <paramref name="partWrites"/> (UCV's write-back records, by part file) tell a
+        /// material-only edit from a reshape, since both leave the part Changed_SQ.
         /// </summary>
-        public static SurfaceDecision Regenerate(SurfaceChangeState state, ChannelFingerprint? lastRegenerate)
+        public static SurfaceDecision Regenerate(SurfaceChangeState state, ChannelFingerprint? lastRegenerate,
+            IReadOnlyDictionary<string, PartWriteRecord>? partWrites = null)
         {
             if (lastRegenerate is not null)
             {
-                List<string> differences = lastRegenerate.DifferencesTo(ChannelFingerprint.From(state, DateTime.UtcNow));
+                List<string> differences = lastRegenerate.DifferencesTo(
+                    ChannelFingerprint.From(state, DateTime.UtcNow),
+                    (then, now) => Write(partWrites, now.PartFile) is PartWriteRecord write &&
+                                   write.VersionAfter == now.PartVersion && write.VersionBefore == then.PartVersion);
                 return differences.Count > 0
                     ? new SurfaceDecision(true, differences)
                     : new SurfaceDecision(false, new[] { $"channels unchanged since UCV regenerated them ({lastRegenerate.CapturedAtUtc.ToLocalTime():yyyy-MM-dd HH:mm})" });
             }
 
-            var reasons = new List<string>();
-            foreach (SurfaceOccurrence o in state.Occurrences.Where(o => o.IsChannel && o.IsNew)) reasons.Add($"channel added: {o.Name}");
-            foreach (SurfaceOccurrence o in state.Occurrences.Where(o => o.IsChannel && !o.IsNew && o.HasModifiedPart)) reasons.Add($"channel modified: {o.Name}");
+            var certain = new List<string>();
+            var uncertain = new List<string>();
+            foreach (SurfaceOccurrence o in state.Occurrences.Where(o => o.IsChannel && o.IsNew)) certain.Add($"channel added: {o.Name}");
 
-            if (reasons.Count > 0) return new SurfaceDecision(true, reasons);
+            foreach (SurfaceOccurrence o in state.Occurrences.Where(o => o.IsChannel && !o.IsNew && o.HasModifiedPart))
+            {
+                PartWriteRecord? write = Write(partWrites, o.PartFile);
+                if (write is not null)
+                {
+                    // UCV wrote it. A material-only edit: unchanged before UCV, untouched since.
+                    bool materialOnly = write.VersionAfter == o.PartVersion && !PartStatusRules.IsChange(write.PreviousStatus);
+                    if (!materialOnly) certain.Add($"channel reshaped: {o.Name}");
+                }
+                else if (o.PartHardEdited)
+                {
+                    // Written by a UCV build that kept no record: a gauge / material edit, or a reshape, can't tell.
+                    uncertain.Add($"channel edited (gauge/material or reshape, can't tell): {o.Name}");
+                }
+                else
+                {
+                    certain.Add($"channel reshaped: {o.Name}");
+                }
+            }
 
             if (state.HasDeletedComponents || state.HasTransformedComponents)
             {
-                return new SurfaceDecision(true, new[] { "components moved or deleted (may not be channels)" }, channelsCertain: false);
+                uncertain.Add("components moved or deleted (may not be channels)");
             }
 
+            if (certain.Count > 0) return new SurfaceDecision(true, certain.Concat(uncertain).ToList());
+            if (uncertain.Count > 0) return new SurfaceDecision(true, uncertain, channelsCertain: false);
             return new SurfaceDecision(false, new[] { "no channel changes" });
         }
+
+        private static PartWriteRecord? Write(IReadOnlyDictionary<string, PartWriteRecord>? partWrites, string partFile) =>
+            partWrites is not null && partWrites.TryGetValue(partFile.Trim(), out PartWriteRecord? write) ? write : null;
 
         /// <summary>Distinct parts with a change status, one entry per part file.</summary>
         private static IEnumerable<SurfaceOccurrence> ChangedParts(SurfaceChangeState state) =>

@@ -123,9 +123,12 @@ namespace UnitConstructionVerifier.UI
                 Dictionary<string, ChannelFingerprint> fingerprints = active is Inventor.AssemblyDocument unitDoc
                     ? ChannelFingerprintStore.Load(unitDoc.FullFileName)
                     : new Dictionary<string, ChannelFingerprint>(StringComparer.OrdinalIgnoreCase);
-                Log($"Channel fingerprints on record for this unit: {fingerprints.Count}");
+                Dictionary<string, PartWriteRecord> partWrites = active is Inventor.AssemblyDocument unitForWrites
+                    ? PartWriteStore.Load(unitForWrites.FullFileName)
+                    : new Dictionary<string, PartWriteRecord>(StringComparer.OrdinalIgnoreCase);
+                Log($"Channel fingerprints on record for this unit: {fingerprints.Count}; UCV part writes on record: {partWrites.Count}");
 
-                var rows = surfaces.Select(s => SpikeRow.Create(s, openDocs, fingerprints)).ToList();
+                var rows = surfaces.Select(s => SpikeRow.Create(s, openDocs, fingerprints, partWrites)).ToList();
                 foreach (SpikeRow row in rows.OrderByDescending(r => r.Regenerate?.Needed == true)
                                              .ThenByDescending(r => r.Upload?.Needed == true)
                                              .ThenBy(r => r.Surface.FullFileName, StringComparer.OrdinalIgnoreCase))
@@ -278,7 +281,7 @@ namespace UnitConstructionVerifier.UI
             private bool HasFingerprint { get; }
 
             public static SpikeRow Create(YcSurface surface, Dictionary<string, Inventor.Document> openDocs,
-                Dictionary<string, ChannelFingerprint> fingerprints)
+                Dictionary<string, ChannelFingerprint> fingerprints, Dictionary<string, PartWriteRecord> partWrites)
             {
                 if (!openDocs.TryGetValue(surface.FullFileName, out Inventor.Document? doc) || doc is not Inventor.AssemblyDocument assembly)
                 {
@@ -292,7 +295,7 @@ namespace UnitConstructionVerifier.UI
 
                 SurfaceChangeState state = SurfaceChangeReader.Read(assembly);
                 fingerprints.TryGetValue(surface.FullFileName, out ChannelFingerprint? fingerprint);
-                return new SpikeRow(surface, string.Empty, SurfaceChangeRules.Regenerate(state, fingerprint), SurfaceChangeRules.Upload(state), fingerprint is not null);
+                return new SpikeRow(surface, string.Empty, SurfaceChangeRules.Regenerate(state, fingerprint, partWrites), SurfaceChangeRules.Upload(state), fingerprint is not null);
             }
 
             public override string ToString() =>

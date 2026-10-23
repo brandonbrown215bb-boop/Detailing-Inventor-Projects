@@ -44,11 +44,13 @@ namespace UnitConstructionVerifier.Extraction
             string name = occ.Name;
             string partFile = string.Empty;
             string partStatus = string.Empty;
+            bool hardEdited = false;
 
             if (occ.Definition?.Document is Document doc)
             {
                 partFile = doc.FullFileName;
                 partStatus = ReadAttribute(doc.AttributeSets, "DOCUMENT_STATUS");
+                hardEdited = IsHardEdited(doc);
             }
 
             string id = ReadAttribute(occ.AttributeSets, "OCCURRENCE_ID");
@@ -63,7 +65,37 @@ namespace UnitConstructionVerifier.Extraction
                 PartStatus = partStatus,
                 Position = Position(occ),
                 PartVersion = PartVersion(partFile),
+                PartHardEdited = hardEdited,
             };
+        }
+
+        /// <summary>The IS_HARD_EDITED user property UCV's write-back sets.</summary>
+        private static bool IsHardEdited(Document doc)
+        {
+            try
+            {
+                string value = doc.PropertySets["Inventor User Defined Properties"]["IS_HARD_EDITED"]?.Value?.ToString() ?? string.Empty;
+                return string.Equals(value.Trim(), "TRUE", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;   // property absent
+            }
+        }
+
+        /// <summary>The file version <see cref="SurfaceOccurrence.PartVersion"/> uses: last write time, UTC ticks.</summary>
+        public static string PartVersion(string partFile)
+        {
+            try
+            {
+                return partFile.Length > 0 && System.IO.File.Exists(partFile)
+                    ? System.IO.File.GetLastWriteTimeUtc(partFile).Ticks.ToString(CultureInfo.InvariantCulture)
+                    : string.Empty;
+            }
+            catch (IOException)
+            {
+                return string.Empty;
+            }
         }
 
         /// <summary>The occurrence's transformation matrix, rounded to 0.001 (cm / unit vectors).</summary>
@@ -83,20 +115,6 @@ namespace UnitConstructionVerifier.Extraction
 
         public static string FormatPosition(double[] cells) =>
             string.Join(",", cells.Select(v => (Math.Round(v, 3) + 0.0).ToString("0.###", CultureInfo.InvariantCulture)));
-
-        private static string PartVersion(string partFile)
-        {
-            try
-            {
-                return partFile.Length > 0 && System.IO.File.Exists(partFile)
-                    ? System.IO.File.GetLastWriteTimeUtc(partFile).Ticks.ToString(CultureInfo.InvariantCulture)
-                    : string.Empty;
-            }
-            catch (IOException)
-            {
-                return string.Empty;
-            }
-        }
 
         private static string ReadAttribute(AttributeSets sets, string attributeName)
         {
