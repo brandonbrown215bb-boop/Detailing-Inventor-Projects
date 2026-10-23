@@ -72,6 +72,30 @@ Branch `ucv/batch-regenerate-upload`. Build and deploy it as above, then open th
 6. **Pattern test:** pattern a channel on a regenerated surface, then Re-check unit.
    - [ ] That surface needs Regenerate again: "channel added: …".
 
+## Upload changed (step 4)
+
+**Stop first:** Upload writes to MOM / MAPICS. Only press **Upload** in YCShell's window once it is agreed which MOM
+environment the spike copy may upload to. Everything up to that press is safe; closing YCShell's window without
+pressing Upload changes nothing.
+
+1. Open the spike copy's `FINAL.IAM` and the verifier. The footer shows **Upload changed (N)…**.
+2. Press it.
+   - [ ] Every surface with changes is ticked, with reasons ("2 Changed_SQ parts", "1 occurrence added", …).
+   - [ ] Surfaces whose channels still need Regenerate are orange: "still needs Regenerate".
+   - [ ] The summary says `FINAL.IAM` goes along.
+3. **Blocker check:** suppress one part on a ticked surface, then press **Upload N surfaces**.
+   - [ ] Nothing opens; the list names that surface and part. Unsuppress it.
+4. Press **Upload N surfaces** again.
+   - [ ] One YCShell "Upload Changes To MOM" window opens, listing the ticked surfaces (not FINAL; YCShell lists
+     only surfaces).
+   - **Safe path:** close it without pressing Upload. The result should say 0 uploaded and list them as still changed.
+   - **Real upload** (only once the MOM environment is agreed): press Upload, wait for "Upload complete", and close.
+5. After the window closes:
+   - [ ] The unit is re-checked.
+   - [ ] The result lists uploaded / renamed / still changed.
+   - [ ] For any renamed surface, check FINAL now references the new file (question 2): no manual relink needed?
+   - [ ] Uploaded surfaces drop off **Upload changed** (their parts read `NoChange`).
+
 ## Send back
 
 - The `ycshell_spike_*.txt` log.

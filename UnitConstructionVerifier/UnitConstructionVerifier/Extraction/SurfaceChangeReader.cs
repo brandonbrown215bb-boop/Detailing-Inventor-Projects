@@ -20,8 +20,8 @@ namespace UnitConstructionVerifier.Extraction
             var state = new SurfaceChangeState
             {
                 SurfaceIamPath = surface.FullFileName,
-                HasDeletedComponents = IsOne(ReadAttribute(surface.AttributeSets, "HAS_DELETED_COMPONENTS")),
-                HasTransformedComponents = IsOne(ReadAttribute(surface.AttributeSets, "HAS_TRANSFORMED_COMPONENTS")),
+                HasDeletedComponents = IsOne(ReadMomAttribute(surface.AttributeSets, "HAS_DELETED_COMPONENTS")),
+                HasTransformedComponents = IsOne(ReadMomAttribute(surface.AttributeSets, "HAS_TRANSFORMED_COMPONENTS")),
             };
 
             foreach (ComponentOccurrence occ in surface.ComponentDefinition.Occurrences)
@@ -49,19 +49,19 @@ namespace UnitConstructionVerifier.Extraction
             if (occ.Definition?.Document is Document doc)
             {
                 partFile = doc.FullFileName;
-                partStatus = ReadAttribute(doc.AttributeSets, "DOCUMENT_STATUS");
+                partStatus = ReadMomAttribute(doc.AttributeSets, "DOCUMENT_STATUS");
                 hardEdited = IsHardEdited(doc);
             }
 
-            string id = ReadAttribute(occ.AttributeSets, "OCCURRENCE_ID");
+            string id = ReadMomAttribute(occ.AttributeSets, "OCCURRENCE_ID");
 
             return new SurfaceOccurrence
             {
                 Id = string.IsNullOrWhiteSpace(id) ? name : id,
                 Name = name,
                 PartFile = partFile,
-                PartType = ReadAttribute(occ.AttributeSets, "PART_TYPE"),
-                IsNew = IsOne(ReadAttribute(occ.AttributeSets, "OCCURRENCE_IS_NEW")),
+                PartType = ReadMomAttribute(occ.AttributeSets, "PART_TYPE"),
+                IsNew = IsOne(ReadMomAttribute(occ.AttributeSets, "OCCURRENCE_IS_NEW")),
                 PartStatus = partStatus,
                 Position = Position(occ),
                 PartVersion = PartVersion(partFile),
@@ -116,7 +116,7 @@ namespace UnitConstructionVerifier.Extraction
         public static string FormatPosition(double[] cells) =>
             string.Join(",", cells.Select(v => (Math.Round(v, 3) + 0.0).ToString("0.###", CultureInfo.InvariantCulture)));
 
-        private static string ReadAttribute(AttributeSets sets, string attributeName)
+        internal static string ReadMomAttribute(AttributeSets sets, string attributeName)
         {
             try
             {

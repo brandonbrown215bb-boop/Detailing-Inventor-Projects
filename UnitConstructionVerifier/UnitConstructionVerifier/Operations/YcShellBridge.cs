@@ -21,19 +21,28 @@ namespace UnitConstructionVerifier.Operations
         private const string Ns = "InventorAddIn_MOM_YCShell";
 
         private readonly object _server;
-        private readonly FieldInfo _openAssemblies;
-        private readonly FieldInfo _activeAssembly;
-        private readonly MethodInfo _runOperation;
-        private readonly Delegate _regenerate;
+        private readonly Members _m;
 
-        private YcShellBridge(object server, FieldInfo openAssemblies, FieldInfo activeAssembly,
-            MethodInfo runOperation, Delegate regenerate, IReadOnlyList<MemberCheck> checks)
+        /// <summary>Everything resolved on YCShell; all present or the bridge is not created.</summary>
+        private sealed class Members
+        {
+            public FieldInfo OpenAssemblies = null!;
+            public FieldInfo OpenParts = null!;
+            public FieldInfo InventorInstance = null!;
+            public FieldInfo ActiveAssembly = null!;
+            public FieldInfo InUpload = null!;
+            public MethodInfo RunOperation = null!;
+            public Delegate Regenerate = null!;
+            public Type UploadForm = null!;
+            public MethodInfo UploadStart = null!;
+            public Delegate SetSuppressDocumentEvents = null!;
+            public MethodInfo HasHoles = null!;
+        }
+
+        private YcShellBridge(object server, Members members, IReadOnlyList<MemberCheck> checks)
         {
             _server = server;
-            _openAssemblies = openAssemblies;
-            _activeAssembly = activeAssembly;
-            _runOperation = runOperation;
-            _regenerate = regenerate;
+            _m = members;
             Checks = checks;
         }
 
@@ -108,56 +117,68 @@ namespace UnitConstructionVerifier.Operations
             Type? setStatusType = CheckType(list, asm, $"{Ns}.CUtility+DelegateSetStatus");
             Type? operationType = CheckType(list, asm, $"{Ns}.CommonUI.CFrmRunOperation+DelegateOperation");
             Type? uploadFormType = CheckType(list, asm, $"{Ns}.Upload.CFrmUploadChanges");
-            CheckType(list, asm, $"{Ns}.Upload.CFrmUploadChanges+DelegateSetSuppressDocumentEvents");
+            Type? suppressType = CheckType(list, asm, $"{Ns}.Upload.CFrmUploadChanges+DelegateSetSuppressDocumentEvents");
+            Type? partExtensions = CheckType(list, asm, $"{Ns}.ExtensionMethods.Inventor_PartDocument");
 
-            FieldInfo? openAssemblies = CheckField(list, type, "m_OpenAssemblyList", typeof(IEnumerable));
-            CheckField(list, type, "m_OpenPartList", typeof(IEnumerable));
-            CheckField(list, type, "m_InventorInstance", null);
-            FieldInfo? activeAssembly = CheckField(list, type, "m_ActiveAssembly", null);
-            CheckField(list, type, "m_InUpload", typeof(bool));
+            var m = new Members();
+            m.OpenAssemblies = CheckField(list, type, "m_OpenAssemblyList", typeof(IEnumerable))!;
+            m.OpenParts = CheckField(list, type, "m_OpenPartList", typeof(IEnumerable))!;
+            m.InventorInstance = CheckField(list, type, "m_InventorInstance", null)!;
+            m.ActiveAssembly = CheckField(list, type, "m_ActiveAssembly", null)!;
+            m.InUpload = CheckField(list, type, "m_InUpload", typeof(bool))!;
 
             MethodInfo? regenerate = setStatusType is null ? null
                 : CheckMethod(list, type, "RegenerateFoamAndSnaplockHoles", typeof(object), setStatusType);
-            MethodInfo? runOperation = operationType is null ? null
-                : CheckMethod(list, type, "RunOperation", typeof(object), operationType, typeof(bool));
-            CheckMethod(list, type, "SetSuppressDocumentEvents", typeof(bool));
+            m.RunOperation = (operationType is null ? null
+                : CheckMethod(list, type, "RunOperation", typeof(object), operationType, typeof(bool)))!;
+            MethodInfo? setSuppress = CheckMethod(list, type, "SetSuppressDocumentEvents", typeof(bool));
 
             if (uploadFormType is not null)
             {
                 MethodInfo? start = uploadFormType.GetMethod("Start", BindingFlags.Public | BindingFlags.Instance);
                 list.Add(new MemberCheck("CFrmUploadChanges.Start", start?.GetParameters().Length == 4,
                     start is null ? "not found" : Describe(start)));
+                m.UploadForm = uploadFormType;
+                m.UploadStart = start!;
             }
 
-            Delegate? regenerateDelegate = null;
-            if (regenerate is not null && operationType is not null)
+            if (partExtensions is not null)
             {
-                try
-                {
-                    regenerateDelegate = Delegate.CreateDelegate(operationType, server, regenerate);
-                }
-                catch (Exception ex)
-                {
-                    list.Add(new MemberCheck("Regenerate as DelegateOperation", false, ex.Message));
-                }
+                // YCShell's own hole test, the one its Upload button uses to refuse structural parts with holes.
+                MethodInfo? hasHoles = partExtensions.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    .FirstOrDefault(x => x.Name == "HasHoles" && x.GetParameters().Length == 1);
+                list.Add(new MemberCheck("Inventor_PartDocument.HasHoles", hasHoles is not null, hasHoles is null ? "not found" : Describe(hasHoles)));
+                m.HasHoles = hasHoles!;
+            }
+
+            try
+            {
+                if (regenerate is not null && operationType is not null)
+                    m.Regenerate = Delegate.CreateDelegate(operationType, server, regenerate);
+                if (setSuppress is not null && suppressType is not null)
+                    m.SetSuppressDocumentEvents = Delegate.CreateDelegate(suppressType, server, setSuppress);
+            }
+            catch (Exception ex)
+            {
+                list.Add(new MemberCheck("YCShell delegates", false, ex.Message));
             }
 
             MemberCheck? firstMiss = list.FirstOrDefault(c => !c.Found);
-            if (firstMiss is not null || openAssemblies is null || activeAssembly is null || runOperation is null || regenerateDelegate is null)
+            if (firstMiss is not null || m.Regenerate is null || m.SetSuppressDocumentEvents is null)
             {
                 problem = $"YCShell version not supported: {firstMiss?.Name ?? "member missing"}";
                 return null;
             }
 
             problem = string.Empty;
-            return new YcShellBridge(server, openAssemblies, activeAssembly, runOperation, regenerateDelegate, list);
+            return new YcShellBridge(server, m, list);
         }
 
         /// <summary>The surfaces and composites YCShell has loaded, in its own order.</summary>
         public IReadOnlyList<YcSurface> GetOpenSurfaces()
         {
             var result = new List<YcSurface>();
-            if (_openAssemblies.GetValue(_server) is not IEnumerable items) return result;
+            if (_m.OpenAssemblies.GetValue(_server) is not IEnumerable items) return result;
 
             foreach (object? item in items)
             {
@@ -169,7 +190,7 @@ namespace UnitConstructionVerifier.Operations
 
         /// <summary>The surface YCShell's own buttons would act on (follows the active / in-place-edited document).</summary>
         public string? ActiveAssemblyFileName =>
-            _activeAssembly.GetValue(_server) is object active ? YcSurface.From(active).FullFileName : null;
+            _m.ActiveAssembly.GetValue(_server) is object active ? YcSurface.From(active).FullFileName : null;
 
         /// <summary>
         /// Runs Regenerate Channel Features on one surface through YCShell's own progress window. Blocks until YCShell
@@ -178,13 +199,50 @@ namespace UnitConstructionVerifier.Operations
         /// </summary>
         public void Regenerate(YcSurface surface)
         {
+            Invoke(() => _m.RunOperation.Invoke(_server, new object[] { surface.Handle, _m.Regenerate, false }));
+        }
+
+        /// <summary>
+        /// Opens YCShell's Upload Changes window for several assemblies at once, as its Upload button does for one
+        /// (MOM_Upload_OnExecute): m_InUpload is set while the window is open. Blocks until the detailer closes it.
+        /// Include the unit's composite assembly so a surface MOM renames is replaced in the unit.
+        /// </summary>
+        public void OpenUploadWindow(IReadOnlyList<YcSurface> assemblies)
+        {
+            if (assemblies.Count == 0) return;
+
+            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(assemblies[0].Handle.GetType()))!;
+            foreach (YcSurface assembly in assemblies) list.Add(assembly.Handle);
+
+            object form = Activator.CreateInstance(_m.UploadForm)!;
+            _m.InUpload.SetValue(_server, true);
             try
             {
-                _runOperation.Invoke(_server, new object[] { surface.Handle, _regenerate, false });
+                Invoke(() => _m.UploadStart.Invoke(form, new[]
+                {
+                    _m.InventorInstance.GetValue(_server), list, _m.OpenParts.GetValue(_server), _m.SetSuppressDocumentEvents,
+                }));
+            }
+            finally
+            {
+                _m.InUpload.SetValue(_server, false);
+            }
+        }
+
+        /// <summary>YCShell's hole test for a part document (structural parts with holes cannot be uploaded).</summary>
+        public bool HasHoles(object partDocument) =>
+            (bool)Invoke(() => _m.HasHoles.Invoke(null, new[] { partDocument }))!;
+
+        private static object? Invoke(Func<object?> call)
+        {
+            try
+            {
+                return call();
             }
             catch (TargetInvocationException ex) when (ex.InnerException is not null)
             {
                 ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                throw;   // unreachable
             }
         }
 

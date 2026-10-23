@@ -1,13 +1,68 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnitConstructionVerifier.Operations;
+using UploadForm = InventorAddIn_MOM_YCShell.Upload.CFrmUploadChanges;
 
 namespace UnitConstructionVerifier.Tests
 {
-    [TestFixture]
+    [TestFixture, NonParallelizable]
     public class YcShellBridgeTests
     {
+        [SetUp]
+        public void ResetUploadForm()
+        {
+            UploadForm.LastStart = null;
+            UploadForm.InUploadDuringStart = false;
+            UploadForm.ThrowOnStart = false;
+        }
+
+        [Test]
+        public void Upload_Window_Gets_All_Assemblies_With_InUpload_Set_As_YCShell_Does()
+        {
+            var server = new InventorAddIn_MOM_YCShell.StandardAddInServer();
+            server.Add(@"C:\Unit\0003\0003.IAM", isLoaded: true, isComposite: false);
+            server.Add(@"C:\Unit\0074\0074.IAM", isLoaded: true, isComposite: false);
+            server.Add(@"C:\Unit\FINAL.IAM", isLoaded: true, isComposite: true);
+            UploadForm.ReadInUpload = () => server.InUpload;
+            YcShellBridge bridge = YcShellBridge.FromServer(server, out _, out _)!;
+            List<YcSurface> surfaces = bridge.GetOpenSurfaces().ToList();
+
+            bridge.OpenUploadWindow(new[] { surfaces[1], surfaces[2] });
+
+            object[] start = UploadForm.LastStart!;
+            Assert.AreSame(server.InventorInstance, start[0]);
+            var assemblies = (List<InventorAddIn_MOM_YCShell.Types.CAssembly>)start[1];   // YCShell's own list type
+            CollectionAssert.AreEqual(new[] { surfaces[1].Handle, surfaces[2].Handle }, assemblies);
+            Assert.AreSame(server.OpenParts, start[2]);
+            ((UploadForm.DelegateSetSuppressDocumentEvents)start[3])(true);
+            Assert.AreEqual(true, server.LastSuppressDocumentEvents, "bound to YCShell's SetSuppressDocumentEvents");
+            Assert.IsTrue(UploadForm.InUploadDuringStart);
+            Assert.IsFalse(server.InUpload);
+        }
+
+        [Test]
+        public void InUpload_Is_Cleared_Even_When_The_Upload_Window_Fails()
+        {
+            var server = new InventorAddIn_MOM_YCShell.StandardAddInServer();
+            server.Add(@"C:\Unit\0003\0003.IAM", isLoaded: true, isComposite: false);
+            UploadForm.ThrowOnStart = true;
+            YcShellBridge bridge = YcShellBridge.FromServer(server, out _, out _)!;
+
+            var ex = Assert.Throws<InvalidOperationException>(() => bridge.OpenUploadWindow(bridge.GetOpenSurfaces()));
+            Assert.AreEqual("upload window failed", ex!.Message);
+            Assert.IsFalse(server.InUpload);
+        }
+
+        [Test]
+        public void Uses_YCShells_Own_Hole_Test()
+        {
+            YcShellBridge bridge = YcShellBridge.FromServer(new InventorAddIn_MOM_YCShell.StandardAddInServer(), out _, out _)!;
+            Assert.IsTrue(bridge.HasHoles("part with holes"));
+            Assert.IsFalse(bridge.HasHoles("plain part"));
+        }
+
         [Test]
         public void Resolves_Every_Member_On_A_Server_Shaped_Like_YCShell()
         {
@@ -125,7 +180,13 @@ namespace InventorAddIn_MOM_YCShell
             operation(item, null!);
         }
 
-        private void SetSuppressDocumentEvents(bool val) { }
+        public bool? LastSuppressDocumentEvents { get; private set; }
+
+        public bool InUpload => m_InUpload;
+        public object InventorInstance => m_InventorInstance;
+        public object OpenParts => m_OpenPartList;
+
+        private void SetSuppressDocumentEvents(bool val) => LastSuppressDocumentEvents = val;
     }
 
     public class ServerWithoutRegenerate
@@ -156,7 +217,26 @@ namespace InventorAddIn_MOM_YCShell.Upload
     {
         public delegate void DelegateSetSuppressDocumentEvents(bool val);
 
-        public void Start(object inventor, object assyList, object partList, DelegateSetSuppressDocumentEvents handler) { }
+        /// <summary>What the last Start received, and whether YCShell's m_InUpload was set at the time.</summary>
+        public static object[]? LastStart;
+        public static bool InUploadDuringStart;
+        public static Func<bool>? ReadInUpload;
+        public static bool ThrowOnStart;
+
+        public void Start(object inventor, object assyList, object partList, DelegateSetSuppressDocumentEvents handler)
+        {
+            LastStart = new[] { inventor, assyList, partList, handler };
+            InUploadDuringStart = ReadInUpload?.Invoke() == true;
+            if (ThrowOnStart) throw new InvalidOperationException("upload window failed");
+        }
+    }
+}
+
+namespace InventorAddIn_MOM_YCShell.ExtensionMethods
+{
+    public static class Inventor_PartDocument
+    {
+        internal static bool HasHoles(this object me) => me is string s && s.Contains("holes");
     }
 }
 

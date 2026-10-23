@@ -425,6 +425,40 @@ From the product owner's run and the UCV debug log:
 - **Not yet seen in Inventor:** a YCShell Yes/No question during a batch. It is covered only by the Win32 watcher
   tests.
 
+### 6.6 Step 4 built: Upload changed (2026-10-23, not yet run in Inventor)
+
+**Upload changed (N)…** is a footer button next to Regenerate changed. It shares the review panel, which now
+serves both batches.
+
+1. **Review:** the same checks before it starts, and the same live re-read of every surface.
+   - Every surface is listed with its Upload reasons, and surfaces with any change are ticked.
+   - A ticked surface whose channels still need Regenerate is orange: "still needs Regenerate". It stays ticked;
+     uploading is the detailer's call.
+   - The panel says the unit (`FINAL.IAM`) goes along when YCShell has it loaded as a composite.
+2. **Blocker check across all ticked surfaces**, the same two checks YCShell's own Upload button makes
+   (`UploadBlockers`):
+   - suppressed parts;
+   - structural parts with holes. These are occurrences with `MOM_DATA.CONSTRUCTION_TYPE = STRUCTURAL`, tested with
+     **YCShell's own** `Inventor_PartDocument.HasHoles` (reached by reflection).
+
+   Any blocker stops the whole upload, with the list. That is stricter than YCShell's first-problem-only message.
+3. **One YCShell upload window** (`YcShellBridge.OpenUploadWindow`) for the ticked surfaces **plus the unit
+   composite**. It is opened as YCShell's button does: `m_InUpload` is set while the window is open (cleared even if
+   it fails), and YCShell gets its own part list and `SetSuppressDocumentEvents`. The detailer reviews and presses
+   **Upload** there.
+4. **After the window closes:** the unit is re-checked, and a result lists each surface sent:
+   - **uploaded**: no longer changed;
+   - **renamed by MOM**: the old file is gone, so check that the unit references the new one;
+   - **still changed**: not uploaded, or the upload failed. Check YCShell's upload log.
+
+   The result is also written to the debug log.
+
+Tests: upload window call shape (YCShell's own `List<CAssembly>`, instance, part list, delegate, `m_InUpload` during
+and after, failure path), YCShell's hole test, the upload review and the after-upload result. 197 pass.
+
+**Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
+MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
+
 ## 7. Steps
 
 | Step | Work | Done when |

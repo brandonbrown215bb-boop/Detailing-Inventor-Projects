@@ -149,6 +149,52 @@ namespace UnitConstructionVerifier.Tests
         };
 
         [Test]
+        public void Upload_Review_Ticks_Any_Change_And_Warns_When_Channels_Still_Need_Regenerate()
+        {
+            SurfaceChangeState skinOnly = Surface(@"C:\U\0003\0003.IAM");
+            skinOnly.Occurrences.Add(new SurfaceOccurrence { Id = "s", Name = "skin:1", PartFile = "skin.ipt", PartType = "SKIN", PartStatus = "Changed_SQ" });
+            var surfaces = new[]
+            {
+                skinOnly,
+                Surface(@"C:\U\0019\0019.IAM", patternedChannel: true),
+                Surface(@"C:\U\0010\0010.IAM"),
+            };
+            var none = new Dictionary<string, ChannelFingerprint>();
+            var noWrites = new Dictionary<string, PartWriteRecord>();
+
+            List<SurfaceReviewItem> items = UploadReview.BuildItems(surfaces, none, noWrites, _ => true);
+
+            CollectionAssert.AreEqual(new[] { "0003", "0019", "0010" }, items.Select(i => i.SurfaceName));
+            Assert.IsTrue(items[0].IsIncluded);
+            Assert.IsFalse(items[0].NeedsAttention, "a skin change needs no Regenerate");
+            Assert.IsTrue(items[1].IsIncluded);
+            Assert.IsTrue(items[1].NeedsAttention);
+            StringAssert.StartsWith("still needs Regenerate  ·  1 occurrence added", items[1].ReasonText);
+            Assert.IsFalse(items[2].IsIncluded);
+            Assert.AreEqual(2, UploadReview.CountNeeded(surfaces));
+            Assert.AreEqual(
+                "2 of 3 surfaces have changes since their last upload; 2 ticked. 1 ticked surface still has channel changes: run Regenerate changed first. " +
+                "FINAL.IAM goes along, so a surface MOM renames is replaced in the unit.",
+                UploadReview.Summary(items, "FINAL.IAM"));
+        }
+
+        [Test]
+        public void Upload_Result_Says_What_Happened_To_Each_Surface()
+        {
+            var sent = new[] { @"C:\U\0003\0003.IAM", @"C:\U\0068\0068.IAM", @"C:\U\0074\0074.IAM" };
+            string result = UploadReview.Result(
+                sent,
+                path => !path.EndsWith("0068.IAM"),                                                                  // renamed by MOM
+                path => path.EndsWith("0074.IAM") ? new SurfaceDecision(true, new[] { "2 Changed_SQ parts" }) : new SurfaceDecision(false, new[] { "no change since last upload" }));
+
+            StringAssert.StartsWith("2 of 3 surfaces uploaded.", result);
+            StringAssert.Contains("Still changed (1)", result);
+            StringAssert.Contains("   0074: 2 Changed_SQ parts", result);
+            StringAssert.Contains("Renamed by MOM (1)", result);
+            StringAssert.Contains("   0003", result);
+        }
+
+        [Test]
         public void Review_Ticks_Surfaces_With_Channel_Changes_That_YCShell_Can_Run()
         {
             var surfaces = new[]
@@ -161,7 +207,7 @@ namespace UnitConstructionVerifier.Tests
             var none = new Dictionary<string, ChannelFingerprint>();
             var noWrites = new Dictionary<string, PartWriteRecord>();
 
-            List<RegenerateReviewItem> items = RegenerateReview.BuildItems(surfaces, none, noWrites, path => !path.EndsWith("0091.IAM"));
+            List<SurfaceReviewItem> items = RegenerateReview.BuildItems(surfaces, none, noWrites, path => !path.EndsWith("0091.IAM"));
 
             CollectionAssert.AreEqual(new[] { "0019", "0091", "0003" }, items.Select(i => i.SurfaceName));
             Assert.IsTrue(items[0].IsIncluded);

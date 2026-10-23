@@ -1455,6 +1455,9 @@
                     <Button x:Name="RegenerateChangedButton" Content="Regenerate changed…" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                             Click="OnRegenerateChanged"
                             ToolTip="Run YCShell's Regenerate Channel Features on every surface whose channels were added, moved or reshaped"/>
+                    <Button x:Name="UploadChangedButton" Content="Upload changed…" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnUploadChanged"
+                            ToolTip="Open YCShell's Upload Changes window once, for every surface with changes since its last upload"/>
                     <Button Content="Save expectations" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="OnSave"
                             ToolTip="Keep expectation changes for this unit (saved next to the IAM)"/>
                     <Button Content="Re-check unit" Style="{StaticResource PrimaryButton}" Click="OnVerify"
@@ -1481,14 +1484,14 @@
 
         <!-- Regenerate changed review: every surface with its reason; surfaces whose channels changed are ticked.
              Covers the window until Regenerate or Cancel. -->
-        <Grid x:Name="RegenerateReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
+        <Grid x:Name="BatchReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
             <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
                     MaxWidth="820" MaxHeight="560" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="Regenerate channel features" Style="{StaticResource SectionHeader}" FontSize="15"/>
-                        <TextBlock x:Name="RegenerateReviewSummary" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                        <TextBlock x:Name="BatchReviewTitle" Text="Regenerate channel features" Style="{StaticResource SectionHeader}" FontSize="15"/>
+                        <TextBlock x:Name="BatchReviewSummary" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
                         <Grid Margin="8,0,8,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="28"/>
@@ -1500,21 +1503,21 @@
                         </Grid>
                     </StackPanel>
                     <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
-                        <Button x:Name="RegenerateReviewConfirmButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="14,5"
-                                Content="Regenerate" Click="OnRegenerateReviewConfirm"/>
-                        <Button x:Name="RegenerateReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
-                                Content="Cancel" IsCancel="True" Click="OnRegenerateReviewCancel"/>
+                        <Button x:Name="BatchReviewConfirmButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="14,5"
+                                Content="Regenerate" Click="OnBatchReviewConfirm"/>
+                        <Button x:Name="BatchReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                Content="Cancel" IsCancel="True" Click="OnBatchReviewCancel"/>
                         <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
-                            <CheckBox x:Name="RegenerateAutoCloseCheck" IsChecked="True" Foreground="{StaticResource TextPrimary}"
+                            <CheckBox x:Name="BatchReviewAutoCloseCheck" IsChecked="True" Foreground="{StaticResource TextPrimary}"
                                       Content="Close YCShell's information boxes automatically"
                                       ToolTip="Only OK-only notices such as 'Channel Features have been recreated/replaced'. Yes/No questions always come to you."/>
-                            <TextBlock Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="11.5"
+                            <TextBlock x:Name="BatchReviewNote" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="11.5"
                                        Text="YCShell saves each surface as it regenerates it. Closing without saving does not undo it."/>
                         </StackPanel>
                     </DockPanel>
                     <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl x:Name="RegenerateReviewList">
+                            <ItemsControl x:Name="BatchReviewList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Grid x:Name="RegenerateRow" Margin="8,0" MinHeight="30" ToolTip="{Binding Tooltip}">
@@ -1533,7 +1536,7 @@
                                             <DataTrigger Binding="{Binding IsIncluded}" Value="False">
                                                 <Setter TargetName="RegenerateRow" Property="Opacity" Value="0.5"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsUncertain}" Value="True">
+                                            <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
                                                 <Setter TargetName="ReasonText" Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding CanRun}" Value="False">
