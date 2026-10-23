@@ -490,6 +490,25 @@ to 8 min each, before counting the clicks.
 - **Change:** UCV's result now finds where each renamed surface went in the unit ("relinked: 0021 → 0048"). It asks
   for a manual relink only when the new file is not referenced.
 
+**Bug after the upload: Re-check unit didn't pick up the renamed surfaces.** There were two causes:
+
+1. **Re-check unit didn't re-read Inventor.** It re-ran the checks on the scan from when the verifier opened.
+2. **Surface rows kept the old IAM path and part number.** The part number is the file name. Saved expectations are
+   matched by that part number, and channel fingerprints are keyed by the IAM path.
+
+**Fixed:**
+
+- **Re-check unit** now follows renamed surfaces, then re-scans the unit. A rename is recognised when the old IAM is
+  gone and the unit now references exactly one other IAM in the same folder that no row claims (`SurfaceRenames`).
+  The rows, the saved expectations (`.construction_verify.json`, keys only) and the channel fingerprints move to
+  the new surface.
+- **When the verifier opens,** the records follow renames from their own stored paths before saved expectations are
+  merged (`SurfaceRenameFollower`). Reopening after an upload keeps the expectations with their surfaces.
+- **After Upload changed,** surfaces that were sent without pending channel work get their channel fingerprint
+  re-taken. The upload replaces SQ parts with newly numbered files, which would otherwise read as changed channels.
+  Surfaces uploaded despite "still needs Regenerate" keep their old record, so they still show as needing it.
+- **Dry run on SW0004's real records** (read-only): all 8 found, `-0021`→`-0048` … `-0030`→`-0055`. 204 tests pass.
+
 **Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
 MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
 

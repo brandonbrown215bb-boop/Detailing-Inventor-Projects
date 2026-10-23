@@ -778,6 +778,19 @@ namespace UnitConstructionVerifier.UI
 
         private void OnVerify(object sender, RoutedEventArgs e)
         {
+            // Re-read the unit from Inventor first: surfaces may have been renamed by an upload, and parts changed.
+            ShowBusy($"Re-checking {Path.GetFileName(_iamPath)}…");
+            try
+            {
+                UpdateBusy("Reading the unit from Inventor", 0.1);
+                FollowRenamedSurfaces();
+                ReScanAndRefresh();
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
             RefreshUnitStatus();
             UnitStatus status = _statusBoard.Status;
 
@@ -1459,6 +1472,58 @@ namespace UnitConstructionVerifier.UI
         }
 
         /// <summary>
+        /// Points surface rows, saved expectations and channel records at surfaces MOM renamed on upload (the old IAM is
+        /// gone; the unit now references a new IAM in the same folder). Returns old path to new.
+        /// </summary>
+        private Dictionary<string, string> FollowRenamedSurfaces()
+        {
+            var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (FindUnitDocument() is not Inventor.AssemblyDocument unit) return renames;
+
+                var references = new List<string>();
+                foreach (Inventor.Document doc in unit.AllReferencedDocuments)
+                {
+                    if (doc.DocumentType == Inventor.DocumentTypeEnum.kAssemblyDocumentObject) references.Add(doc.FullFileName);
+                }
+
+                IEnumerable<string> rowPaths = _data.RoofRows.Select(r => r.SourceSurfaceIam)
+                    .Concat(_data.WallRows.Select(r => r.SourceSurfaceIam))
+                    .Concat(_data.BaseRows.Select(r => r.SourceSurfaceIam));
+                renames = SurfaceRenameFollower.Follow(_iamPath, rowPaths, references);
+                if (renames.Count == 0 || SurfaceRenames.Apply(_data, renames) == 0) return renames;
+
+                RoofSurfaceList.Items.Refresh();
+                WallSurfaceList.Items.Refresh();
+                BaseSurfaceList.Items.Refresh();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.FollowRenamedSurfaces");
+            }
+
+            return renames;
+        }
+
+        /// <summary>
+        /// The upload replaces SQ parts with newly numbered files, which would read as changed channels against a channel
+        /// record. For surfaces sent without pending channel work, the record is taken again; surfaces sent while they
+        /// still needed Regenerate keep theirs, so they still show as needing it.
+        /// </summary>
+        private void RefreshChannelRecordsAfterUpload(IEnumerable<string> withoutChannelWork, IReadOnlyDictionary<string, string> renames)
+        {
+            Dictionary<string, ChannelFingerprint> records = ChannelFingerprintStore.Load(_iamPath);
+            foreach (string sent in withoutChannelWork)
+            {
+                string path = renames.TryGetValue(sent.Trim(), out string? renamed) ? renamed : sent;
+                if (!records.ContainsKey(path.Trim())) continue;
+                try { RecordChannelFingerprint(path); }
+                catch (Exception ex) { DebugLogger.Log(ex, $"RefreshChannelRecordsAfterUpload: {path}"); }
+            }
+        }
+
+        /// <summary>
         /// YCShell regenerates only walls and roofs ("Regenerating Features is only supported for Wall and Indoor Roof
         /// surfaces"), so base surfaces are left out of Regenerate changed (field test, 2026-10-23).
         /// </summary>
@@ -1488,14 +1553,16 @@ namespace UnitConstructionVerifier.UI
             if (surfaces.Count == 0 || _ycShell is null) return;
 
             if (_batchKind == BatchKind.Regenerate) RunRegenerateBatch(_ycShell, surfaces, autoClose);
-            else RunUploadBatch(_ycShell, surfaces);
+            else RunUploadBatch(_ycShell, surfaces,
+                _batchItems.Where(i => i.IsIncluded && i.Warning.Length == 0).Select(i => i.SurfaceIamPath).ToList());
         }
 
         /// <summary>
         /// YCShell's upload checks on every surface, then one YCShell upload window for all of them plus the unit
         /// composite. The detailer presses Upload there; UCV reports what changed once the window closes.
         /// </summary>
-        private void RunUploadBatch(YcShellBridge bridge, List<string> surfaces)
+        /// <param name="withoutChannelWork">Surfaces sent that did not still need Regenerate.</param>
+        private void RunUploadBatch(YcShellBridge bridge, List<string> surfaces, List<string> withoutChannelWork)
         {
             const string title = "Upload changed";
 
@@ -1553,7 +1620,9 @@ namespace UnitConstructionVerifier.UI
             ShowBusy("Re-checking after upload…");
             try
             {
+                Dictionary<string, string> renames = FollowRenamedSurfaces();
                 ReScanAndRefresh();
+                RefreshChannelRecordsAfterUpload(withoutChannelWork, renames);
             }
             finally
             {

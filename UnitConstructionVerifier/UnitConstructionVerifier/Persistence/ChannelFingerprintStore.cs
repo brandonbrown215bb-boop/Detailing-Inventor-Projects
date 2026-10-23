@@ -43,13 +43,35 @@ namespace UnitConstructionVerifier.Persistence
         public static ChannelFingerprint? Find(string unitIamPath, string surfaceIamPath) =>
             Load(unitIamPath).TryGetValue(surfaceIamPath.Trim(), out ChannelFingerprint? fingerprint) ? fingerprint : null;
 
+        /// <summary>Moves records to surfaces MOM renamed on upload.</summary>
+        public static void RenameSurfaces(string unitIamPath, IReadOnlyDictionary<string, string> renames)
+        {
+            if (renames.Count == 0) return;
+            Dictionary<string, ChannelFingerprint> all = Load(unitIamPath);
+            bool changed = false;
+            foreach (KeyValuePair<string, string> rename in renames)
+            {
+                if (!all.TryGetValue(rename.Key.Trim(), out ChannelFingerprint? fingerprint)) continue;
+                all.Remove(rename.Key.Trim());
+                fingerprint.SurfaceIamPath = rename.Value;
+                all[rename.Value.Trim()] = fingerprint;
+                changed = true;
+            }
+
+            if (changed) Save(unitIamPath, all.Values);
+        }
+
         /// <summary>Replaces the record for one surface; other surfaces are kept.</summary>
         public static void Record(string unitIamPath, ChannelFingerprint fingerprint)
         {
             Dictionary<string, ChannelFingerprint> all = Load(unitIamPath);
             all[fingerprint.SurfaceIamPath.Trim()] = fingerprint;
+            Save(unitIamPath, all.Values);
+        }
 
-            var ordered = new List<ChannelFingerprint>(all.Values);
+        private static void Save(string unitIamPath, IEnumerable<ChannelFingerprint> fingerprints)
+        {
+            var ordered = new List<ChannelFingerprint>(fingerprints);
             ordered.Sort((a, b) => string.Compare(a.SurfaceIamPath, b.SurfaceIamPath, StringComparison.OrdinalIgnoreCase));
             File.WriteAllText(GetSidecarPath(unitIamPath), JsonConvert.SerializeObject(ordered, Formatting.Indented));
         }
