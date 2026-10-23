@@ -339,6 +339,34 @@ Log: `%TEMP%\UnitConstructionVerifier\ycshell_spike_20261023_064133.txt`. Instal
 - **Still open:** question 2, second half (does passing FINAL to the upload window relink a renamed surface?), and
   question 6.
 
+### 6.3 Step 0.5 results (2026-10-23)
+
+Code is on branch `ucv/batch-regenerate-upload`:
+
+- `Models/SurfaceChanges.cs`: change-state model, both rules (`SurfaceChangeRules`) and `ChannelFingerprint`.
+- `Extraction/SurfaceChangeReader.cs`: reads the markers from a live surface IAM. The UCV scan now fills
+  `IptScanResult.Surfaces`.
+- `Persistence/ChannelFingerprintStore.cs`: the `.ucv_channel_fingerprints.json` sidecar next to the unit IAM.
+- 12 tests in `SurfaceChangeRulesTests`. The full suite passes: 173 tests.
+- The YCShell Spike window now shows each surface's Regenerate / Upload verdict with reasons. A spike regenerate
+  records the channel fingerprint.
+
+The compiled rules were run over both test units (markers read with Apprentice, read-only):
+
+| Unit | Upload | Regenerate |
+|---|---|---|
+| Original | 11 surfaces (all with changed parts) | 4: 0073, 0074, 0078, 0080 (channel parts edited) |
+| Spike copy | same 11 + 0019 | same 4 + 0019 (patterned channel) + 0055 (channels the spike regenerate replaced, with no fingerprint) |
+
+Skin, liner and subfloor-only changes (0003, 0006, 0009, 0055 original, 0059, 0065, 0091) go to Upload only.
+
+**Open:** the 4 Regenerate surfaces have channel parts edited through UCV (gauge / material write-back). Does such
+an edit need Regenerate, or only a geometry change? Today's rule says any `Changed_SQ` / `Changed_Parameter` on a
+channel needs it.
+
+**Not done in 0.5:** the surface-list badges. They move to Step 2 with the buttons. The Apprentice scan tool
+(`ucv-scan`) does not fill `Surfaces` yet.
+
 ## 7. Steps
 
 | Step | Work | Done when |

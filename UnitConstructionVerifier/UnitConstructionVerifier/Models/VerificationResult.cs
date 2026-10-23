@@ -49,6 +49,9 @@ namespace UnitConstructionVerifier.Models
     public sealed class IptScanResult
     {
         public List<IptProperties> Parts { get; set; } = new();
+
+        /// <summary>Change markers per surface IAM, for Regenerate / Upload changed. Empty in older snapshots.</summary>
+        public List<SurfaceChangeState> Surfaces { get; set; } = new();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -7,7 +7,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using UnitConstructionVerifier.Extraction;
+using UnitConstructionVerifier.Models;
 using UnitConstructionVerifier.Operations;
+using UnitConstructionVerifier.Persistence;
 
 namespace UnitConstructionVerifier.UI
 {
@@ -117,16 +120,22 @@ namespace UnitConstructionVerifier.UI
 
                 IReadOnlyList<YcSurface> surfaces = _bridge.GetOpenSurfaces();
                 Dictionary<string, Inventor.Document> openDocs = OpenDocumentsByPath();
+                Dictionary<string, ChannelFingerprint> fingerprints = active is Inventor.AssemblyDocument unitDoc
+                    ? ChannelFingerprintStore.Load(unitDoc.FullFileName)
+                    : new Dictionary<string, ChannelFingerprint>(StringComparer.OrdinalIgnoreCase);
+                Log($"Channel fingerprints on record for this unit: {fingerprints.Count}");
 
-                var rows = surfaces.Select(s => SpikeRow.Create(s, openDocs)).ToList();
-                foreach (SpikeRow row in rows.OrderByDescending(r => r.ChangedSq).ThenBy(r => r.Surface.FullFileName, StringComparer.OrdinalIgnoreCase))
+                var rows = surfaces.Select(s => SpikeRow.Create(s, openDocs, fingerprints)).ToList();
+                foreach (SpikeRow row in rows.OrderByDescending(r => r.Regenerate?.Needed == true)
+                                             .ThenByDescending(r => r.Upload?.Needed == true)
+                                             .ThenBy(r => r.Surface.FullFileName, StringComparer.OrdinalIgnoreCase))
                 {
                     _surfaceList.Items.Add(row);
                 }
 
-                Log($"YCShell open assembly list: {surfaces.Count} entries, {rows.Count(r => r.ChangedSq > 0)} with Changed_SQ parts, " +
-                    $"{rows.Sum(r => r.ChangedSq)} Changed_SQ parts in all");
-                foreach (SpikeRow row in rows) Log("  " + row);
+                Log($"YCShell open assembly list: {surfaces.Count} entries. Regenerate needed on {rows.Count(r => r.Regenerate?.Needed == true)} surfaces, " +
+                    $"Upload needed on {rows.Count(r => r.Upload?.Needed == true)}.");
+                foreach (SpikeRow row in rows) Log("  " + row.Detail());
 
                 CompareWithActiveUnit(active, surfaces);
             }
@@ -174,7 +183,7 @@ namespace UnitConstructionVerifier.UI
                 return;
             }
 
-            if (MessageBox.Show(this, $"Run YCShell Regenerate Channel Features on\n\n{path}\n\n({row.ChangedSq} Changed_SQ parts)?",
+            if (MessageBox.Show(this, $"Run YCShell Regenerate Channel Features on\n\n{path}\n\nRegenerate rule: {row.Regenerate?.ToString() ?? "not evaluated"}",
                     "YCShell spike", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             {
                 return;
@@ -194,6 +203,13 @@ namespace UnitConstructionVerifier.UI
             {
                 _bridge.Regenerate(row.Surface);
                 Log($"Regenerate returned after {watch.Elapsed.TotalSeconds:F1} s (includes time spent on YCShell message boxes)");
+
+                if (_app.ActiveDocument is Inventor.AssemblyDocument unit && doc is Inventor.AssemblyDocument surfaceDoc)
+                {
+                    ChannelFingerprint fingerprint = ChannelFingerprint.From(SurfaceChangeReader.Read(surfaceDoc), DateTime.UtcNow);
+                    ChannelFingerprintStore.Record(unit.FullFileName, fingerprint);
+                    Log($"Recorded channel fingerprint ({fingerprint.Channels.Count} channels) in {ChannelFingerprintStore.GetSidecarPath(unit.FullFileName)}");
+                }
             }
             catch (Exception ex)
             {
@@ -246,33 +262,50 @@ namespace UnitConstructionVerifier.UI
 
         private sealed class SpikeRow
         {
-            private SpikeRow(YcSurface surface, int changedSq, string statuses)
+            private SpikeRow(YcSurface surface, string note, SurfaceDecision? regenerate, SurfaceDecision? upload, bool hasFingerprint)
             {
                 Surface = surface;
-                ChangedSq = changedSq;
-                Statuses = statuses;
+                Note = note;
+                Regenerate = regenerate;
+                Upload = upload;
+                HasFingerprint = hasFingerprint;
             }
 
             public YcSurface Surface { get; }
-            public int ChangedSq { get; }
-            private string Statuses { get; }
+            public SurfaceDecision? Regenerate { get; }
+            public SurfaceDecision? Upload { get; }
+            private string Note { get; }
+            private bool HasFingerprint { get; }
 
-            public static SpikeRow Create(YcSurface surface, Dictionary<string, Inventor.Document> openDocs)
+            public static SpikeRow Create(YcSurface surface, Dictionary<string, Inventor.Document> openDocs,
+                Dictionary<string, ChannelFingerprint> fingerprints)
             {
                 if (!openDocs.TryGetValue(surface.FullFileName, out Inventor.Document? doc) || doc is not Inventor.AssemblyDocument assembly)
                 {
-                    return new SpikeRow(surface, 0, "(not open in Inventor)");
+                    return new SpikeRow(surface, "(not open in Inventor)", null, null, false);
                 }
 
-                IDictionary<string, int> counts = PartChangeStatus.CountByStatus(assembly);
-                int changed = counts.Where(kv => PartChangeStatus.IsChangedSq(kv.Key)).Sum(kv => kv.Value);
-                return new SpikeRow(surface, changed, string.Join(" ", counts.Select(kv => $"{kv.Key}={kv.Value}")));
+                if (surface.IsComposite == true)
+                {
+                    return new SpikeRow(surface, "(composite: not a surface)", null, null, false);
+                }
+
+                SurfaceChangeState state = SurfaceChangeReader.Read(assembly);
+                fingerprints.TryGetValue(surface.FullFileName, out ChannelFingerprint? fingerprint);
+                return new SpikeRow(surface, string.Empty, SurfaceChangeRules.Regenerate(state, fingerprint), SurfaceChangeRules.Upload(state), fingerprint is not null);
             }
 
             public override string ToString() =>
-                $"{(ChangedSq > 0 ? $"CHANGED {ChangedSq,3}" : "           ")}  " +
-                $"loaded={(Surface.IsLoaded ? "yes" : "no ")}  composite={Show(Surface.IsComposite),-7}  " +
-                $"{Surface.FullFileName}   [{Statuses}]";
+                $"{Flag(Regenerate, "REGEN")} {Flag(Upload, "UPLOAD")}  {System.IO.Path.GetFileName(Surface.FullFileName),-24} " +
+                (Note.Length > 0 ? Note : $"regen: {Regenerate}   |   upload: {Upload}");
+
+            public string Detail() =>
+                $"{Flag(Regenerate, "REGEN")} {Flag(Upload, "UPLOAD")}  loaded={(Surface.IsLoaded ? "yes" : "no ")} composite={Show(Surface.IsComposite),-7} " +
+                $"fingerprint={(HasFingerprint ? "yes" : "no ")}  {Surface.FullFileName}" +
+                (Note.Length > 0 ? $"  {Note}" : $"\n      regenerate: {Regenerate}{(Regenerate?.ChannelsCertain == false ? " [ticked by default]" : "")}\n      upload: {Upload}");
+
+            private static string Flag(SurfaceDecision? decision, string text) =>
+                decision?.Needed == true ? text : new string(' ', text.Length);
         }
     }
 }
