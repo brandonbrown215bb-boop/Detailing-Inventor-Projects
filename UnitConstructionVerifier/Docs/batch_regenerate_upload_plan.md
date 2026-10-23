@@ -467,6 +467,29 @@ narrows it to the active surface. A TODO there calls the single-item list "an ar
 uploading from all tabs". UCV reuses that older capability. The multi-surface and relink paths are not exercised by
 YCShell's button today, so the first uploads should be watched closely.
 
+**First real batch upload (2026-10-23, `SW0004\Skid 1`, 8 surfaces, unit `SW GROWTH TEST 4 (01)((XA1-FF1-IP1)).IAM`).**
+From YCShell's `Uploads.log` and the UCV debug log:
+
+| Phase | Time |
+|---|---|
+| Upload window opened, BOM list loaded | 11:59:26 → about 12:00 |
+| Upload pressed, initial saves | 12:00:27 → 12:01:23 (56 s) |
+| 8 surfaces uploaded | 12:01:23 → 12:11:40 (10 min 17 s; 39 s to 2 min 20 s each, about 77 s average) |
+| Renamed surfaces swapped into the unit; unit saved and reopened | 12:11:40 → 12:13:39 (2 min) |
+| UCV re-check and result | 12:14:26 |
+
+About 15 minutes end to end, one press. For comparison, YCShell's log has single-surface uploads of 1 min 20 s
+to 8 min each, before counting the clicks.
+
+- **Question 2 answered: yes.** MOM gave all 8 surfaces new part numbers (`-0021`→`-0048` … `-0030`→`-0055`).
+  YCShell's relink step replaced each in the unit, and the unit (saved 12:13:38) references all 8 new files with none
+  missing. **No manual relink.**
+- **"N/A" in YCShell's window after completion is expected for renamed surfaces.** The window's Part # reads the
+  assembly document, which YCShell closes when it swaps the renamed surface in (`CAssemblyWrapper.PartNumber`
+  returns "N/A" without a document). Cosmetic.
+- **Change:** UCV's result now finds where each renamed surface went in the unit ("relinked: 0021 → 0048"). It asks
+  for a manual relink only when the new file is not referenced.
+
 **Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
 MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
 

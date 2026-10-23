@@ -212,8 +212,22 @@ namespace UnitConstructionVerifier.Tests
             StringAssert.StartsWith("2 of 3 surfaces uploaded.", result);
             StringAssert.Contains("Still changed (1)", result);
             StringAssert.Contains("   0074: 2 Changed_SQ parts", result);
-            StringAssert.Contains("Renamed by MOM (1)", result);
+            StringAssert.Contains("Renamed by MOM but not found in the unit (1)", result);
             StringAssert.Contains("   0003", result);
+        }
+
+        [Test]
+        public void Renamed_Surfaces_Are_Found_Relinked_In_The_Unit()
+        {
+            // SW0004 Skid 1, 2026-10-23: all 8 surfaces renamed by MOM; YCShell swapped each into the unit.
+            var sent = new[] { @"C:\SW0004\Skid 1\391Z010216-0021\391Z010216-0021.IAM", @"C:\SW0004\Skid 1\391Z010216-0022\391Z010216-0022.IAM" };
+            var unitReferences = new[] { @"C:\SW0004\Skid 1\391Z010216-0021\391Z010216-0048.IAM" };
+
+            string result = UploadReview.Result(sent, _ => false, _ => null, unitReferences);
+
+            StringAssert.StartsWith("2 of 2 surfaces uploaded.", result);
+            StringAssert.Contains("Renamed by MOM and relinked in the unit (1)" + Environment.NewLine + "   391Z010216-0021 → 391Z010216-0048", result);
+            StringAssert.Contains("Renamed by MOM but not found in the unit (1): relink these in the unit and save." + Environment.NewLine + "   391Z010216-0022", result);
         }
 
         [Test]

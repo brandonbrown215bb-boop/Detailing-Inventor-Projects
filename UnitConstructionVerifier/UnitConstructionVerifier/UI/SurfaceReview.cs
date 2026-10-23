@@ -162,20 +162,32 @@ namespace UnitConstructionVerifier.UI
         }
 
         /// <summary>What happened to each surface sent to the upload window, read after it closed.</summary>
-        public static string Result(IReadOnlyList<string> sent, Func<string, bool> fileExists, Func<string, SurfaceDecision?> uploadDecisionNow)
+        /// <param name="unitReferences">Surface IAMs the unit references now, to find where a renamed surface went.</param>
+        public static string Result(IReadOnlyList<string> sent, Func<string, bool> fileExists, Func<string, SurfaceDecision?> uploadDecisionNow,
+            IReadOnlyCollection<string>? unitReferences = null)
         {
             var uploaded = new List<string>();
             var stillChanged = new List<string>();
+            var relinked = new List<string>();
             var renamed = new List<string>();
             foreach (string path in sent)
             {
                 string name = Path.GetFileNameWithoutExtension(path);
-                if (!fileExists(path)) renamed.Add(name);
+                if (!fileExists(path))
+                {
+                    // YCShell saves the renamed surface next to the old one and swaps it into the unit.
+                    string folder = Path.GetDirectoryName(path) ?? string.Empty;
+                    string? now = unitReferences?.FirstOrDefault(r =>
+                        string.Equals(Path.GetDirectoryName(r), folder, StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(r, path, StringComparison.OrdinalIgnoreCase));
+                    if (now is not null) relinked.Add($"{name} → {Path.GetFileNameWithoutExtension(now)}");
+                    else renamed.Add(name);
+                }
                 else if (uploadDecisionNow(path)?.Needed == true) stillChanged.Add($"{name}: {uploadDecisionNow(path)}");
                 else uploaded.Add(name);
             }
 
-            var lines = new List<string> { $"{uploaded.Count + renamed.Count} of {sent.Count} surfaces uploaded." };
+            var lines = new List<string> { $"{uploaded.Count + relinked.Count + renamed.Count} of {sent.Count} surfaces uploaded." };
             if (stillChanged.Count > 0)
             {
                 lines.Add(string.Empty);
@@ -185,8 +197,14 @@ namespace UnitConstructionVerifier.UI
             if (renamed.Count > 0)
             {
                 lines.Add(string.Empty);
-                lines.Add($"Renamed by MOM ({renamed.Count}): the old file is gone. Check that the unit references the new surface.");
+                lines.Add($"Renamed by MOM but not found in the unit ({renamed.Count}): relink these in the unit and save.");
                 lines.AddRange(renamed.Select(s => "   " + s));
+            }
+            if (relinked.Count > 0)
+            {
+                lines.Add(string.Empty);
+                lines.Add($"Renamed by MOM and relinked in the unit ({relinked.Count})");
+                lines.AddRange(relinked.Select(s => "   " + s));
             }
             if (uploaded.Count > 0)
             {

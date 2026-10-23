@@ -1563,8 +1563,20 @@ namespace UnitConstructionVerifier.UI
             Dictionary<string, SurfaceChangeState> now = (_iptResult?.Surfaces ?? new List<SurfaceChangeState>())
                 .GroupBy(s => s.SurfaceIamPath.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            var unitReferences = new List<string>();
+            try
+            {
+                if (FindUnitDocument() is Inventor.AssemblyDocument unitDoc)
+                    foreach (Inventor.Document doc in unitDoc.ReferencedDocuments) unitReferences.Add(doc.FullFileName);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: unit references");
+            }
+
             string result = UploadReview.Result(surfaces, File.Exists,
-                path => now.TryGetValue(path.Trim(), out SurfaceChangeState? state) ? SurfaceChangeRules.Upload(state) : null);
+                path => now.TryGetValue(path.Trim(), out SurfaceChangeState? state) ? SurfaceChangeRules.Upload(state) : null,
+                unitReferences);
 
             DebugLogger.Log("Upload changed result:" + Environment.NewLine + result);
             ShowNotice(result.Split('\n')[0].Trim());
