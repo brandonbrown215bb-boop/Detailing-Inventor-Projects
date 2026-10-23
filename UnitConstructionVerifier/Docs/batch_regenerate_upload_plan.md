@@ -408,6 +408,23 @@ Tests: `RegenerateBatchTests` (message classification, outcomes, runner order / 
 and `YcShellMessageWatcherTests` (real Win32 message boxes shown from a worker thread: closes the completion box,
 leaves a Yes/No question alone, closes nothing when auto-close is off). 192 pass.
 
+### 6.5 Field test of Regenerate changed (2026-10-23, spike copy)
+
+From the product owner's run and the UCV debug log:
+
+- **Run 1 (09:44):** 6 of 6 surfaces regenerated: 0019, 0055, 0073, 0074, 0078 and 0080. Each took between 6 and
+  60 s. Every completion box was closed by UCV. No Yes/No questions came up.
+- **Run 2 (09:47):** 0019 done, then **Stop** worked. 0055 was listed as "Not run (stopped)".
+- The summary listed the surfaces with times, as designed.
+- **Bug found:** a channel patterned on 0063 *after* the verifier's last scan was not offered. The button and review
+  panel used the scan's markers, and 0063 only appeared after a later run's closing re-check. **Fixed:** pressing
+  **Regenerate changed…** now re-reads every open surface's markers live from Inventor before building the review,
+  and updates the button count. The button label itself still reflects the last scan or press until then.
+- **Also fixed:** the test suite wrote fake errors into the real UCV debug log under `%TEMP%`. Tests now use their
+  own temp folder (`TestTempFolder`).
+- **Not yet seen in Inventor:** a YCShell Yes/No question during a batch. It is covered only by the Win32 watcher
+  tests.
+
 ## 7. Steps
 
 | Step | Work | Done when |

@@ -1366,9 +1366,12 @@ namespace UnitConstructionVerifier.UI
                 return;
             }
 
+            // The scan can be stale: channels patterned since the last Re-check would be missed (field test, 2026-10-23).
+            List<SurfaceChangeState> current = ReadSurfaceChangesNow(_iptResult.Surfaces);
+
             IReadOnlyList<YcSurface> loaded = _ycShell.GetOpenSurfaces().Where(s => s.IsLoaded && s.IsComposite != true).ToList();
             _regenerateItems = RegenerateReview.BuildItems(
-                _iptResult.Surfaces,
+                current,
                 ChannelFingerprintStore.Load(_iamPath),
                 PartWriteStore.Load(_iamPath),
                 path => loaded.Any(s => s.Matches(path)));
@@ -1381,6 +1384,47 @@ namespace UnitConstructionVerifier.UI
             UpdateRegenerateReview();
             RegenerateReviewOverlay.Visibility = Visibility.Visible;
             RegenerateReviewCancelButton.Focus();
+        }
+
+        /// <summary>
+        /// Re-reads YCShell's markers from each surface open in Inventor, keeping the scanned state for any that is not.
+        /// Also refreshes the scan result and the button count.
+        /// </summary>
+        private List<SurfaceChangeState> ReadSurfaceChangesNow(IReadOnlyList<SurfaceChangeState> scanned)
+        {
+            var current = new List<SurfaceChangeState>(scanned.Count);
+            ShowBusy("Checking surfaces for channel changes…");
+            try
+            {
+                for (int i = 0; i < scanned.Count; i++)
+                {
+                    SurfaceChangeState state = scanned[i];
+                    UpdateBusy(Path.GetFileNameWithoutExtension(state.SurfaceIamPath), (double)i / scanned.Count);
+                    try
+                    {
+                        current.Add(OpenAssembly(state.SurfaceIamPath) is Inventor.AssemblyDocument doc
+                            ? Extraction.SurfaceChangeReader.Read(doc)
+                            : state);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Log(ex, $"ReadSurfaceChangesNow: {state.SurfaceIamPath}");
+                        current.Add(state);
+                    }
+                }
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            if (_iptResult is not null)
+            {
+                _iptResult.Surfaces = current;
+                UpdateRegenerateButton();
+            }
+
+            return current;
         }
 
         private void UpdateRegenerateReview()
