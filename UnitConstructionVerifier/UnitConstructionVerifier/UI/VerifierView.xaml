@@ -578,6 +578,7 @@
             <MenuItem Header="Open in Inventor" Click="OnOpenPartInInventor"/>
         </ContextMenu>
         <ContextMenu x:Key="OverflowMenu">
+            <MenuItem Header="Surface number history…" Click="OnShowSurfaceHistory"/>
             <MenuItem Header="Save snapshot for regression tests…" Click="OnSaveSnapshot"/>
         </ContextMenu>
 

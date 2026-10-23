@@ -509,6 +509,24 @@ to 8 min each, before counting the clicks.
   Surfaces uploaded despite "still needs Regenerate" keep their old record, so they still show as needing it.
 - **Dry run on SW0004's real records** (read-only): all 8 found, `-0021`→`-0048` … `-0030`→`-0055`. 204 tests pass.
 
+**Surface number history (product owner request, 2026-10-23).** A surface can be renamed on every upload, for
+example 0021 → 0048 → 0049 → 0122. UCV keeps each surface's chain in `.ucv_surface_history.json` next to the unit
+IAM (`SurfaceHistoryStore`, `SurfaceHistoryRules`).
+
+- **Recorded:**
+  - every rename UCV follows (on open, Re-check, or after Upload changed), dated when MOM's new IAM was created;
+  - every surface uploaded through Upload changed, under its number after any rename. Not twice, when the rename
+    is that same upload.
+- **Shown:**
+  - **⋯ > Surface number history…** lists every chain with dates, renamed surfaces first, and copies the list to the
+    clipboard;
+  - the Upload changed result adds the full chain for any surface renamed more than once.
+- **Damaged history:** an unreadable history file is kept aside (`.unreadable`) rather than overwritten.
+- **Limits:**
+  - a history starts at the first rename or upload UCV sees; earlier numbers aren't known;
+  - renames made while UCV was not used are picked up, with their dates, the next time the verifier opens on the
+    unit.
+
 **Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
 MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
 

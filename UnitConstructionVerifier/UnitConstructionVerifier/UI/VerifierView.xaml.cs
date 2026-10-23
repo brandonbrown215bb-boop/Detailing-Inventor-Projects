@@ -1471,6 +1471,16 @@ namespace UnitConstructionVerifier.UI
             BatchReviewConfirmButton.IsEnabled = ticked > 0;
         }
 
+        /// <summary>Every number each surface has had, renamed ones first; also copied to the clipboard.</summary>
+        private void OnShowSurfaceHistory(object sender, RoutedEventArgs e)
+        {
+            FollowRenamedSurfaces();   // pick up a rename made since the last check
+            string report = SurfaceHistoryRules.Report(SurfaceHistoryStore.Load(_iamPath));
+            try { Clipboard.SetText(report); } catch { /* clipboard busy */ }
+            Dialogs.Show(this, report + Environment.NewLine + Environment.NewLine + "(Copied to the clipboard.)", "Surface number history",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
         /// <summary>
         /// Points surface rows, saved expectations and channel records at surfaces MOM renamed on upload (the old IAM is
         /// gone; the unit now references a new IAM in the same folder). Returns old path to new.
@@ -1617,10 +1627,11 @@ namespace UnitConstructionVerifier.UI
                 return;
             }
 
+            var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             ShowBusy("Re-checking after upload…");
             try
             {
-                Dictionary<string, string> renames = FollowRenamedSurfaces();
+                renames = FollowRenamedSurfaces();
                 ReScanAndRefresh();
                 RefreshChannelRecordsAfterUpload(withoutChannelWork, renames);
             }
@@ -1646,6 +1657,33 @@ namespace UnitConstructionVerifier.UI
             string result = UploadReview.Result(surfaces, File.Exists,
                 path => now.TryGetValue(path.Trim(), out SurfaceChangeState? state) ? SurfaceChangeRules.Upload(state) : null,
                 unitReferences);
+
+            // Note each surface that went up (under its number after any rename) in the surface number history.
+            try
+            {
+                List<string> uploaded = surfaces
+                    .Select(s => renames.TryGetValue(s.Trim(), out string? renamed) ? renamed : s)
+                    .Where(p => File.Exists(p) && !(now.TryGetValue(p.Trim(), out SurfaceChangeState? state) && SurfaceChangeRules.Upload(state).Needed))
+                    .ToList();
+                SurfaceHistoryStore.RecordUploads(_iamPath, uploaded);
+
+                List<SurfaceHistory> histories = SurfaceHistoryStore.Load(_iamPath);
+                List<string> chains = renames.Values
+                    .Select(p => histories.LastOrDefault(h => string.Equals(h.Current?.IamPath, p, StringComparison.OrdinalIgnoreCase)))
+                    .OfType<SurfaceHistory>()
+                    .Where(h => h.Entries.Count(e => e.Event == SurfaceHistory.Renamed) > 1)
+                    .Select(h => "   " + h.NumberChain())
+                    .ToList();
+                if (chains.Count > 0)
+                {
+                    result += Environment.NewLine + Environment.NewLine + "Renamed before (full history under ⋯ > Surface number history):" +
+                              Environment.NewLine + string.Join(Environment.NewLine, chains);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: history");
+            }
 
             DebugLogger.Log("Upload changed result:" + Environment.NewLine + result);
             ShowNotice(result.Split('\n')[0].Trim());

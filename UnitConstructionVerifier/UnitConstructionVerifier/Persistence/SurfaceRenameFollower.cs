@@ -28,6 +28,8 @@ namespace UnitConstructionVerifier.Persistence
 
             PersistenceManager.RenameSurfaces(unitIamPath, renames);
             ChannelFingerprintStore.RenameSurfaces(unitIamPath, renames);
+            try { SurfaceHistoryStore.RecordRenames(unitIamPath, renames); }
+            catch (Exception ex) { DebugLogger.Log(ex, "SurfaceRenameFollower: history"); }
             DebugLogger.Log("Followed renamed surfaces: " + string.Join(", ", renames.Select(r => $"{Path.GetFileName(r.Key)} -> {Path.GetFileName(r.Value)}")));
             return renames;
         }
