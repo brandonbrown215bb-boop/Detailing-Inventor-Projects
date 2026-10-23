@@ -46,6 +46,32 @@ window. The window **never uploads**, and it only regenerates surfaces whose pat
 5. Optional: regenerate a larger one (0074, 8 changed parts) for a second timing.
 6. Regenerated surfaces are already saved by YCShell. That is fine here, because this is the copy.
 
+## Regenerate changed (step 2)
+
+Branch `ucv/batch-regenerate-upload`. Build and deploy it as above, then open the spike copy's `FINAL.IAM`.
+
+1. Open the verifier (**Verify & Edit Specs**) and let it scan. The footer shows **Regenerate changed (N)…**.
+   - [ ] Without records, expect about 7: 0019 and 0055 (spike leftovers), plus 0073, 0074, 0078 and 0080 ("can't
+     tell", orange). Surfaces with only skin, liner or subfloor changes must not be ticked.
+2. Press it.
+   - [ ] The review panel lists every surface with its reason; ticks and colours as above.
+   - [ ] Untick all but **two small surfaces** for the first run (for example 0019 and 0055).
+3. Press **Regenerate 2 surfaces**.
+   - [ ] A small "Regenerating channel features" window appears top-right, above Inventor, with **Stop after this
+     surface**.
+   - [ ] YCShell's own progress shows for each surface.
+   - [ ] The "Channel Features have been recreated/replaced" box closes by itself.
+   - [ ] Any Yes/No question waits for you.
+4. At the end:
+   - [ ] The summary lists both surfaces with times.
+   - [ ] The unit is re-checked.
+   - [ ] The button count drops: those surfaces now have channel records (`.ucv_channel_fingerprints.json` next to
+     FINAL).
+5. **Stop test:** run again with three or more surfaces ticked and press Stop during the first.
+   - [ ] The first finishes; the rest are listed as "Not run (stopped)".
+6. **Pattern test:** pattern a channel on a regenerated surface, then Re-check unit.
+   - [ ] That surface needs Regenerate again: "channel added: …".
+
 ## Send back
 
 - The `ycshell_spike_*.txt` log.

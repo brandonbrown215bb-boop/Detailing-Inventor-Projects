@@ -24,6 +24,8 @@ namespace UnitConstructionVerifier.UI
         private readonly Inventor.Application _inventorApp;
         private readonly Dictionary<string, StagedEdit> _pendingEdits = new Dictionary<string, StagedEdit>(StringComparer.OrdinalIgnoreCase);
         private List<WriteReviewItem> _reviewItems = new List<WriteReviewItem>();
+        private List<RegenerateReviewItem> _regenerateItems = new List<RegenerateReviewItem>();
+        private YcShellBridge? _ycShell;
         private byte _xRayColorR = XRayHighlightColors.Default.R;
         private byte _xRayColorG = XRayHighlightColors.Default.G;
         private byte _xRayColorB = XRayHighlightColors.Default.B;
@@ -272,6 +274,7 @@ namespace UnitConstructionVerifier.UI
         {
             _iptResult = iptResult;
             RefreshUnitStatus();
+            UpdateRegenerateButton();
         }
 
         public void SetSnapshot(UnitSnapshot snapshot)
@@ -1320,6 +1323,164 @@ namespace UnitConstructionVerifier.UI
             Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
         }
 
+        // ── Regenerate changed (Docs/batch_regenerate_upload_plan.md) ──────────
+
+        /// <summary>Shows how many surfaces need Regenerate, from the last scan and UCV's own records.</summary>
+        private void UpdateRegenerateButton()
+        {
+            try
+            {
+                int needed = _iptResult is null || string.IsNullOrEmpty(_iamPath) ? 0
+                    : RegenerateReview.CountNeeded(_iptResult.Surfaces, ChannelFingerprintStore.Load(_iamPath), PartWriteStore.Load(_iamPath));
+                RegenerateChangedButton.Content = needed > 0 ? $"Regenerate changed ({needed})…" : "Regenerate changed…";
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.UpdateRegenerateButton");
+            }
+        }
+
+        private void OnRegenerateChanged(object sender, RoutedEventArgs e)
+        {
+            if (_iptResult is null || _iptResult.Surfaces.Count == 0)
+            {
+                ShowNotice("Re-check the unit first: there is no surface scan to decide from.");
+                return;
+            }
+
+            if (_pendingEdits.Count > 0)
+            {
+                Dialogs.Show(this, "Write or discard the staged part changes first. Regenerate replaces channel parts, so staged edits could land on the wrong files.",
+                    "Regenerate changed", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var trace = new List<string>();
+            _ycShell = YcShellBridge.Connect(_inventorApp, trace, out string problem, out IReadOnlyList<MemberCheck> checks);
+            if (_ycShell is null)
+            {
+                DebugLogger.Log("Regenerate changed: YCShell not reached. " + problem + Environment.NewLine +
+                                string.Join(Environment.NewLine, trace) + Environment.NewLine + string.Join(Environment.NewLine, checks));
+                Dialogs.Show(this, $"{problem}\n\nRegenerate changed needs the JCI MOM (YCShell) add-in loaded and logged in. Details are in the UCV debug log.",
+                    "Regenerate changed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            IReadOnlyList<YcSurface> loaded = _ycShell.GetOpenSurfaces().Where(s => s.IsLoaded && s.IsComposite != true).ToList();
+            _regenerateItems = RegenerateReview.BuildItems(
+                _iptResult.Surfaces,
+                ChannelFingerprintStore.Load(_iamPath),
+                PartWriteStore.Load(_iamPath),
+                path => loaded.Any(s => s.Matches(path)));
+            foreach (RegenerateReviewItem item in _regenerateItems)
+            {
+                item.PropertyChanged += (_, __) => UpdateRegenerateReview();
+            }
+
+            RegenerateReviewList.ItemsSource = _regenerateItems;
+            UpdateRegenerateReview();
+            RegenerateReviewOverlay.Visibility = Visibility.Visible;
+            RegenerateReviewCancelButton.Focus();
+        }
+
+        private void UpdateRegenerateReview()
+        {
+            int ticked = _regenerateItems.Count(i => i.IsIncluded);
+            RegenerateReviewSummary.Text = RegenerateReview.Summary(_regenerateItems);
+            RegenerateReviewConfirmButton.Content = ticked == 0 ? "Regenerate" : $"Regenerate {WriteReview.Plural(ticked, "surface")}";
+            RegenerateReviewConfirmButton.IsEnabled = ticked > 0;
+        }
+
+        private void CloseRegenerateReview()
+        {
+            RegenerateReviewOverlay.Visibility = Visibility.Collapsed;
+            RegenerateReviewList.ItemsSource = null;
+        }
+
+        private void OnRegenerateReviewCancel(object sender, RoutedEventArgs e) => CloseRegenerateReview();
+
+        private void OnRegenerateReviewConfirm(object sender, RoutedEventArgs e)
+        {
+            List<string> surfaces = _regenerateItems.Where(i => i.IsIncluded).Select(i => i.SurfaceIamPath).ToList();
+            bool autoClose = RegenerateAutoCloseCheck.IsChecked == true;
+            CloseRegenerateReview();
+            if (surfaces.Count > 0 && _ycShell is not null) RunRegenerateBatch(_ycShell, surfaces, autoClose);
+        }
+
+        private void RunRegenerateBatch(YcShellBridge bridge, List<string> surfaces, bool autoClose)
+        {
+            IReadOnlyList<RegenerateOutcome> outcomes;
+            using (var watcher = new YcShellMessageWatcher { AutoClose = autoClose })
+            {
+                var runner = new RegenerateBatchRunner(
+                    new YcShellSurfaceRegenerator(bridge),
+                    watcher,
+                    SkipReason,
+                    RecordChannelFingerprint);
+
+                BatchProgressWindow? progress = null;
+                ShowBusy("Regenerating channel features…");
+                try
+                {
+                    progress = BatchProgressWindow.Open("Regenerating channel features");
+                    outcomes = runner.Run(surfaces, () => progress.StopRequested, (n, total, surface) =>
+                    {
+                        string text = $"{n} of {total}: {Path.GetFileNameWithoutExtension(surface)}";
+                        progress.Update(text, (n - 1.0) / total);
+                        UpdateBusy(text, (n - 1.0) / total);
+                    });
+
+                    UpdateBusy($"Re-checking {Path.GetFileName(_iamPath)}…", 1);
+                    ReScanAndRefresh();
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Log(ex, "VerifierView.RunRegenerateBatch");
+                    Dialogs.Show(this, $"Regenerate changed stopped: {ex.Message}", "Regenerate changed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                finally
+                {
+                    progress?.Close();
+                    BusyOverlay.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            string summary = RegenerateBatchSummary.Text(outcomes);
+            DebugLogger.Log("Regenerate changed summary:" + Environment.NewLine + summary);
+            ShowNotice(RegenerateBatchSummary.Headline(outcomes));
+            Dialogs.Show(this, summary, "Regenerate changed", MessageBoxButton.OK,
+                outcomes.All(o => o.Succeeded) ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        /// <summary>YCShell refuses surfaces with suppressed parts; skip them here rather than leave the batch waiting on its dialog.</summary>
+        private string? SkipReason(string surfaceIamPath)
+        {
+            Inventor.AssemblyDocument? surface = OpenAssembly(surfaceIamPath);
+            if (surface is null) return "not open in Inventor";
+
+            foreach (Inventor.ComponentOccurrence occ in surface.ComponentDefinition.Occurrences)
+            {
+                if (occ.Suppressed) return "has suppressed parts; unsuppress them and run Regenerate on this surface by hand";
+            }
+
+            return null;
+        }
+
+        /// <summary>Records the surface's channels so the next run knows it is done until a channel changes again.</summary>
+        private void RecordChannelFingerprint(string surfaceIamPath)
+        {
+            if (OpenAssembly(surfaceIamPath) is not Inventor.AssemblyDocument surface) return;
+            SurfaceChangeState state = Extraction.SurfaceChangeReader.Read(surface);
+            ChannelFingerprintStore.Record(_iamPath, ChannelFingerprint.From(state, DateTime.UtcNow));
+        }
+
+        private Inventor.AssemblyDocument? OpenAssembly(string path)
+        {
+            try { return _inventorApp.Documents.get_ItemByName(path) as Inventor.AssemblyDocument; }
+            catch { return null; }
+        }
+
         // ── Text Normalization & Format Utilities ──────────────────────────────
 
         private static string Normalize(string s)
@@ -2102,7 +2263,7 @@ namespace UnitConstructionVerifier.UI
 
             if (e.Key == Key.F8 && modifiers == ModifierKeys.None)
             {
-                if (WriteReviewOverlay.Visibility != Visibility.Visible) GoToNextIssue();
+                if (WriteReviewOverlay.Visibility != Visibility.Visible && RegenerateReviewOverlay.Visibility != Visibility.Visible) GoToNextIssue();
                 e.Handled = true;
             }
             else if (modifiers == ModifierKeys.Control && e.Key == Key.C && !inText)
