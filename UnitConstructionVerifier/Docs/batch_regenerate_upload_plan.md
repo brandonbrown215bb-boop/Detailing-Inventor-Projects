@@ -456,6 +456,17 @@ serves both batches.
 Tests: upload window call shape (YCShell's own `List<CAssembly>`, instance, part list, delegate, `m_InUpload` during
 and after, failure path), YCShell's hole test, the upload review and the after-upload result. 197 pass.
 
+**Field test on a second assembly (2026-10-23):** Regenerate on a base surface stopped on YCShell's "Regenerating
+Features is only supported for Wall and Indoor Roof surfaces" (an OK box UCV does not close, as its wording is
+unknown). **Fixed:** base surfaces (UCV's base rows) are left out of Regenerate changed and its count, and never carry
+"still needs Regenerate" on Upload.
+
+**YCShell's upload window is multi-surface by design:** `CFrmUploadChanges.Start` takes a list. `DoLoad` /
+`DoUpload` loop every assembly, and the composite-relink step exists for exactly this case. Only the Upload button
+narrows it to the active surface. A TODO there calls the single-item list "an artifact from when we'd allow
+uploading from all tabs". UCV reuses that older capability. The multi-surface and relink paths are not exercised by
+YCShell's button today, so the first uploads should be watched closely.
+
 **Open, needs the product owner:** an upload really writes to MOM / MAPICS. Before the first real press: agree which
 MOM environment the spike copy may upload to (question 2, second half: does passing FINAL relink a renamed surface).
 

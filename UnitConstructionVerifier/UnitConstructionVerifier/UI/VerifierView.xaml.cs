@@ -1334,7 +1334,7 @@ namespace UnitConstructionVerifier.UI
             try
             {
                 bool scanned = _iptResult is not null && !string.IsNullOrEmpty(_iamPath);
-                int regenerate = scanned ? RegenerateReview.CountNeeded(_iptResult!.Surfaces, ChannelFingerprintStore.Load(_iamPath), PartWriteStore.Load(_iamPath)) : 0;
+                int regenerate = scanned ? RegenerateReview.CountNeeded(_iptResult!.Surfaces, ChannelFingerprintStore.Load(_iamPath), PartWriteStore.Load(_iamPath), CanRegenerate) : 0;
                 int upload = scanned ? UploadReview.CountNeeded(_iptResult!.Surfaces) : 0;
                 RegenerateChangedButton.Content = regenerate > 0 ? $"Regenerate changed ({regenerate})…" : "Regenerate changed…";
                 UploadChangedButton.Content = upload > 0 ? $"Upload changed ({upload})…" : "Upload changed…";
@@ -1388,8 +1388,8 @@ namespace UnitConstructionVerifier.UI
 
             _batchKind = kind;
             _batchItems = kind == BatchKind.Regenerate
-                ? RegenerateReview.BuildItems(current, fingerprints, partWrites, canRun)
-                : UploadReview.BuildItems(current, fingerprints, partWrites, canRun);
+                ? RegenerateReview.BuildItems(current, fingerprints, partWrites, canRun, CanRegenerate)
+                : UploadReview.BuildItems(current, fingerprints, partWrites, canRun, CanRegenerate);
             foreach (SurfaceReviewItem item in _batchItems)
             {
                 item.PropertyChanged += (_, __) => UpdateBatchReview();
@@ -1457,6 +1457,13 @@ namespace UnitConstructionVerifier.UI
             BatchReviewConfirmButton.Content = ticked == 0 ? verb : $"{verb} {WriteReview.Plural(ticked, "surface")}";
             BatchReviewConfirmButton.IsEnabled = ticked > 0;
         }
+
+        /// <summary>
+        /// YCShell regenerates only walls and roofs ("Regenerating Features is only supported for Wall and Indoor Roof
+        /// surfaces"), so base surfaces are left out of Regenerate changed (field test, 2026-10-23).
+        /// </summary>
+        private bool CanRegenerate(string surfaceIamPath) =>
+            !_data.BaseRows.Any(r => string.Equals(r.SourceSurfaceIam?.Trim(), surfaceIamPath.Trim(), StringComparison.OrdinalIgnoreCase));
 
         /// <summary>The unit IAM's file name when YCShell has it loaded as a composite (it goes along with uploads).</summary>
         private string? UnitCompositeName() =>

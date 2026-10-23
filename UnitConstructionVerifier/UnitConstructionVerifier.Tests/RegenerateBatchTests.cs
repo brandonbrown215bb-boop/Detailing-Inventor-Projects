@@ -179,6 +179,28 @@ namespace UnitConstructionVerifier.Tests
         }
 
         [Test]
+        public void Bases_Are_Left_Out_Of_Regenerate_But_Still_Uploaded()
+        {
+            // YCShell: "Regenerating Features is only supported for Wall and Indoor Roof surfaces".
+            var surfaces = new[]
+            {
+                Surface(@"C:\U\0019\0019.IAM", patternedChannel: true),
+                Surface(@"C:\U\0025\391Z010216-0025.IAM", patternedChannel: true),   // a base
+            };
+            var none = new Dictionary<string, ChannelFingerprint>();
+            var noWrites = new Dictionary<string, PartWriteRecord>();
+            Func<string, bool> notBase = path => !path.EndsWith("391Z010216-0025.IAM");
+
+            CollectionAssert.AreEqual(new[] { "0019" }, RegenerateReview.BuildItems(surfaces, none, noWrites, null, notBase).Select(i => i.SurfaceName));
+            Assert.AreEqual(1, RegenerateReview.CountNeeded(surfaces, none, noWrites, notBase));
+
+            List<SurfaceReviewItem> upload = UploadReview.BuildItems(surfaces, none, noWrites, null, notBase);
+            SurfaceReviewItem baseItem = upload.Single(i => i.SurfaceName == "391Z010216-0025");
+            Assert.IsTrue(baseItem.IsIncluded);
+            Assert.AreEqual(string.Empty, baseItem.Warning, "no 'still needs Regenerate' on a base");
+        }
+
+        [Test]
         public void Upload_Result_Says_What_Happened_To_Each_Surface()
         {
             var sent = new[] { @"C:\U\0003\0003.IAM", @"C:\U\0068\0068.IAM", @"C:\U\0074\0074.IAM" };

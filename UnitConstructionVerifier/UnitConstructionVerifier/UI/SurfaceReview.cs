@@ -64,18 +64,22 @@ namespace UnitConstructionVerifier.UI
     public static class RegenerateReview
     {
         /// <summary>
-        /// Every scanned surface with its Regenerate decision, needed ones first. <paramref name="loadedInYcShell"/> says
-        /// whether YCShell can run a surface; null when YCShell has not been reached yet.
+        /// Every scanned surface YCShell can regenerate, with its Regenerate decision, needed ones first.
+        /// <paramref name="loadedInYcShell"/> says whether YCShell can run a surface; null when YCShell has not been
+        /// reached yet. <paramref name="canRegenerate"/> leaves out surfaces YCShell refuses (bases: it regenerates only
+        /// walls and roofs).
         /// </summary>
         public static List<SurfaceReviewItem> BuildItems(
             IEnumerable<SurfaceChangeState> surfaces,
             IReadOnlyDictionary<string, ChannelFingerprint> fingerprints,
             IReadOnlyDictionary<string, PartWriteRecord> partWrites,
-            Func<string, bool>? loadedInYcShell)
+            Func<string, bool>? loadedInYcShell,
+            Func<string, bool>? canRegenerate = null)
         {
             return surfaces
                 .GroupBy(s => s.SurfaceIamPath.Trim(), StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
+                .Where(s => canRegenerate?.Invoke(s.SurfaceIamPath) ?? true)
                 .Select(s =>
                 {
                     fingerprints.TryGetValue(s.SurfaceIamPath.Trim(), out ChannelFingerprint? fingerprint);
@@ -91,8 +95,9 @@ namespace UnitConstructionVerifier.UI
         public static int CountNeeded(
             IEnumerable<SurfaceChangeState> surfaces,
             IReadOnlyDictionary<string, ChannelFingerprint> fingerprints,
-            IReadOnlyDictionary<string, PartWriteRecord> partWrites) =>
-            BuildItems(surfaces, fingerprints, partWrites, null).Count(i => i.Needed);
+            IReadOnlyDictionary<string, PartWriteRecord> partWrites,
+            Func<string, bool>? canRegenerate = null) =>
+            BuildItems(surfaces, fingerprints, partWrites, null, canRegenerate).Count(i => i.Needed);
 
         public static string Summary(IReadOnlyList<SurfaceReviewItem> items)
         {
@@ -119,7 +124,8 @@ namespace UnitConstructionVerifier.UI
             IEnumerable<SurfaceChangeState> surfaces,
             IReadOnlyDictionary<string, ChannelFingerprint> fingerprints,
             IReadOnlyDictionary<string, PartWriteRecord> partWrites,
-            Func<string, bool>? loadedInYcShell)
+            Func<string, bool>? loadedInYcShell,
+            Func<string, bool>? canRegenerate = null)
         {
             return surfaces
                 .GroupBy(s => s.SurfaceIamPath.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -127,7 +133,8 @@ namespace UnitConstructionVerifier.UI
                 .Select(s =>
                 {
                     fingerprints.TryGetValue(s.SurfaceIamPath.Trim(), out ChannelFingerprint? fingerprint);
-                    bool needsRegenerate = SurfaceChangeRules.Regenerate(s, fingerprint, partWrites).Needed;
+                    bool needsRegenerate = (canRegenerate?.Invoke(s.SurfaceIamPath) ?? true) &&
+                                           SurfaceChangeRules.Regenerate(s, fingerprint, partWrites).Needed;
                     return new SurfaceReviewItem(s.SurfaceIamPath, SurfaceChangeRules.Upload(s),
                         loadedInYcShell?.Invoke(s.SurfaceIamPath) ?? true, "not loaded by YCShell",
                         needsRegenerate ? NeedsRegenerate : string.Empty);
