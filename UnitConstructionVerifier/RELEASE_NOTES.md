@@ -2,6 +2,19 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.33.0 (2026-10-27) — cuts go through after a gauge change
+
+- **Fixed: cutouts stopped halfway through after a gauge change.** YCShell's cuts (orientation holes, skin
+  openings) are cut both ways from the sheet's face, so only half the cut distance goes into the sheet. UCV linked
+  them to `Thickness`, which reaches halfway. Seen on SW0004 surface 0055: liners 0441 and 0442 (files
+  `0251.IPT`, `0252.IPT`) cut 0.014" into a 0.028" sheet.
+  - Cuts that went through the old sheet are now linked to `Thickness * 2 ul` (both ways) or `Thickness` (one way,
+    and holes). Cuts that never went through are left alone, and so are cuts that still go through.
+  - Writing a part with UCV repairs cuts linked the old way, even if its thickness doesn't change.
+  - Parts already written are not repaired until UCV writes them again. Their cut shows in the model as stopping
+    partway through the sheet.
+  - One failing feature no longer stops the rest from being adjusted; it is logged instead.
+
 ## v1.0.32.0 (2026-10-27) — simpler Thickness Inspector
 
 - The hover tooltip is now two lines: gauge and material (as the parts grid words them) and the recorded thickness.
