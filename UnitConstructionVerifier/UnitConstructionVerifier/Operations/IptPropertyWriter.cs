@@ -446,11 +446,14 @@ namespace UnitConstructionVerifier.Operations
                         }
 
                         Parameter? thicknessParam = TryGetSheetMetalThicknessParameter(smDef, name);
-                        if (thicknessParam != null &&
-                            TrySetParameterValueCm(thicknessParam, cmValue, out double oldCmValue))
+                        if (thicknessParam != null)
                         {
-                            AdjustCutFeatureExtents(doc, oldCmValue, cmValue);
-                            return true;
+                            bool changed = TrySetParameterValueCm(thicknessParam, cmValue, out double oldCmValue);
+
+                            // Also when the thickness is unchanged: repairs cuts an earlier write left halfway.
+                            if (oldCmValue > 0)
+                                changed |= AdjustCutFeatureExtents(doc, oldCmValue, cmValue);
+                            return changed;
                         }
                     }
                 }
@@ -519,60 +522,50 @@ namespace UnitConstructionVerifier.Operations
             }
         }
 
-        private void AdjustCutFeatureExtents(PartDocument doc, double oldCmValue, double newCmValue)
+        /// <summary>Keeps cuts that went through the old sheet going through the new one. See <see cref="CutDepthRule"/>.</summary>
+        private static bool AdjustCutFeatureExtents(PartDocument doc, double oldCmValue, double newCmValue)
         {
-            try
+            bool changed = false;
+            foreach (PartFeature feature in doc.ComponentDefinition.Features)
             {
-                PartComponentDefinition compDef = doc.ComponentDefinition;
-                foreach (PartFeature feature in compDef.Features)
+                // One feature failing must not stop the rest.
+                try
                 {
-                    bool isCut = false;
+                    if (!TryGetCutDistance(feature, out Parameter distance, out bool symmetric)) continue;
 
-                    if (feature is ExtrudeFeature extrude)
-                    {
-                        isCut = (extrude.Operation == PartFeatureOperationEnum.kCutOperation);
-                    }
-                    else if (feature is HoleFeature hole)
-                    {
-                        isCut = (hole.ExtentType != PartFeatureExtentEnum.kThroughAllExtent);
-                    }
-                    else if (feature is CutFeature)
-                    {
-                        isCut = true;
-                    }
+                    string? expression = CutDepthRule.NewExpression(
+                        symmetric, distance.Expression, Convert.ToDouble(distance.Value), oldCmValue, newCmValue);
+                    if (expression == null) continue;
 
-                    if (isCut)
-                    {
-                        foreach (Parameter p in feature.Parameters)
-                        {
-                            double currentVal = 0;
-                            if (p.Value is double dVal)
-                            {
-                                currentVal = dVal;
-                            }
-                            else
-                            {
-                                currentVal = Convert.ToDouble(p.Value);
-                            }
-
-                            // If the cut depth matches the old thickness, adjust it
-                            if (Math.Abs(currentVal - oldCmValue) < 0.001)
-                            {
-                                try
-                                {
-                                    // Try making it fully parametric using the "Thickness" parameter
-                                    p.Expression = "Thickness";
-                                }
-                                catch
-                                {
-                                    p.Value = newCmValue;
-                                }
-                            }
-                        }
-                    }
+                    distance.Expression = expression;
+                    changed = true;
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Log(ex, $"AdjustCutFeatureExtents: {doc.FullFileName} {feature.Name}");
                 }
             }
-            catch {}
+            return changed;
+        }
+
+        /// <summary>The distance of a cut, extruded cut or hole with a distance extent; false for any other feature.</summary>
+        private static bool TryGetCutDistance(PartFeature feature, out Parameter distance, out bool symmetric)
+        {
+            distance = null!;
+            symmetric = false;
+
+            object? extent = feature switch
+            {
+                CutFeature cut => cut.Definition.Extent,
+                ExtrudeFeature extrude when extrude.Operation == PartFeatureOperationEnum.kCutOperation => extrude.Definition.Extent,
+                HoleFeature hole => hole.Extent,
+                _ => null,
+            };
+            if (!(extent is DistanceExtent distanceExtent)) return false;
+
+            distance = distanceExtent.Distance;
+            symmetric = distanceExtent.Direction == PartFeatureExtentDirectionEnum.kSymmetricExtentDirection;
+            return true;
         }
 
         private bool SyncPhysicalMaterial(PartDocument doc, string ycmAtlVal)
