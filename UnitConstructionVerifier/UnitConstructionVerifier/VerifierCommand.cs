@@ -300,6 +300,22 @@ namespace UnitConstructionVerifier
                     Ipt           = iptResult,
                 };
 
+                // Saved expectations are keyed by surface part number (the file name); move them to surfaces MOM renamed
+                // on upload before merging, or they would no longer match the freshly built rows.
+                try
+                {
+                    var references = new System.Collections.Generic.List<string>();
+                    foreach (Inventor.Document doc in asmDoc.AllReferencedDocuments)
+                    {
+                        if (doc.DocumentType == Inventor.DocumentTypeEnum.kAssemblyDocumentObject) references.Add(doc.FullFileName);
+                    }
+                    SurfaceRenameFollower.Follow(iamPath, Array.Empty<string>(), references);
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Log(ex, "VerifierCommand: following renamed surfaces");
+                }
+
                 // Load any previously saved overrides
                 DebugLogger.Log($"Loading overrides for {iamPath}");
                 PersistenceManager.LoadOverrides(iamPath, data);

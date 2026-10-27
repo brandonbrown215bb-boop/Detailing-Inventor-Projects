@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using UnitConstructionVerifier.Models;
@@ -31,6 +32,29 @@ namespace UnitConstructionVerifier.Persistence
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[UCV] PersistenceManager.Save: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Moves saved expectations to surfaces MOM renamed (rows are matched by part number, the file name), so they
+        /// stay with their surface. Only renames keys; no expectation changes. Returns true when the sidecar changed.
+        /// </summary>
+        public static bool RenameSurfaces(string iamPath, IReadOnlyDictionary<string, string> renames)
+        {
+            string path = GetSidecarPath(iamPath);
+            if (renames.Count == 0 || !File.Exists(path)) return false;
+
+            try
+            {
+                var saved = JsonConvert.DeserializeObject<UnitConstructionData>(File.ReadAllText(path, System.Text.Encoding.UTF8));
+                if (saved is null || SurfaceRenames.Apply(saved, renames) == 0) return false;
+                File.WriteAllText(path, JsonConvert.SerializeObject(saved, Formatting.Indented), System.Text.Encoding.UTF8);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, $"PersistenceManager.RenameSurfaces: {path}");
+                return false;
             }
         }
 

@@ -18,6 +18,7 @@ namespace UnitConstructionVerifier.Extraction
 
             // Determine if the root document itself is a Surface IAM
             string initialOwner = HasConfigJson(rootDoc) ? rootDoc.FullFileName : string.Empty;
+            if (initialOwner.Length > 0) ReadSurfaceChanges(rootDoc, result);
 
             ScanOccurrences(rootDoc.ComponentDefinition.Occurrences, initialOwner, result, visited);
             return result;
@@ -48,7 +49,9 @@ namespace UnitConstructionVerifier.Extraction
                     {
                         // If the subassembly has a CONFIG_JSON, it defines its own surface boundary.
                         // Otherwise, it inherits the parent surface owner.
-                        string nextOwner = HasConfigJson(subAsm) ? filePath : ownerIamPath;
+                        bool isSurface = HasConfigJson(subAsm);
+                        string nextOwner = isSurface ? filePath : ownerIamPath;
+                        if (isSurface) ReadSurfaceChanges(subAsm, result);
 
                         ScanOccurrences(
                             subAsm.ComponentDefinition.Occurrences,
@@ -59,6 +62,12 @@ namespace UnitConstructionVerifier.Extraction
                 }
                 catch { /* skip inaccessible references */ }
             }
+        }
+
+        private static void ReadSurfaceChanges(AssemblyDocument surface, IptScanResult result)
+        {
+            try { result.Surfaces.Add(SurfaceChangeReader.Read(surface)); }
+            catch (Exception ex) { DebugLogger.Log(ex, $"IptPropertyReader.ReadSurfaceChanges: {surface.FullFileName}"); }
         }
 
         private static IptProperties ReadPartProperties(PartDocument doc, string ownerIamPath)

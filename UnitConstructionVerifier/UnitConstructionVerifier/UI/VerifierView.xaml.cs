@@ -24,6 +24,9 @@ namespace UnitConstructionVerifier.UI
         private readonly Inventor.Application _inventorApp;
         private readonly Dictionary<string, StagedEdit> _pendingEdits = new Dictionary<string, StagedEdit>(StringComparer.OrdinalIgnoreCase);
         private List<WriteReviewItem> _reviewItems = new List<WriteReviewItem>();
+        private List<SurfaceReviewItem> _batchItems = new List<SurfaceReviewItem>();
+        private BatchKind _batchKind;
+        private YcShellBridge? _ycShell;
         private byte _xRayColorR = XRayHighlightColors.Default.R;
         private byte _xRayColorG = XRayHighlightColors.Default.G;
         private byte _xRayColorB = XRayHighlightColors.Default.B;
@@ -272,6 +275,7 @@ namespace UnitConstructionVerifier.UI
         {
             _iptResult = iptResult;
             RefreshUnitStatus();
+            UpdateBatchButtons();
         }
 
         public void SetSnapshot(UnitSnapshot snapshot)
@@ -774,6 +778,19 @@ namespace UnitConstructionVerifier.UI
 
         private void OnVerify(object sender, RoutedEventArgs e)
         {
+            // Re-read the unit from Inventor first: surfaces may have been renamed by an upload, and parts changed.
+            ShowBusy($"Re-checking {Path.GetFileName(_iamPath)}…");
+            try
+            {
+                UpdateBusy("Reading the unit from Inventor", 0.1);
+                FollowRenamedSurfaces();
+                ReScanAndRefresh();
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
             RefreshUnitStatus();
             UnitStatus status = _statusBoard.Status;
 
@@ -1180,6 +1197,7 @@ namespace UnitConstructionVerifier.UI
             var writer = new Operations.IptPropertyWriter(_inventorApp);
             int successCount = 0;
             var errorList = new List<string>();
+            var partWrites = new List<PartWriteRecord>();
 
             int fileNumber = 0;
             ShowBusy("Writing part changes…");
@@ -1198,6 +1216,7 @@ namespace UnitConstructionVerifier.UI
                     if (writer.UpdatePartProperties(filePath, edits, out string err))
                     {
                         successCount++;
+                        if (writer.LastWrite is PartWriteRecord write) partWrites.Add(write);
                     }
                     else
                     {
@@ -1228,6 +1247,10 @@ namespace UnitConstructionVerifier.UI
                         trans.End();
                         trans = null;
                     }
+
+                    // Lets Regenerate changed tell these gauge / material edits from channel reshapes.
+                    try { PartWriteStore.Record(_iamPath, partWrites); }
+                    catch (Exception ex) { DebugLogger.Log(ex, "VerifierView: recording part writes"); }
 
                     foreach (WriteReviewItem item in included)
                     {
@@ -1312,6 +1335,433 @@ namespace UnitConstructionVerifier.UI
             BusyProgress.Value = fraction;
             // Render runs above Background priority, so this returns after the panel has been redrawn.
             Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+        }
+
+        // ── Regenerate / Upload changed (Docs/batch_regenerate_upload_plan.md) ─
+
+        private enum BatchKind { Regenerate, Upload }
+
+        /// <summary>Shows how many surfaces need Regenerate / Upload, from the last scan and UCV's own records.</summary>
+        private void UpdateBatchButtons()
+        {
+            try
+            {
+                bool scanned = _iptResult is not null && !string.IsNullOrEmpty(_iamPath);
+                int regenerate = scanned ? RegenerateReview.CountNeeded(_iptResult!.Surfaces, ChannelFingerprintStore.Load(_iamPath), PartWriteStore.Load(_iamPath), CanRegenerate) : 0;
+                int upload = scanned ? UploadReview.CountNeeded(_iptResult!.Surfaces) : 0;
+                RegenerateChangedButton.Content = regenerate > 0 ? $"Regenerate changed ({regenerate})…" : "Regenerate changed…";
+                UploadChangedButton.Content = upload > 0 ? $"Upload changed ({upload})…" : "Upload changed…";
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.UpdateBatchButtons");
+            }
+        }
+
+        private void OnRegenerateChanged(object sender, RoutedEventArgs e) => OpenBatchReview(BatchKind.Regenerate);
+
+        private void OnUploadChanged(object sender, RoutedEventArgs e) => OpenBatchReview(BatchKind.Upload);
+
+        private void OpenBatchReview(BatchKind kind)
+        {
+            string title = kind == BatchKind.Regenerate ? "Regenerate changed" : "Upload changed";
+            if (_iptResult is null || _iptResult.Surfaces.Count == 0)
+            {
+                ShowNotice("Re-check the unit first: there is no surface scan to decide from.");
+                return;
+            }
+
+            if (_pendingEdits.Count > 0)
+            {
+                Dialogs.Show(this, kind == BatchKind.Regenerate
+                        ? "Write or discard the staged part changes first. Regenerate replaces channel parts, so staged edits could land on the wrong files."
+                        : "Write or discard the staged part changes first, so the upload carries them.",
+                    title, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var trace = new List<string>();
+            _ycShell = YcShellBridge.Connect(_inventorApp, trace, out string problem, out IReadOnlyList<MemberCheck> checks);
+            if (_ycShell is null)
+            {
+                DebugLogger.Log($"{title}: YCShell not reached. " + problem + Environment.NewLine +
+                                string.Join(Environment.NewLine, trace) + Environment.NewLine + string.Join(Environment.NewLine, checks));
+                Dialogs.Show(this, $"{problem}\n\n{title} needs the JCI MOM (YCShell) add-in loaded and logged in. Details are in the UCV debug log.",
+                    title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // The scan can be stale: channels patterned since the last Re-check would be missed (field test, 2026-10-23).
+            List<SurfaceChangeState> current = ReadSurfaceChangesNow(_iptResult.Surfaces);
+
+            IReadOnlyList<YcSurface> loaded = _ycShell.GetOpenSurfaces().Where(s => s.IsLoaded && s.IsComposite != true).ToList();
+            Func<string, bool> canRun = path => loaded.Any(s => s.Matches(path));
+            var fingerprints = ChannelFingerprintStore.Load(_iamPath);
+            var partWrites = PartWriteStore.Load(_iamPath);
+
+            _batchKind = kind;
+            _batchItems = kind == BatchKind.Regenerate
+                ? RegenerateReview.BuildItems(current, fingerprints, partWrites, canRun, CanRegenerate)
+                : UploadReview.BuildItems(current, fingerprints, partWrites, canRun, CanRegenerate);
+            foreach (SurfaceReviewItem item in _batchItems)
+            {
+                item.PropertyChanged += (_, __) => UpdateBatchReview();
+            }
+
+            BatchReviewTitle.Text = kind == BatchKind.Regenerate ? "Regenerate channel features" : "Upload changes to MOM";
+            BatchReviewAutoCloseCheck.Visibility = kind == BatchKind.Regenerate ? Visibility.Visible : Visibility.Collapsed;
+            BatchReviewNote.Text = kind == BatchKind.Regenerate
+                ? "YCShell saves each surface as it regenerates it. Closing without saving does not undo it."
+                : "UCV checks every ticked surface for suppressed parts and structural parts with holes, then opens YCShell's upload window once. Press Upload there.";
+            BatchReviewList.ItemsSource = _batchItems;
+            UpdateBatchReview();
+            BatchReviewOverlay.Visibility = Visibility.Visible;
+            BatchReviewCancelButton.Focus();
+        }
+
+        /// <summary>
+        /// Re-reads YCShell's markers from each surface open in Inventor, keeping the scanned state for any that is not.
+        /// Also refreshes the scan result and the button count.
+        /// </summary>
+        private List<SurfaceChangeState> ReadSurfaceChangesNow(IReadOnlyList<SurfaceChangeState> scanned)
+        {
+            var current = new List<SurfaceChangeState>(scanned.Count);
+            ShowBusy("Checking surfaces for channel changes…");
+            try
+            {
+                for (int i = 0; i < scanned.Count; i++)
+                {
+                    SurfaceChangeState state = scanned[i];
+                    UpdateBusy(Path.GetFileNameWithoutExtension(state.SurfaceIamPath), (double)i / scanned.Count);
+                    try
+                    {
+                        current.Add(OpenAssembly(state.SurfaceIamPath) is Inventor.AssemblyDocument doc
+                            ? Extraction.SurfaceChangeReader.Read(doc)
+                            : state);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Log(ex, $"ReadSurfaceChangesNow: {state.SurfaceIamPath}");
+                        current.Add(state);
+                    }
+                }
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            if (_iptResult is not null)
+            {
+                _iptResult.Surfaces = current;
+                UpdateBatchButtons();
+            }
+
+            return current;
+        }
+
+        private void UpdateBatchReview()
+        {
+            int ticked = _batchItems.Count(i => i.IsIncluded);
+            string verb = _batchKind == BatchKind.Regenerate ? "Regenerate" : "Upload";
+            BatchReviewSummary.Text = _batchKind == BatchKind.Regenerate
+                ? RegenerateReview.Summary(_batchItems)
+                : UploadReview.Summary(_batchItems, UnitCompositeName());
+            BatchReviewConfirmButton.Content = ticked == 0 ? verb : $"{verb} {WriteReview.Plural(ticked, "surface")}";
+            BatchReviewConfirmButton.IsEnabled = ticked > 0;
+        }
+
+        /// <summary>Every number each surface has had, renamed ones first; also copied to the clipboard.</summary>
+        private void OnShowSurfaceHistory(object sender, RoutedEventArgs e)
+        {
+            FollowRenamedSurfaces();   // pick up a rename made since the last check
+            string report = SurfaceHistoryRules.Report(SurfaceHistoryStore.Load(_iamPath));
+            try { Clipboard.SetText(report); } catch { /* clipboard busy */ }
+            Dialogs.Show(this, report + Environment.NewLine + Environment.NewLine + "(Copied to the clipboard.)", "Surface number history",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// Points surface rows, saved expectations and channel records at surfaces MOM renamed on upload (the old IAM is
+        /// gone; the unit now references a new IAM in the same folder). Returns old path to new.
+        /// </summary>
+        private Dictionary<string, string> FollowRenamedSurfaces()
+        {
+            var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (FindUnitDocument() is not Inventor.AssemblyDocument unit) return renames;
+
+                var references = new List<string>();
+                foreach (Inventor.Document doc in unit.AllReferencedDocuments)
+                {
+                    if (doc.DocumentType == Inventor.DocumentTypeEnum.kAssemblyDocumentObject) references.Add(doc.FullFileName);
+                }
+
+                IEnumerable<string> rowPaths = _data.RoofRows.Select(r => r.SourceSurfaceIam)
+                    .Concat(_data.WallRows.Select(r => r.SourceSurfaceIam))
+                    .Concat(_data.BaseRows.Select(r => r.SourceSurfaceIam));
+                renames = SurfaceRenameFollower.Follow(_iamPath, rowPaths, references);
+                if (renames.Count == 0 || SurfaceRenames.Apply(_data, renames) == 0) return renames;
+
+                RoofSurfaceList.Items.Refresh();
+                WallSurfaceList.Items.Refresh();
+                BaseSurfaceList.Items.Refresh();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.FollowRenamedSurfaces");
+            }
+
+            return renames;
+        }
+
+        /// <summary>
+        /// The upload replaces SQ parts with newly numbered files, which would read as changed channels against a channel
+        /// record. For surfaces sent without pending channel work, the record is taken again; surfaces sent while they
+        /// still needed Regenerate keep theirs, so they still show as needing it.
+        /// </summary>
+        private void RefreshChannelRecordsAfterUpload(IEnumerable<string> withoutChannelWork, IReadOnlyDictionary<string, string> renames)
+        {
+            Dictionary<string, ChannelFingerprint> records = ChannelFingerprintStore.Load(_iamPath);
+            foreach (string sent in withoutChannelWork)
+            {
+                string path = renames.TryGetValue(sent.Trim(), out string? renamed) ? renamed : sent;
+                if (!records.ContainsKey(path.Trim())) continue;
+                try { RecordChannelFingerprint(path); }
+                catch (Exception ex) { DebugLogger.Log(ex, $"RefreshChannelRecordsAfterUpload: {path}"); }
+            }
+        }
+
+        /// <summary>
+        /// YCShell regenerates only walls and roofs ("Regenerating Features is only supported for Wall and Indoor Roof
+        /// surfaces"), so base surfaces are left out of Regenerate changed (field test, 2026-10-23).
+        /// </summary>
+        private bool CanRegenerate(string surfaceIamPath) =>
+            !_data.BaseRows.Any(r => string.Equals(r.SourceSurfaceIam?.Trim(), surfaceIamPath.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>The unit IAM's file name when YCShell has it loaded as a composite (it goes along with uploads).</summary>
+        private string? UnitCompositeName() =>
+            UnitComposite() is YcSurface unit ? Path.GetFileName(unit.FullFileName) : null;
+
+        private YcSurface? UnitComposite() =>
+            _ycShell?.GetOpenSurfaces().FirstOrDefault(s => s.IsComposite == true && s.Matches(_iamPath));
+
+        private void CloseBatchReview()
+        {
+            BatchReviewOverlay.Visibility = Visibility.Collapsed;
+            BatchReviewList.ItemsSource = null;
+        }
+
+        private void OnBatchReviewCancel(object sender, RoutedEventArgs e) => CloseBatchReview();
+
+        private void OnBatchReviewConfirm(object sender, RoutedEventArgs e)
+        {
+            List<string> surfaces = _batchItems.Where(i => i.IsIncluded).Select(i => i.SurfaceIamPath).ToList();
+            bool autoClose = BatchReviewAutoCloseCheck.IsChecked == true;
+            CloseBatchReview();
+            if (surfaces.Count == 0 || _ycShell is null) return;
+
+            if (_batchKind == BatchKind.Regenerate) RunRegenerateBatch(_ycShell, surfaces, autoClose);
+            else RunUploadBatch(_ycShell, surfaces,
+                _batchItems.Where(i => i.IsIncluded && i.Warning.Length == 0).Select(i => i.SurfaceIamPath).ToList());
+        }
+
+        /// <summary>
+        /// YCShell's upload checks on every surface, then one YCShell upload window for all of them plus the unit
+        /// composite. The detailer presses Upload there; UCV reports what changed once the window closes.
+        /// </summary>
+        /// <param name="withoutChannelWork">Surfaces sent that did not still need Regenerate.</param>
+        private void RunUploadBatch(YcShellBridge bridge, List<string> surfaces, List<string> withoutChannelWork)
+        {
+            const string title = "Upload changed";
+
+            var blocked = new List<string>();
+            ShowBusy("Checking surfaces before upload…");
+            try
+            {
+                for (int i = 0; i < surfaces.Count; i++)
+                {
+                    UpdateBusy(Path.GetFileNameWithoutExtension(surfaces[i]), (double)i / surfaces.Count);
+                    if (OpenAssembly(surfaces[i]) is not Inventor.AssemblyDocument doc)
+                    {
+                        blocked.Add($"{Path.GetFileNameWithoutExtension(surfaces[i])}: not open in Inventor");
+                        continue;
+                    }
+
+                    blocked.AddRange(UploadBlockers.Find(doc, bridge.HasHoles).Select(b => $"{Path.GetFileNameWithoutExtension(surfaces[i])}: {b}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: checks");
+                blocked.Add($"Check failed: {ex.Message}");
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            if (blocked.Count > 0)
+            {
+                Dialogs.Show(this,
+                    "Nothing was uploaded. YCShell does not upload surfaces with suppressed parts or structural parts with holes:\n\n" +
+                    string.Join("\n", blocked.Take(30)) + (blocked.Count > 30 ? $"\n… and {blocked.Count - 30} more" : string.Empty) +
+                    "\n\nFix these, or untick those surfaces, and run Upload changed again.",
+                    title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            List<YcSurface> loaded = bridge.GetOpenSurfaces().ToList();
+            var send = surfaces.Select(p => loaded.FirstOrDefault(s => s.Matches(p))).OfType<YcSurface>().ToList();
+            if (UnitComposite() is YcSurface unit) send.Add(unit);
+
+            try
+            {
+                bridge.OpenUploadWindow(send);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: upload window");
+                Dialogs.Show(this, $"YCShell's upload window failed: {ex.Message}", title, MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var renames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            ShowBusy("Re-checking after upload…");
+            try
+            {
+                renames = FollowRenamedSurfaces();
+                ReScanAndRefresh();
+                RefreshChannelRecordsAfterUpload(withoutChannelWork, renames);
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            Dictionary<string, SurfaceChangeState> now = (_iptResult?.Surfaces ?? new List<SurfaceChangeState>())
+                .GroupBy(s => s.SurfaceIamPath.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            var unitReferences = new List<string>();
+            try
+            {
+                if (FindUnitDocument() is Inventor.AssemblyDocument unitDoc)
+                    foreach (Inventor.Document doc in unitDoc.ReferencedDocuments) unitReferences.Add(doc.FullFileName);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: unit references");
+            }
+
+            string result = UploadReview.Result(surfaces, File.Exists,
+                path => now.TryGetValue(path.Trim(), out SurfaceChangeState? state) ? SurfaceChangeRules.Upload(state) : null,
+                unitReferences);
+
+            // Note each surface that went up (under its number after any rename) in the surface number history.
+            try
+            {
+                List<string> uploaded = surfaces
+                    .Select(s => renames.TryGetValue(s.Trim(), out string? renamed) ? renamed : s)
+                    .Where(p => File.Exists(p) && !(now.TryGetValue(p.Trim(), out SurfaceChangeState? state) && SurfaceChangeRules.Upload(state).Needed))
+                    .ToList();
+                SurfaceHistoryStore.RecordUploads(_iamPath, uploaded);
+
+                List<SurfaceHistory> histories = SurfaceHistoryStore.Load(_iamPath);
+                List<string> chains = renames.Values
+                    .Select(p => histories.LastOrDefault(h => string.Equals(h.Current?.IamPath, p, StringComparison.OrdinalIgnoreCase)))
+                    .OfType<SurfaceHistory>()
+                    .Where(h => h.Entries.Count(e => e.Event == SurfaceHistory.Renamed) > 1)
+                    .Select(h => "   " + h.NumberChain())
+                    .ToList();
+                if (chains.Count > 0)
+                {
+                    result += Environment.NewLine + Environment.NewLine + "Renamed before (full history under ⋯ > Surface number history):" +
+                              Environment.NewLine + string.Join(Environment.NewLine, chains);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView.RunUploadBatch: history");
+            }
+
+            DebugLogger.Log("Upload changed result:" + Environment.NewLine + result);
+            ShowNotice(result.Split('\n')[0].Trim());
+            Dialogs.Show(this, result, title, MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void RunRegenerateBatch(YcShellBridge bridge, List<string> surfaces, bool autoClose)
+        {
+            IReadOnlyList<RegenerateOutcome> outcomes;
+            using (var watcher = new YcShellMessageWatcher { AutoClose = autoClose })
+            {
+                var runner = new RegenerateBatchRunner(
+                    new YcShellSurfaceRegenerator(bridge),
+                    watcher,
+                    SkipReason,
+                    RecordChannelFingerprint);
+
+                BatchProgressWindow? progress = null;
+                ShowBusy("Regenerating channel features…");
+                try
+                {
+                    progress = BatchProgressWindow.Open("Regenerating channel features");
+                    outcomes = runner.Run(surfaces, () => progress.StopRequested, (n, total, surface) =>
+                    {
+                        string text = $"{n} of {total}: {Path.GetFileNameWithoutExtension(surface)}";
+                        progress.Update(text, (n - 1.0) / total);
+                        UpdateBusy(text, (n - 1.0) / total);
+                    });
+
+                    UpdateBusy($"Re-checking {Path.GetFileName(_iamPath)}…", 1);
+                    ReScanAndRefresh();
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Log(ex, "VerifierView.RunRegenerateBatch");
+                    Dialogs.Show(this, $"Regenerate changed stopped: {ex.Message}", "Regenerate changed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                finally
+                {
+                    progress?.Close();
+                    BusyOverlay.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            string summary = RegenerateBatchSummary.Text(outcomes);
+            DebugLogger.Log("Regenerate changed summary:" + Environment.NewLine + summary);
+            ShowNotice(RegenerateBatchSummary.Headline(outcomes));
+            Dialogs.Show(this, summary, "Regenerate changed", MessageBoxButton.OK,
+                outcomes.All(o => o.Succeeded) ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
+        /// <summary>YCShell refuses surfaces with suppressed parts; skip them here rather than leave the batch waiting on its dialog.</summary>
+        private string? SkipReason(string surfaceIamPath)
+        {
+            Inventor.AssemblyDocument? surface = OpenAssembly(surfaceIamPath);
+            if (surface is null) return "not open in Inventor";
+
+            foreach (Inventor.ComponentOccurrence occ in surface.ComponentDefinition.Occurrences)
+            {
+                if (occ.Suppressed) return "has suppressed parts; unsuppress them and run Regenerate on this surface by hand";
+            }
+
+            return null;
+        }
+
+        /// <summary>Records the surface's channels so the next run knows it is done until a channel changes again.</summary>
+        private void RecordChannelFingerprint(string surfaceIamPath)
+        {
+            if (OpenAssembly(surfaceIamPath) is not Inventor.AssemblyDocument surface) return;
+            SurfaceChangeState state = Extraction.SurfaceChangeReader.Read(surface);
+            ChannelFingerprintStore.Record(_iamPath, ChannelFingerprint.From(state, DateTime.UtcNow));
+        }
+
+        private Inventor.AssemblyDocument? OpenAssembly(string path)
+        {
+            try { return _inventorApp.Documents.get_ItemByName(path) as Inventor.AssemblyDocument; }
+            catch { return null; }
         }
 
         // ── Text Normalization & Format Utilities ──────────────────────────────
@@ -2096,7 +2546,7 @@ namespace UnitConstructionVerifier.UI
 
             if (e.Key == Key.F8 && modifiers == ModifierKeys.None)
             {
-                if (WriteReviewOverlay.Visibility != Visibility.Visible) GoToNextIssue();
+                if (WriteReviewOverlay.Visibility != Visibility.Visible && BatchReviewOverlay.Visibility != Visibility.Visible) GoToNextIssue();
                 e.Handled = true;
             }
             else if (modifiers == ModifierKeys.Control && e.Key == Key.C && !inText)

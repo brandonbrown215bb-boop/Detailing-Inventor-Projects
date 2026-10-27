@@ -2,6 +2,30 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.31.0 (2026-10-23) — Regenerate changed, Upload changed
+
+- **Regenerate changed (N)…** runs YCShell's Regenerate Channel Features on every wall and roof whose channels were
+  added (including patterned), reshaped or moved, one after another.
+  - A review shows why each surface is picked. Uncertain ones are orange but still ticked.
+  - YCShell's "Channel Features have been recreated/replaced" box closes by itself; its Yes/No questions still come
+    to you.
+  - **Stop after this surface** sits in a small window that stays clickable while YCShell works.
+  - A summary at the end lists each surface with its time.
+  - Gauge or material edits made in UCV, and bases, are not offered.
+- **Upload changed (N)…** opens **one** YCShell upload window for every surface changed since its last upload, plus
+  the unit, so you press Upload once.
+  - YCShell's own checks (suppressed parts, structural parts with holes) run on every surface first.
+  - Surfaces MOM renames are relinked in the unit by YCShell. The result names them (0021 → 0048) and anything
+    still changed.
+  - First real run: 8 surfaces in about 15 minutes.
+- **Re-check unit** now re-reads the unit from Inventor. Before, it only re-ran the checks on the scan from when the
+  verifier opened.
+- **Renamed surfaces are followed:** when MOM gives a surface a new number on upload, its row, saved expectations
+  and records move to the new file. That happens on open, on Re-check, and after Upload changed.
+- **Surface number history…** (⋯ menu) lists every number each surface has had, with dates.
+- Needs the JCI MOM (YCShell) add-in loaded and logged in. UCV checks YCShell's build on each press and keeps the
+  buttons off with a clear message if it changed. See *Known issues: Regenerate / Upload changed*.
+
 ## v1.0.30.0 (2026-10-22) — following units; writing many parts
 
 - **Switching units:** when Inventor moves to a different assembly, the verifier shows which unit it is still

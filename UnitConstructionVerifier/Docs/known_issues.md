@@ -85,3 +85,40 @@ Check the flagged angles: if they are on a side with no upturned lip, 16 GA STL 
 mismatch can be ignored. If they are on the lip side, the part is wrong. The verifier deliberately does not
 accept both values, because that would hide a UTL angle that came out as 16 GA STL GALV.
 
+
+---
+
+## Regenerate / Upload changed (v1.0.31.0)
+
+**Status:** Limits by design. Most follow from driving YCShell, which UCV may not change.
+
+### UCV drives YCShell from outside
+
+YCShell offers no way for another add-in to call it. UCV finds the running YCShell through the event handlers it
+attaches to Inventor and calls its own (private) methods. On every press UCV checks that each one is still there.
+If a YCShell update renames or changes one, the buttons report *"YCShell version not supported: …"* and do
+nothing. UCV then needs an update. Checked against YCShell build 2022.9.9.1435.
+
+### Changes UCV cannot see
+
+- **Patterned or copied plain SQ parts** that YCShell does not make unique add quantity without marking anything. Use
+  YCShell's **Mark Selected Components As Changed** so Upload changed picks them up. Normal channels are marked,
+  because YCShell flags every added occurrence.
+- **Changes made while YCShell was not loaded or logged in** are not marked by YCShell. After UCV has regenerated a
+  surface, its channel record still catches added, moved or changed channels.
+- **Moved or deleted components** are flagged by YCShell per surface, not per part. Such surfaces are offered for
+  Regenerate (orange) even if only a skin moved.
+- **Channels edited by UCV before v1.0.31** read "gauge/material or reshape, can't tell" and are offered for Regenerate.
+  From v1.0.31 UCV records its own edits and skips gauge / material-only changes.
+- **A gauge change made in YCShell's parameter editor** counts as a reshape, because UCV can't see which parameter
+  changed.
+
+### Message boxes
+
+UCV closes only YCShell's completion box ("… Channel Features have been recreated/replaced") and the sloped-roof
+notice. Any other YCShell box, including errors and Yes/No questions, waits for you. Error windows YCShell shows
+as its own WPF forms also wait for you.
+
+### Saving
+
+YCShell saves each surface as Regenerate runs and as Upload runs. Neither can be undone by closing without saving.
