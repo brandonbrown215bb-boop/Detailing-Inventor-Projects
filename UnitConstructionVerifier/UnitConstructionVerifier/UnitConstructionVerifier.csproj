@@ -8,8 +8,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <OutputType>Library</OutputType>
-    <AssemblyVersion>1.0.33.0</AssemblyVersion>
-    <FileVersion>1.0.33.0</FileVersion>
+    <AssemblyVersion>1.0.34.0</AssemblyVersion>
+    <FileVersion>1.0.34.0</FileVersion>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
 
@@ -21,6 +21,8 @@
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="stdole">
       <HintPath>C:\Program Files\Autodesk\Inventor 2020\Bin\stdole.dll</HintPath>

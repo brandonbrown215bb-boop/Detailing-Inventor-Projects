@@ -129,7 +129,8 @@ The verifier is **modeless** — you can pan and rotate the model in Inventor wh
 - **Save expectations** keeps expectation changes for this unit in the sidecar file next to the IAM.
 - **Re-check unit** re-reads the unit from Inventor, then runs every check again. It follows surfaces MOM renamed on
   upload (see below).
-- **⋯** holds **Surface number history…** and **Save snapshot for regression tests…** (see below).
+- **⋯** holds **Check paperwork (IDW BOMs)…**, **Surface number history…** and **Save snapshot for regression tests…**
+  (see below).
 
 ---
 
@@ -239,6 +240,28 @@ When MOM gives a surface a new number, its expectations, channel record and surf
 when the verifier opens, on Re-check, and after Upload changed. **⋯ > Surface number history…** lists every number
 each surface has had, with dates (for example 0021 → 0048 → 0049 → 0122), and copies the list to the clipboard. It
 is kept in `.ucv_surface_history.json` next to the unit.
+
+---
+
+## Check paperwork (IDW BOMs)
+
+**⋯ > Check paperwork (IDW BOMs)…** reads each surface's paperwork IDW and lists BOM rows whose printed gauge or
+material differs from the part as modelled, for example:
+
+```
+391Z010216-0061: 2 of 4 rows differ (from 391Z010216-0061.idw)
+   Liners:2 M 091Z010216-0464: IDW 22 GA STL GALV, part 20 GA STL GALV
+```
+
+- Report only: nothing is changed. The report is also copied to the clipboard.
+- The IDW is `<surface>.idw` next to the surface IAM, or, when there is none, the one inside `<surface>.ZIP` from the
+  last upload. Either way it is the paperwork MOM got at that upload.
+- YCShell prints the material from the **surface configuration**, not the part. A part edited away from it (an SQ
+  edit, or a UCV write to a changed expectation) keeps the configured material on paper. Fix that in the surface
+  configuration in YCShell, then upload again.
+- Rows are matched to parts by part number (after upload the file name can differ). Channel and insulation rows
+  print no material and are not checked. A row whose part isn't in the unit is listed as *part not found*.
+- Each IDW opens hidden in Inventor and closes without saving; one taken from a ZIP is read from a temp copy.
 
 ---
 

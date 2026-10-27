@@ -2,6 +2,16 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.34.0 (2026-10-27) — Check paperwork (IDW BOMs)
+
+- **⋯ > Check paperwork (IDW BOMs)…** reads every surface's paperwork IDW (next to the IAM, else inside its upload
+  ZIP) and lists BOM rows whose printed gauge or material differs from the part. Report only; copied to the
+  clipboard.
+- YCShell prints BOM materials from the surface configuration, not the part, so parts written to a changed
+  expectation keep the configured gauge on paper. First seen on SW0004 surface 0061: liners 0464/0465 print 22 GA
+  (parts are 20 GA), skins 0466/0467 print 18 GA PPC (parts are 16 GA PPC).
+- Channel and insulation rows print no material and are not checked. The skid packet IDW is not checked yet.
+
 ## v1.0.33.0 (2026-10-27) — cuts go through after a gauge change
 
 - **Fixed: cutouts stopped halfway through after a gauge change.** YCShell's cuts (orientation holes, skin

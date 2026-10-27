@@ -1482,6 +1482,50 @@ namespace UnitConstructionVerifier.UI
         }
 
         /// <summary>
+        /// Reads each surface's paperwork IDW and lists BOM rows whose printed gauge or material differs from the part.
+        /// Report only; also copied to the clipboard.
+        /// </summary>
+        private void OnCheckPaperwork(object sender, RoutedEventArgs e)
+        {
+            if (_iptResult is null)
+            {
+                Dialogs.Show(this, "Scan the unit first (Re-check unit).", "Check paperwork", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            FollowRenamedSurfaces();
+            List<string> surfaces = _data.RoofRows.Select(r => r.SourceSurfaceIam)
+                .Concat(_data.WallRows.Select(r => r.SourceSurfaceIam))
+                .Concat(_data.BaseRows.Select(r => r.SourceSurfaceIam))
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(p => Path.GetFileNameWithoutExtension(p), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var reader = new IdwBomReader(_inventorApp);
+            var results = new List<(SurfacePaperwork, List<PaperworkFinding>)>();
+            ShowBusy("Checking paperwork (IDW BOMs)…");
+            try
+            {
+                for (int i = 0; i < surfaces.Count; i++)
+                {
+                    UpdateBusy(Path.GetFileNameWithoutExtension(surfaces[i]), (double)i / surfaces.Count);
+                    SurfacePaperwork paperwork = reader.Read(surfaces[i]);
+                    results.Add((paperwork, PaperworkCheck.Compare(paperwork, _iptResult.Parts)));
+                }
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            string report = PaperworkCheck.Report(results);
+            try { Clipboard.SetText(report); } catch { /* clipboard busy */ }
+            Dialogs.Show(this, report + Environment.NewLine + Environment.NewLine + "(Copied to the clipboard.)", "Check paperwork",
+                MessageBoxButton.OK, results.Any(r => r.Item2.Count > 0) ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
+        /// <summary>
         /// Points surface rows, saved expectations and channel records at surfaces MOM renamed on upload (the old IAM is
         /// gone; the unit now references a new IAM in the same folder). Returns old path to new.
         /// </summary>
