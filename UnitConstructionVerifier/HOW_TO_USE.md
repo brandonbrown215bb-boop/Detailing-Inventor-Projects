@@ -242,6 +242,23 @@ is kept in `.ucv_surface_history.json` next to the unit.
 
 ---
 
+## Thickness Inspector (hover)
+
+Press **Thickness Inspector** on the ribbon, then hover a part. The tooltip shows what the verifier reads for that part:
+
+```
+16 GA STL GALV
+0.056"
+```
+
+- Line 1 is the gauge and material, worded as in the parts grid. The thickness is the part's recorded thickness (`MOM_DATA`, else the `Thickness` iProperty, else the sheet metal thickness).
+- **Measured 0.0598"** appears only when a sheet metal part's modelled thickness is off from the recorded one.
+- **No gauge match** means the gauge isn't in the materials database; line 1 then shows the material alone.
+- **No thickness recorded** on a part that isn't sheet metal means nothing records its thickness. The tooltip no longer guesses one from the part's size.
+- Press the button again or Esc to stop.
+
+---
+
 ## Working with assemblies
 
 - Highlight works when a **surface sub-assembly IAM is opened directly**, not only from the unit root.

@@ -2,6 +2,18 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.32.0 (2026-10-27) — simpler Thickness Inspector
+
+- The hover tooltip is now two lines: gauge and material (as the parts grid words them) and the recorded thickness.
+  It reads the part the same way the verifier does, so the two always agree.
+- **Measured …"** is added only when a sheet metal part's modelled thickness is off from the recorded one.
+  **No gauge match** is added when the gauge isn't in the materials database.
+- Parts that aren't sheet metal show their recorded thickness. Before, the tooltip took the part's smallest
+  overall size as its thickness, so a solid part could show a confident but wrong gauge. With nothing recorded it now
+  says **No thickness recorded**.
+- Dropped: millimetres, Material Group/Style/Type lines (the two "Type:" lines no longer clash), and the tooltip's
+  own gauge guessing, which could pick an aluminium gauge for steel because many material names contain "al".
+
 ## v1.0.31.0 (2026-10-23) — Regenerate changed, Upload changed
 
 - **Regenerate changed (N)…** runs YCShell's Regenerate Channel Features on every wall and roof whose channels were

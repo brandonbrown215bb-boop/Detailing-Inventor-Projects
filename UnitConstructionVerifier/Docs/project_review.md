@@ -193,6 +193,6 @@ These are low-risk, low-effort improvements that increase long-term maintainabil
 ## 8. Open Questions for Future Sessions
 
 - [ ] Which other part types follow the "fixed gauge + borrow material from field X" pattern? (Discoverable only from real units)
-- [ ] What does the ThicknessHoverCommand currently show that should be removed?
+- [x] What does the ThicknessHoverCommand currently show that should be removed? (v1.0.32: everything but gauge + material, recorded thickness, and an off-only measured line)
 - [ ] For IDW BOM verification — what is the typical folder naming convention and how reliably are IDWs co-located with their IAM?
 - [ ] For the Skid Packet IDW — is there a consistent naming convention that links it to the top-level unit assembly?

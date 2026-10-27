@@ -2,6 +2,8 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using Inventor;
+using UnitConstructionVerifier.Extraction;
+using UnitConstructionVerifier.Models;
 using UnitConstructionVerifier.UI;
 using InvApp = Inventor.Application;
 using InvBtnDef = Inventor.ButtonDefinition;
@@ -85,6 +87,7 @@ namespace UnitConstructionVerifier.Operations
 
             try
             {
+                MaterialsConfig.Initialize();
                 _tooltipForm = new TooltipForm();
                 _interactionEvents = _inventorApp.CommandManager.CreateInteractionEvents();
                 _interactionEvents.InteractionDisabled = false;
@@ -236,101 +239,12 @@ namespace UnitConstructionVerifier.Operations
                     return;
                 }
 
-                double thicknessCm = 0;
-                bool isSheetMetal = false;
-
+                double? measuredInches = null;
                 if (partDef is SheetMetalComponentDefinition smDef)
-                {
-                    isSheetMetal = true;
-                    thicknessCm = Convert.ToDouble(smDef.Thickness.Value);
-                }
-                else
-                {
-                    Box bbox = partDef.RangeBox;
-                    double dx = bbox.MaxPoint.X - bbox.MinPoint.X;
-                    double dy = bbox.MaxPoint.Y - bbox.MinPoint.Y;
-                    double dz = bbox.MaxPoint.Z - bbox.MinPoint.Z;
-                    thicknessCm = Math.Min(dx, Math.Min(dy, dz));
-                }
+                    measuredInches = Convert.ToDouble(smDef.Thickness.Value) / 2.54;
 
-                double thicknessInches = thicknessCm / 2.54;
-
-                // Retrieve Material Name and custom iProperties (MaterialStyle / MaterialType)
-                string materialName = "";
-                string materialStyle = "";
-                string materialType = "";
-                try
-                {
-                    if (partDef.Material != null)
-                    {
-                        materialName = partDef.Material.Name;
-                    }
-                }
-                catch { }
-
-                try
-                {
-                    Document doc = (Document)partDef.Document;
-                    PropertySet customPropSet = doc.PropertySets["Inventor User Defined Properties"];
-                    if (customPropSet != null)
-                    {
-                        try
-                        {
-                            Property propStyle = customPropSet["INPUT_PARAMETER_MaterialStyle"];
-                            if (propStyle != null)
-                            {
-                                materialStyle = Convert.ToString(propStyle.Value)?.Trim('\"', ' ') ?? "";
-                            }
-                        }
-                        catch { }
-
-                        try
-                        {
-                            Property propType = customPropSet["INPUT_PARAMETER_MaterialType"];
-                            if (propType != null)
-                            {
-                                materialType = Convert.ToString(propType.Value)?.Trim('\"', ' ') ?? "";
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                string combinedMaterial = $"{materialName} {materialStyle} {materialType}".Trim();
-
-                // Find the best match in the materials database configuration (Single Source of Truth)
-                string matchedGauge = "";
-                string matchedMaterialGroup = "";
-                double designThickness = 0;
-                bool foundMatch = FindBestGaugeMatch(thicknessInches, combinedMaterial, out matchedGauge, out matchedMaterialGroup, out designThickness);
-
-                string tooltipText;
-                string styleSuffix = "";
-                if (!string.IsNullOrEmpty(materialStyle))
-                {
-                    styleSuffix += $"\nStyle: {materialStyle}";
-                }
-                if (!string.IsNullOrEmpty(materialType))
-                {
-                    styleSuffix += $"\nType: {materialType}";
-                }
-
-                if (foundMatch)
-                {
-                    tooltipText = $"Material Group: {matchedMaterialGroup}\n" +
-                                  $"Gauge: {matchedGauge}\n" +
-                                  $"Thickness: {designThickness:0.000}\" ({designThickness * 25.4:0.00} mm)\n" +
-                                  $"(Measured: {thicknessInches:0.0000}\"){styleSuffix}";
-                }
-                else
-                {
-                    string partType = isSheetMetal ? "Sheet Metal Part" : "Standard Solid Part";
-                    tooltipText = $"Material: {(!string.IsNullOrEmpty(materialName) ? materialName : "Unknown")}\n" +
-                                  $"Type: {partType}\n" +
-                                  $"Thickness: {thicknessInches:0.000}\" ({thicknessCm * 10:0.00} mm)\n" +
-                                  $"(No matching gauge in database){styleSuffix}";
-                }
+                var part = IptPropertyMapper.Map(new PartDocumentSource((PartDocument)partDef.Document), string.Empty);
+                string tooltipText = ThicknessTooltip.Build(part, measuredInches);
 
                 if (_tooltipForm != null)
                 {
@@ -368,153 +282,6 @@ namespace UnitConstructionVerifier.Operations
                     System.Windows.Forms.Cursor.Position.Y + 15
                 );
             }
-        }
-
-        // ── Unified Database-driven Gauge Lookup ─────────────────────────────
-
-        private bool FindBestGaugeMatch(
-            double thicknessInches, 
-            string partMaterialInfo, 
-            out string gauge, 
-            out string materialGroup, 
-            out double designThickness)
-        {
-            gauge = string.Empty;
-            materialGroup = string.Empty;
-            designThickness = 0;
-
-            // Ensure the config is loaded
-            UnitConstructionVerifier.Models.MaterialsConfig.Initialize();
-
-            // 1. Try precise match first (tolerance 0.000009)
-            string thicknessStr = thicknessInches.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
-            if (UnitConstructionVerifier.Models.MaterialsConfig.ResolveFromThickness(thicknessStr, out gauge, out materialGroup))
-            {
-                // Find design thickness from matching key value
-                foreach (var kvp in UnitConstructionVerifier.Models.MaterialsConfig.ThicknessMap)
-                {
-                    if (kvp.Key.StartsWith(gauge) && kvp.Key.EndsWith(materialGroup))
-                    {
-                        if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
-                        {
-                            designThickness = val;
-                            return true;
-                        }
-                    }
-                }
-                designThickness = thicknessInches;
-                return true;
-            }
-
-            // 2. Collect candidates that match the thickness within tolerance (0.005)
-            double tolerance = 0.005;
-            var candidates = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
-
-            foreach (var kvp in UnitConstructionVerifier.Models.MaterialsConfig.ThicknessMap)
-            {
-                if (double.TryParse(kvp.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double mapVal))
-                {
-                    double diff = Math.Abs(thicknessInches - mapVal);
-                    if (diff < tolerance)
-                    {
-                        candidates.Add(new System.Collections.Generic.KeyValuePair<string, double>(kvp.Key, mapVal));
-                    }
-                }
-            }
-
-            if (candidates.Count == 0)
-            {
-                return false;
-            }
-
-            // 3. Filter candidates using keywords in the part material details
-            System.Collections.Generic.KeyValuePair<string, double>? bestCandidate = null;
-            if (!string.IsNullOrEmpty(partMaterialInfo))
-            {
-                string infoLower = partMaterialInfo.ToLower();
-
-                foreach (var candidate in candidates)
-                {
-                    string keyLower = candidate.Key.ToLower();
-
-                    // Prioritize PPC (Pre-Paint Coil) first
-                    if (infoLower.Contains("ppc") && keyLower.Contains("ppc"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if (infoLower.Contains("paint") && (keyLower.Contains("ppc") || keyLower.Contains("ppg") || keyLower.Contains("ppw")))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if ((infoLower.Contains("g90") || infoLower.Contains("galv")) && keyLower.Contains("galv") && !keyLower.Contains("ppc"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if (infoLower.Contains("hr") && keyLower.Contains("hot roll"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if ((infoLower.Contains("al") || infoLower.Contains("aluminum")) && keyLower.Contains("alm"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if ((infoLower.Contains("sst") || infoLower.Contains("stainless")) && keyLower.Contains("sst"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if (infoLower.Contains("expanded") && keyLower.Contains("exp"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                    if (infoLower.Contains("perf") && keyLower.Contains("prf"))
-                    {
-                        bestCandidate = candidate;
-                        break;
-                    }
-                }
-            }
-
-            // 4. Fallback to candidate with minimum difference
-            if (bestCandidate == null)
-            {
-                double minDiff = double.MaxValue;
-                foreach (var candidate in candidates)
-                {
-                    double diff = Math.Abs(thicknessInches - candidate.Value);
-                    if (diff < minDiff)
-                    {
-                        minDiff = diff;
-                        bestCandidate = candidate;
-                    }
-                }
-            }
-
-            if (bestCandidate != null)
-            {
-                string bestKey = bestCandidate.Value.Key;
-                designThickness = bestCandidate.Value.Value;
-
-                int i = 0;
-                while (i < bestKey.Length && (char.IsDigit(bestKey[i]) || bestKey[i] == '.'))
-                {
-                    i++;
-                }
-                if (i > 0)
-                {
-                    gauge = bestKey.Substring(0, i);
-                    materialGroup = bestKey.Substring(i).Trim();
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         // ── Programmatic Icon Generation ──────────────────────────────────────
