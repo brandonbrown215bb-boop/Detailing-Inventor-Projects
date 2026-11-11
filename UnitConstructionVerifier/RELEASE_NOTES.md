@@ -2,6 +2,18 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.35.0 (2026-11-11) — flat sheet cuts go through all
+
+- **Cuts on flat sheets are now Through All.** On a sheet metal part with no bends (skins and liners), a cut or hole
+  that went through the old sheet is switched to **Through All** in the same direction, instead of being linked to
+  `Thickness` or `Thickness * 2 ul`. Its depth no longer depends on how the cut was sketched or which way it points.
+  Prompted by a roof skin whose cut stopped partway on another PC with v1.0.34; the cause there was not found.
+- Parts with bends keep the v1.0.33 behaviour (linked to the thickness), because Through All could cut into a
+  flange. If Inventor refuses Through All on a cut, it falls back to the link and the refusal is logged.
+- Cuts that never went all the way through are still left alone. Writing a flat part also converts cuts an earlier
+  version linked to the thickness.
+- Not covered: cuts with two different distances, cuts to a face, and two-direction extruded cuts.
+
 ## v1.0.34.0 (2026-10-27) — Check paperwork (IDW BOMs)
 
 - **⋯ > Check paperwork (IDW BOMs)…** reads every surface's paperwork IDW (next to the IAM, else inside its upload

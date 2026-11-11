@@ -522,19 +522,36 @@ namespace UnitConstructionVerifier.Operations
             }
         }
 
-        /// <summary>Keeps cuts that went through the old sheet going through the new one. See <see cref="CutDepthRule"/>.</summary>
+        /// <summary>
+        /// Keeps cuts that went through the old sheet going through the new one. On a flat sheet (no bends) they are
+        /// made Through All; elsewhere, or if that fails, their distance is linked to the thickness. See
+        /// <see cref="CutDepthRule"/>.
+        /// </summary>
         private static bool AdjustCutFeatureExtents(PartDocument doc, double oldCmValue, double newCmValue)
         {
+            bool flat = IsFlatSheet(doc);
             bool changed = false;
             foreach (PartFeature feature in doc.ComponentDefinition.Features)
             {
                 // One feature failing must not stop the rest.
                 try
                 {
-                    if (!TryGetCutDistance(feature, out Parameter distance, out bool symmetric)) continue;
+                    if (!TryGetCutDistance(feature, out DistanceExtent extent)) continue;
+
+                    Parameter distance = extent.Distance;
+                    PartFeatureExtentDirectionEnum direction = extent.Direction;
+                    bool symmetric = direction == PartFeatureExtentDirectionEnum.kSymmetricExtentDirection;
+                    double distanceCm = Convert.ToDouble(distance.Value);
+
+                    if (flat && CutDepthRule.WentThrough(symmetric, distance.Expression, distanceCm, oldCmValue)
+                        && TrySetThroughAll(feature, direction))
+                    {
+                        changed = true;
+                        continue;
+                    }
 
                     string? expression = CutDepthRule.NewExpression(
-                        symmetric, distance.Expression, Convert.ToDouble(distance.Value), oldCmValue, newCmValue);
+                        symmetric, distance.Expression, distanceCm, oldCmValue, newCmValue);
                     if (expression == null) continue;
 
                     distance.Expression = expression;
@@ -548,24 +565,56 @@ namespace UnitConstructionVerifier.Operations
             return changed;
         }
 
-        /// <summary>The distance of a cut, extruded cut or hole with a distance extent; false for any other feature.</summary>
-        private static bool TryGetCutDistance(PartFeature feature, out Parameter distance, out bool symmetric)
+        /// <summary>A sheet metal part with no bends; there a Through All cut cannot reach past the sheet into a flange.</summary>
+        private static bool IsFlatSheet(PartDocument doc)
         {
-            distance = null!;
-            symmetric = false;
+            try
+            {
+                return doc.ComponentDefinition is SheetMetalComponentDefinition smDef && smDef.Bends.Count == 0;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, $"IsFlatSheet: {doc.FullFileName}");
+                return false;
+            }
+        }
 
-            object? extent = feature switch
+        /// <summary>The distance extent of a cut, extruded cut or hole; false for any other feature or extent.</summary>
+        private static bool TryGetCutDistance(PartFeature feature, out DistanceExtent extent)
+        {
+            extent = (feature switch
             {
                 CutFeature cut => cut.Definition.Extent,
                 ExtrudeFeature extrude when extrude.Operation == PartFeatureOperationEnum.kCutOperation => extrude.Definition.Extent,
                 HoleFeature hole => hole.Extent,
                 _ => null,
-            };
-            if (!(extent is DistanceExtent distanceExtent)) return false;
+            } as DistanceExtent)!;
+            return extent != null;
+        }
 
-            distance = distanceExtent.Distance;
-            symmetric = distanceExtent.Direction == PartFeatureExtentDirectionEnum.kSymmetricExtentDirection;
-            return true;
+        /// <summary>Makes a cut Through All in the same direction; false (logged) if Inventor refused or kept the old extent.</summary>
+        private static bool TrySetThroughAll(PartFeature feature, PartFeatureExtentDirectionEnum direction)
+        {
+            try
+            {
+                switch (feature)
+                {
+                    case CutFeature cut:
+                        cut.Definition.SetThroughAllExtent(direction);
+                        return cut.Definition.ExtentType == PartFeatureExtentEnum.kThroughAllExtent;
+                    case ExtrudeFeature extrude when !extrude.Definition.IsTwoDirectional:
+                        extrude.Definition.SetThroughAllExtent(direction);
+                        return extrude.Definition.ExtentType == PartFeatureExtentEnum.kThroughAllExtent;
+                    case HoleFeature hole:
+                        hole.SetThroughAllExtent(direction);
+                        return hole.ExtentType == PartFeatureExtentEnum.kThroughAllExtent;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, $"TrySetThroughAll: {feature.Name}");
+            }
+            return false;
         }
 
         private bool SyncPhysicalMaterial(PartDocument doc, string ycmAtlVal)

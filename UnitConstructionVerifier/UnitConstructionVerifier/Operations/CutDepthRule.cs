@@ -35,6 +35,17 @@ namespace UnitConstructionVerifier.Operations
             return linked;
         }
 
+        /// <summary>
+        /// True when a cut went through the old sheet, so on a flat sheet it can be made Through All. Cuts linked to
+        /// either thickness expression count, whatever their distance reads mid-write.
+        /// </summary>
+        public static bool WentThrough(bool symmetric, string expression, double distanceCm, double oldThicknessCm)
+        {
+            if (SameExpression(expression, OneSided) || SameExpression(expression, Symmetric)) return true;
+            double reach = symmetric ? distanceCm / 2 : distanceCm;
+            return reach >= oldThicknessCm - ToleranceCm;
+        }
+
         private static bool SameExpression(string a, string b) =>
             string.Equals((a ?? string.Empty).Replace(" ", ""), b.Replace(" ", ""), StringComparison.OrdinalIgnoreCase);
     }

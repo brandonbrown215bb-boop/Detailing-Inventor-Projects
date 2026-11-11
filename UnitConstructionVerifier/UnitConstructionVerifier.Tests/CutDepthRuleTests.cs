@@ -62,6 +62,17 @@ namespace UnitConstructionVerifier.Tests
         }
 
         [Test]
+        public void WentThrough_TellsThroughCutsFromPartialOnes()
+        {
+            Assert.IsTrue(CutDepthRule.WentThrough(true, "0.09 in", 0.09 * 2.54, Ga18));     // library cut
+            Assert.IsTrue(CutDepthRule.WentThrough(false, "0.5 in", 0.5 * 2.54, Ga22));      // deep one-sided
+            Assert.IsTrue(CutDepthRule.WentThrough(true, "Thickness", Ga22, Ga22));          // left halfway by v1.0.32
+            Assert.IsTrue(CutDepthRule.WentThrough(true, "Thickness * 2 ul", 2 * Ga22, Ga18)); // linked, read mid-write
+            Assert.IsFalse(CutDepthRule.WentThrough(false, "0.01 in", 0.01 * 2.54, Ga22));   // partial
+            Assert.IsFalse(CutDepthRule.WentThrough(true, "0.02 in", 0.02 * 2.54, Ga22));    // partial, both ways
+        }
+
+        [Test]
         public void LibraryCutWithinTolerance_CountsAsThrough()
         {
             // 0.09" both ways is 0.045" into a 0.04504" PPC skin: through, so nothing to change.
