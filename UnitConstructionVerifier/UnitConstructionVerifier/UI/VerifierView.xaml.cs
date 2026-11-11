@@ -40,6 +40,7 @@ namespace UnitConstructionVerifier.UI
         private bool _pendingVerifierFocusRestore;
         private HighlightMode _highlightMode = HighlightMode.Box;
         private readonly SurfaceStatusBoard _statusBoard;
+        private readonly IDisposable _theme;
         private readonly System.Windows.Threading.DispatcherTimer _statusTimer;
         private readonly System.Windows.Threading.DispatcherTimer _noticeTimer;
         private readonly Dictionary<DataGrid, string> _partsFilters = new Dictionary<DataGrid, string>();
@@ -51,8 +52,12 @@ namespace UnitConstructionVerifier.UI
             // Must exist before the XAML loads: the surface list templates reference it as a StaticResource.
             _statusBoard = new SurfaceStatusBoard();
             Resources["StatusBoard"] = _statusBoard;
+            // Palette brushes too, so the first paint is already in the user's theme. Disposed in Shutdown.
+            _theme = UcvTheme.Track(this);
 
             InitializeComponent();
+            UpdateThemeButton();
+            UcvTheme.Changed += UpdateThemeButton;
 
             _data    = data;
             _iamPath = iamPath;
@@ -114,6 +119,25 @@ namespace UnitConstructionVerifier.UI
         }
 
         private void OnDockToggleClick(object sender, RoutedEventArgs e) => DockToggleRequested?.Invoke();
+
+        private void OnThemeClick(object sender, RoutedEventArgs e) => UcvTheme.Choice = UcvTheme.Next(UcvTheme.Choice);
+
+        private void UpdateThemeButton()
+        {
+            ThemeChoice choice = UcvTheme.Choice;
+            ThemeButton.Content = choice switch
+            {
+                ThemeChoice.Light => "☀ Light",
+                ThemeChoice.Dark => "☾ Dark",
+                _ => "◐ System",
+            };
+            ThemeButton.ToolTip = choice switch
+            {
+                ThemeChoice.Light => "Light theme. Click for dark.",
+                ThemeChoice.Dark => "Dark theme. Click to follow Windows.",
+                _ => "Theme follows Windows. Click for light.",
+            };
+        }
 
         /// <summary>Raised by the bar's Check this unit button: check the assembly now active in Inventor instead.</summary>
         public event Action? CheckActiveUnitRequested;
@@ -260,6 +284,8 @@ namespace UnitConstructionVerifier.UI
         public void Shutdown()
         {
             Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+            UcvTheme.Changed -= UpdateThemeButton;
+            _theme.Dispose();
             try { _partPreviewWindow?.Close(); } catch { }
             InventorSelectionHelper.RestoreNormal(_inventorApp);
         }
@@ -795,7 +821,7 @@ namespace UnitConstructionVerifier.UI
             UnitStatus status = _statusBoard.Status;
 
             CheckBannerText.Text = status.BannerText();
-            CheckBanner.Background = (Brush)FindResource(status.Mismatches > 0 ? "FailTint" : status.Scanned ? "PassTint" : "MutedTint");
+            CheckBanner.SetResourceReference(Border.BackgroundProperty, status.Mismatches > 0 ? "FailTint" : status.Scanned ? "PassTint" : "MutedTint");
             BannerNextIssueButton.Visibility = status.Mismatches > 0 ? Visibility.Visible : Visibility.Collapsed;
             CheckBanner.Visibility = Visibility.Visible;
 
@@ -828,8 +854,8 @@ namespace UnitConstructionVerifier.UI
 
             OverallStatusText.Text = status.HeaderText();
             string tone = !status.Scanned ? "Muted" : status.Mismatches > 0 ? "Fail" : "Pass";
-            OverallStatusPill.Background = (Brush)FindResource(tone + "Tint");
-            OverallStatusText.Foreground = (Brush)FindResource(tone switch
+            OverallStatusPill.SetResourceReference(Border.BackgroundProperty, tone + "Tint");
+            OverallStatusText.SetResourceReference(TextBlock.ForegroundProperty, tone switch
             {
                 "Fail" => "AccentRed",
                 "Pass" => "AccentGreen",
@@ -857,8 +883,8 @@ namespace UnitConstructionVerifier.UI
             int mismatches = status.MismatchesIn(iams);
             badge.Visibility = Visibility.Visible;
             text.Text = mismatches > 0 ? mismatches.ToString(CultureInfo.InvariantCulture) : "✓";
-            badge.Background = (Brush)FindResource(mismatches > 0 ? "FailTint" : "PassTint");
-            text.Foreground = (Brush)FindResource(mismatches > 0 ? "AccentRed" : "AccentGreen");
+            badge.SetResourceReference(Border.BackgroundProperty, mismatches > 0 ? "FailTint" : "PassTint");
+            text.SetResourceReference(TextBlock.ForegroundProperty, mismatches > 0 ? "AccentRed" : "AccentGreen");
         }
 
         private void OnNextIssueClick(object sender, RoutedEventArgs e) => GoToNextIssue();

@@ -8,6 +8,7 @@ namespace UnitConstructionVerifier.UI
     public class TooltipForm : Form
     {
         private Label lblText;
+        private Color _borderColor = Color.FromArgb(80, 80, 80);
 
         [DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
         private static extern IntPtr CreateRoundRectRgn(
@@ -89,15 +90,25 @@ namespace UnitConstructionVerifier.UI
 
             if (!this.Visible)
             {
+                ApplyTheme();
                 this.Show();
             }
+        }
+
+        // Same light/dark choice as the verifier window; checked each time the tooltip appears.
+        private void ApplyTheme()
+        {
+            bool dark = UcvTheme.IsDark;
+            this.BackColor = dark ? Color.FromArgb(40, 40, 40) : Color.FromArgb(250, 250, 250);
+            lblText.ForeColor = dark ? Color.FromArgb(245, 245, 245) : Color.FromArgb(30, 30, 30);
+            _borderColor = dark ? Color.FromArgb(80, 80, 80) : Color.FromArgb(190, 190, 190);
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             // Draw a subtle border inside the rounded region to make it pop
-            using (Pen borderPen = new Pen(Color.FromArgb(80, 80, 80), 1.5f))
+            using (Pen borderPen = new Pen(_borderColor, 1.5f))
             {
                 e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 // Use a smaller rectangle to draw the inside border

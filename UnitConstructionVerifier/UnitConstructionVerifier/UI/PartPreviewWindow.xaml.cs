@@ -36,6 +36,8 @@ namespace UnitConstructionVerifier.UI
 
         public PartPreviewWindow()
         {
+            IDisposable theme = UcvTheme.Track(this);
+            Closed += (_, __) => theme.Dispose();
             InitializeComponent();
             InitializeColorPicker();
             Loaded += (_, __) => Redraw();

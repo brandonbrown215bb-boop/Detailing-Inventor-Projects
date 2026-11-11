@@ -2,6 +2,14 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.36.0 (2026-11-11) — light theme
+
+- **Light and dark themes.** The verifier follows the Windows app mode by default and switches live when Windows
+  does. The header's theme button cycles **System → Light → Dark**; the choice is remembered per Windows user.
+- The Thickness Inspector tooltip and the wireframe preview window use the same theme. The preview's drawing area
+  stays dark in both, so yellow and white wireframes stay visible. The busy and review overlays still dim with a
+  dark shade, and the regenerate progress window keeps the standard Windows look.
+
 ## v1.0.35.0 (2026-11-11) — flat sheet cuts go through all
 
 - **Cuts on flat sheets are now Through All.** On a sheet metal part with no bends (skins and liners), a cut or hole

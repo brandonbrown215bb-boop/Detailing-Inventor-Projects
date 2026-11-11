@@ -8,34 +8,8 @@
         PreviewKeyDown="OnViewPreviewKeyDown">
 
     <UserControl.Resources>
-        <!-- ── Palette ── -->
-        <SolidColorBrush x:Key="BgPrimary"      Color="#191B22"/>
-        <SolidColorBrush x:Key="BgSurface"      Color="#20232B"/>
-        <SolidColorBrush x:Key="BgCard"         Color="#262A33"/>
-        <SolidColorBrush x:Key="BgInput"        Color="#15171D"/>
-        <SolidColorBrush x:Key="BgHover"        Color="#2A2F3B"/>
-        <SolidColorBrush x:Key="BgSelected"     Color="#2D3550"/>
-        <SolidColorBrush x:Key="BorderColor"    Color="#343946"/>
-        <SolidColorBrush x:Key="BorderStrong"   Color="#4A5163"/>
-        <SolidColorBrush x:Key="TextPrimary"    Color="#E7E9EF"/>
-        <SolidColorBrush x:Key="TextSecondary"  Color="#98A0B1"/>
-        <SolidColorBrush x:Key="AccentBlue"     Color="#7C9EFF"/>
-        <SolidColorBrush x:Key="AccentGreen"    Color="#46C083"/>
-        <SolidColorBrush x:Key="AccentRed"      Color="#F06872"/>
-        <SolidColorBrush x:Key="AccentOrange"   Color="#E8A33D"/>
-        <SolidColorBrush x:Key="AccentPending"  Color="#D9B44A"/>
-        <SolidColorBrush x:Key="FailTint"       Color="#3A2228"/>
-        <SolidColorBrush x:Key="PassTint"       Color="#1E3529"/>
-        <SolidColorBrush x:Key="PendingTint"    Color="#3A3218"/>
-        <SolidColorBrush x:Key="MutedTint"      Color="#2B2F39"/>
-
-        <!-- Default control templates that fall back to system colours get dark values here. -->
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#20232B"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E7E9EF"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2D3550"/>
-        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E7E9EF"/>
-        <!-- No InactiveSelectionHighlight*BrushKey entries: Inventor runs WPF in .NET 4.0 compatibility, where
-             those keys equal ControlBrushKey/ControlTextBrushKey and the duplicate key stops the window loading. -->
+        <!-- Palette brushes (BgPrimary, TextPrimary, …) and their light/dark values live in UcvTheme, added from code
+             before this loads. Reference them as DynamicResource so a theme switch repaints. -->
 
 
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
@@ -44,18 +18,18 @@
 
         <!-- ── Text ── -->
         <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
         </Style>
         <Style x:Key="ColumnLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize" Value="10.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
@@ -63,11 +37,11 @@
 
         <!-- ── Tooltip ── -->
         <Style TargetType="ToolTip">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderStrong}"
+                        <Border Background="{DynamicResource BgCard}" BorderBrush="{DynamicResource BorderStrong}"
                                 BorderThickness="1" CornerRadius="4" Padding="8,5" MaxWidth="420">
                             <ContentPresenter>
                                 <ContentPresenter.Resources>
@@ -84,8 +58,8 @@
 
         <!-- ── Buttons ── -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
-            <Setter Property="Foreground" Value="#12141B"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBlue}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccent}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="12.5"/>
@@ -105,7 +79,7 @@
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.4"/>
@@ -116,9 +90,9 @@
             </Setter>
         </Style>
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="{StaticResource BgCard}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Background" Value="{DynamicResource BgCard}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="Padding" Value="12,6"/>
         </Style>
         <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
@@ -128,18 +102,18 @@
         <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource SmallButton}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                    <Setter Property="Background" Value="{StaticResource BgHover}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                    <Setter Property="Background" Value="{DynamicResource BgHover}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- ── Check box, switch, segmented control, filter chips ── -->
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -148,20 +122,20 @@
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
                             <Border x:Name="Box" Width="15" Height="15" CornerRadius="3" VerticalAlignment="Center"
-                                    Background="{StaticResource BgInput}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1">
-                                <Path x:Name="Tick" Data="M 2.5 7 L 6 10.5 L 12 3.5" Stroke="#12141B" StrokeThickness="2"
+                                    Background="{DynamicResource BgInput}" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1">
+                                <Path x:Name="Tick" Data="M 2.5 7 L 6 10.5 L 12 3.5" Stroke="{DynamicResource TextOnAccent}" StrokeThickness="2"
                                       Visibility="Collapsed" Margin="-1,-1,0,0"/>
                             </Border>
                             <ContentPresenter Margin="7,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBlue}"/>
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentBlue}"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                                 <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -170,7 +144,7 @@
         </Style>
 
         <Style x:Key="SwitchCheckBox" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -178,21 +152,21 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9" Background="{StaticResource BorderColor}"
+                            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9" Background="{DynamicResource BorderColor}"
                                     BorderBrush="Transparent" BorderThickness="1" VerticalAlignment="Center">
-                                <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{StaticResource TextPrimary}"
+                                <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource TextPrimary}"
                                          HorizontalAlignment="Left" Margin="2,0,0,0"/>
                             </Border>
                             <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentPending}"/>
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentPending}"/>
                                 <Setter TargetName="Knob" Property="Margin" Value="16,0,0,0"/>
-                                <Setter TargetName="Knob" Property="Fill" Value="#1B1B1B"/>
+                                <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource TextOnAccent}"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -201,7 +175,7 @@
         </Style>
 
         <Style x:Key="SegmentButton" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="Padding" Value="11,3"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -214,15 +188,15 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCard}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgCard}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextSecondary}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextSecondary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -231,29 +205,29 @@
         </Style>
 
         <Style x:Key="FilterChip" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource BorderColor}"
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="{DynamicResource BorderColor}"
                                 BorderThickness="1" CornerRadius="11" Padding="10,2">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCard}"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextSecondary}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgCard}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextSecondary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -265,22 +239,22 @@
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="Padding" Value="5,1"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{StaticResource MutedTint}"/>
+            <Setter Property="Background" Value="{DynamicResource MutedTint}"/>
         </Style>
         <Style x:Key="CountBadgeText" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
 
         <!-- ── Text inputs ── -->
         <Style x:Key="FormTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource BgInput}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="SelectionBrush" Value="{StaticResource AccentBlue}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Background" Value="{DynamicResource BgInput}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource AccentBlue}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="4,0"/>
             <Setter Property="Height" Value="26"/>
@@ -293,7 +267,7 @@
                                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
                             <Grid>
                                 <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Padding="0"/>
-                                <TextBlock x:Name="Hint" Text="{TemplateBinding Tag}" Foreground="{StaticResource TextSecondary}"
+                                <TextBlock x:Name="Hint" Text="{TemplateBinding Tag}" Foreground="{DynamicResource TextSecondary}"
                                            Margin="9,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed"/>
                             </Grid>
                         </Border>
@@ -302,7 +276,7 @@
                                 <Setter TargetName="Hint" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -310,19 +284,19 @@
             </Setter>
         </Style>
         <Style x:Key="DataGridEditingTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource BgInput}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AccentPending}"/>
+            <Setter Property="Background" Value="{DynamicResource BgInput}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentPending}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="3,1"/>
         </Style>
 
         <!-- ── Combo box ── -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource BgInput}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Background" Value="{DynamicResource BgInput}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -350,14 +324,14 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="22"/>
                                                 </Grid.ColumnDefinitions>
-                                                <Path x:Name="Arrow" Grid.Column="1" Fill="{StaticResource TextSecondary}"
+                                                <Path x:Name="Arrow" Grid.Column="1" Fill="{DynamicResource TextSecondary}"
                                                       HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z"/>
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
-                                                <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource TextPrimary}"/>
+                                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource BorderStrong}"/>
+                                                <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimary}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -370,7 +344,7 @@
                                               VerticalAlignment="Center" HorizontalAlignment="Left"/>
                             <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
                                    AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
-                                <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}"
+                                <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}"
                                         BorderThickness="1" CornerRadius="5" Margin="0,2,0,0"
                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}">
@@ -382,7 +356,7 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -390,7 +364,7 @@
             </Setter>
         </Style>
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -400,10 +374,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgHover}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgSelected}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgSelected}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -427,10 +401,10 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
-                        <Border x:Name="Bd" Background="{StaticResource BorderStrong}" CornerRadius="3"/>
+                        <Border x:Name="Bd" Background="{DynamicResource BorderStrong}" CornerRadius="3"/>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource TextSecondary}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TextSecondary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -493,11 +467,11 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="GridSplitter">
                         <Border Background="Transparent">
-                            <Rectangle x:Name="Line" Width="1" Fill="{StaticResource BorderColor}" HorizontalAlignment="Center"/>
+                            <Rectangle x:Name="Line" Width="1" Fill="{DynamicResource BorderColor}" HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Line" Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                <Setter TargetName="Line" Property="Fill" Value="{DynamicResource AccentBlue}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -507,11 +481,11 @@
 
         <!-- ── Menus ── -->
         <Style TargetType="ContextMenu">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ContextMenu">
-                        <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}"
+                        <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}"
                                 BorderThickness="1" CornerRadius="5" Padding="3">
                             <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
                         </Border>
@@ -520,7 +494,7 @@
             </Setter>
         </Style>
         <Style TargetType="MenuItem">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
@@ -532,15 +506,15 @@
                                 </Grid.ColumnDefinitions>
                                 <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}" Margin="24,0,0,0"
-                                           Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgSelected}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgSelected}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -554,13 +528,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderColor}"
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource BorderColor}"
                                 BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -593,7 +567,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1">
                                 <TabPanel IsItemsHost="True" Margin="12,0"/>
                             </Border>
                             <ContentPresenter Grid.Row="1" ContentSource="SelectedContent" Margin="12"/>
@@ -603,7 +577,7 @@
             </Setter>
         </Style>
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
@@ -615,15 +589,15 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgHover}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -636,7 +610,7 @@
             <Setter Property="ContextMenu" Value="{StaticResource SurfaceContextMenu}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -645,10 +619,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgHover}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgSelected}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BgSelected}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -661,13 +635,13 @@
             <Setter Property="Height" Value="8"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Fill" Value="{StaticResource BorderStrong}"/>
+            <Setter Property="Fill" Value="{DynamicResource BorderStrong}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsFail}" Value="True">
-                    <Setter Property="Fill" Value="{StaticResource AccentRed}"/>
+                    <Setter Property="Fill" Value="{DynamicResource AccentRed}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsPass}" Value="True">
-                    <Setter Property="Fill" Value="{StaticResource AccentGreen}"/>
+                    <Setter Property="Fill" Value="{DynamicResource AccentGreen}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -689,11 +663,11 @@
                 </Ellipse>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="{Binding PartNumber}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding Segments, StringFormat='Segments \{0\}'}" Foreground="{StaticResource TextSecondary}"
+                    <TextBlock Text="{Binding Segments, StringFormat='Segments \{0\}'}" Foreground="{DynamicResource TextSecondary}"
                                Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
                 <Border Grid.Column="2" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
-                        Background="{StaticResource FailTint}"
+                        Background="{DynamicResource FailTint}"
                         Visibility="{Binding ShowBadge, Converter={StaticResource BoolToVisibility}}">
                     <Border.DataContext>
                         <MultiBinding Converter="{StaticResource StatusBoard}">
@@ -701,20 +675,20 @@
                             <Binding Source="{StaticResource StatusBoard}" Path="Version"/>
                         </MultiBinding>
                     </Border.DataContext>
-                    <TextBlock Text="{Binding Mismatches}" Style="{StaticResource CountBadgeText}" Foreground="{StaticResource AccentRed}"/>
+                    <TextBlock Text="{Binding Mismatches}" Style="{StaticResource CountBadgeText}" Foreground="{DynamicResource AccentRed}"/>
                 </Border>
             </Grid>
         </DataTemplate>
 
         <!-- ── Parts grid ── -->
         <Style TargetType="DataGrid">
-            <Setter Property="Background" Value="{StaticResource BgSurface}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Background" Value="{DynamicResource BgSurface}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="RowBackground" Value="Transparent"/>
             <Setter Property="AlternatingRowBackground" Value="Transparent"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource BorderColor}"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
@@ -727,20 +701,20 @@
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="{StaticResource BgCard}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Background" Value="{DynamicResource BgCard}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridColumnHeader">
                         <Grid>
-                            <Border Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderColor}"
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource BorderColor}"
                                     BorderThickness="0,0,0,1" Padding="10,7" SnapsToDevicePixels="True">
                                 <StackPanel Orientation="Horizontal">
                                     <ContentPresenter VerticalAlignment="Center"/>
                                     <Path x:Name="SortArrow" Visibility="Collapsed" Margin="6,0,0,0" VerticalAlignment="Center"
-                                          Fill="{StaticResource TextSecondary}" Data="M 0 4 L 4 0 L 8 4 Z"/>
+                                          Fill="{DynamicResource TextSecondary}" Data="M 0 4 L 4 0 L 8 4 Z"/>
                                 </StackPanel>
                             </Border>
                             <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right" Width="6" Cursor="SizeWE">
@@ -779,23 +753,23 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{StaticResource BgSelected}"/>
-                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                    <Setter Property="Background" Value="{DynamicResource BgSelected}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="PartRowStyle" TargetType="DataGridRow">
             <Setter Property="ContextMenu" Value="{StaticResource PartContextMenu}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsNotChecked}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource FailTint}"/>
+                    <Setter Property="Background" Value="{DynamicResource FailTint}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsEditPending}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PendingTint}"/>
+                    <Setter Property="Background" Value="{DynamicResource PendingTint}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -812,7 +786,7 @@
             <TextBlock x:Name="InPartText" Text="{Binding InPartText}" Style="{StaticResource MonoCellText}" VerticalAlignment="Center"/>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsEditPending}" Value="True">
-                    <Setter TargetName="InPartText" Property="Foreground" Value="{StaticResource AccentPending}"/>
+                    <Setter TargetName="InPartText" Property="Foreground" Value="{DynamicResource AccentPending}"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -824,32 +798,32 @@
         <!-- Status chip: colour and wording never depend on the row background. -->
         <DataTemplate x:Key="StatusCellTemplate">
             <Border x:Name="Chip" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left"
-                    Background="{StaticResource PassTint}" ToolTip="{Binding StatusTooltip}">
+                    Background="{DynamicResource PassTint}" ToolTip="{Binding StatusTooltip}">
                 <TextBlock x:Name="ChipText" Text="{Binding StatusText}" FontWeight="SemiBold" FontSize="11.5"
-                           Foreground="{StaticResource AccentGreen}" TextTrimming="CharacterEllipsis"/>
+                           Foreground="{DynamicResource AccentGreen}" TextTrimming="CharacterEllipsis"/>
             </Border>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource FailTint}"/>
-                    <Setter TargetName="ChipText" Property="Foreground" Value="{StaticResource AccentRed}"/>
+                    <Setter TargetName="Chip" Property="Background" Value="{DynamicResource FailTint}"/>
+                    <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource AccentRed}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsNotChecked}" Value="True">
-                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource MutedTint}"/>
-                    <Setter TargetName="ChipText" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                    <Setter TargetName="Chip" Property="Background" Value="{DynamicResource MutedTint}"/>
+                    <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsDisplayOnly}" Value="True">
-                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource MutedTint}"/>
-                    <Setter TargetName="ChipText" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                    <Setter TargetName="Chip" Property="Background" Value="{DynamicResource MutedTint}"/>
+                    <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsEditPending}" Value="True">
-                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource PendingTint}"/>
-                    <Setter TargetName="ChipText" Property="Foreground" Value="{StaticResource AccentPending}"/>
+                    <Setter TargetName="Chip" Property="Background" Value="{DynamicResource PendingTint}"/>
+                    <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource AccentPending}"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
         <DataTemplate x:Key="DescriptionCellTemplate">
             <TextBlock TextTrimming="CharacterEllipsis" ToolTip="{Binding DescriptionTooltip}">
-                <Run Text="{Binding Description, Mode=OneWay}"/><Run Text="{Binding ReasonSuffix, Mode=OneWay}" Foreground="{StaticResource TextSecondary}"/>
+                <Run Text="{Binding Description, Mode=OneWay}"/><Run Text="{Binding ReasonSuffix, Mode=OneWay}" Foreground="{DynamicResource TextSecondary}"/>
             </TextBlock>
         </DataTemplate>
     </UserControl.Resources>
@@ -863,7 +837,7 @@
         </Grid.RowDefinitions>
 
         <!-- ── Header: unit, overall status, highlight, edit switch ── -->
-        <Border Grid.Row="0" Background="{StaticResource BgSurface}" Padding="16,10">
+        <Border Grid.Row="0" Background="{DynamicResource BgSurface}" Padding="16,10">
             <Grid x:Name="HeaderGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -871,35 +845,35 @@
                 </Grid.ColumnDefinitions>
 
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="⬡" FontSize="20" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="⬡" FontSize="20" Foreground="{DynamicResource AccentBlue}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock x:Name="IamPathLabel" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="320"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                        <TextBlock Text="Unit Construction Verifier · checked live" Foreground="{StaticResource TextSecondary}" FontSize="11.5"/>
+                        <TextBlock Text="Unit Construction Verifier · checked live" Foreground="{DynamicResource TextSecondary}" FontSize="11.5"/>
                     </StackPanel>
                     <Border x:Name="OverallStatusPill" CornerRadius="11" Padding="10,3" VerticalAlignment="Center"
-                            Background="{StaticResource MutedTint}">
-                        <TextBlock x:Name="OverallStatusText" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Text="Not scanned"/>
+                            Background="{DynamicResource MutedTint}">
+                        <TextBlock x:Name="OverallStatusText" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Text="Not scanned"/>
                     </Border>
                     <Border x:Name="NotCheckedPill" CornerRadius="11" Padding="10,3" Margin="6,0,0,0" VerticalAlignment="Center"
-                            Background="{StaticResource MutedTint}" Visibility="Collapsed"
+                            Background="{DynamicResource MutedTint}" Visibility="Collapsed"
                             ToolTip="Parts a rule covers but that could not be checked. Use the Not checked filter on a surface to see why.">
-                        <TextBlock x:Name="NotCheckedText" Foreground="{StaticResource TextSecondary}"/>
+                        <TextBlock x:Name="NotCheckedText" Foreground="{DynamicResource TextSecondary}"/>
                     </Border>
                     <Button x:Name="NextIssueButton" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Visibility="Collapsed"
                             Click="OnNextIssueClick" ToolTip="Go to the next surface with a mismatch (F8)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Next issue"/>
-                            <Border BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="3" Padding="4,0" Margin="6,0,0,0">
-                                <TextBlock Text="F8" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                            <Border BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1" CornerRadius="3" Padding="4,0" Margin="6,0,0,0">
+                                <TextBlock Text="F8" FontSize="10.5" Foreground="{DynamicResource TextSecondary}"/>
                             </Border>
                         </StackPanel>
                     </Button>
                 </WrapPanel>
 
                 <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Highlight" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <Border Background="{StaticResource BgInput}" CornerRadius="6" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <TextBlock Text="Highlight" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Border Background="{DynamicResource BgInput}" CornerRadius="6" Padding="2" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="HighlightBoxRadio" GroupName="HighlightMode" Content="Box" IsChecked="True"
                                          Style="{StaticResource SegmentButton}" Checked="OnHighlightModeChanged"
@@ -916,11 +890,11 @@
                             Click="OnXRayColorButtonClick" ToolTip="Highlight color" Cursor="Hand">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
-                                <Border x:Name="Swatch" Background="{TemplateBinding Background}" BorderBrush="{StaticResource BorderStrong}"
+                                <Border x:Name="Swatch" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource BorderStrong}"
                                         BorderThickness="1" CornerRadius="10"/>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Swatch" Property="BorderBrush" Value="{StaticResource TextPrimary}"/>
+                                        <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource TextPrimary}"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -928,18 +902,19 @@
                     </Button>
                     <Popup x:Name="XRayColorPopup" PlacementTarget="{Binding ElementName=XRayColorButton}" Placement="Bottom"
                            StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1"
+                        <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1"
                                 CornerRadius="6" Padding="4" Margin="0,4,0,0">
                             <StackPanel x:Name="XRayColorListPanel"/>
                         </Border>
                     </Popup>
 
-                    <Rectangle Width="1" Height="20" Fill="{StaticResource BorderColor}" Margin="16,0"/>
+                    <Rectangle Width="1" Height="20" Fill="{DynamicResource BorderColor}" Margin="16,0"/>
 
                     <CheckBox x:Name="EditModeCheckBox" Style="{StaticResource SwitchCheckBox}" Content="Edit parts"
                               Checked="OnEditModeChanged" Unchecked="OnEditModeChanged"
                               ToolTip="Stage changes to part properties, then write them to the IPT files"/>
-                    <Button x:Name="DockToggleButton" Style="{StaticResource GhostButton}" Margin="12,0,0,0" Visibility="Collapsed"
+                    <Button x:Name="ThemeButton" Style="{StaticResource GhostButton}" Margin="12,0,0,0" Click="OnThemeClick"/>
+                    <Button x:Name="DockToggleButton" Style="{StaticResource GhostButton}" Margin="4,0,0,0" Visibility="Collapsed"
                             Content="Dock" Click="OnDockToggleClick"/>
                 </WrapPanel>
             </Grid>
@@ -948,19 +923,19 @@
         <StackPanel Grid.Row="1">
             <!-- ── Inventor moved to another unit than the one being checked ── -->
             <Border x:Name="OtherUnitBanner" Margin="12,10,12,0" CornerRadius="6" Padding="12,7"
-                    Background="{StaticResource PendingTint}" BorderBrush="{StaticResource AccentPending}" BorderThickness="1" Visibility="Collapsed">
+                    Background="{DynamicResource PendingTint}" BorderBrush="{DynamicResource AccentPending}" BorderThickness="1" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="✕" Click="OnCloseOtherUnitBannerClick"
                             ToolTip="Keep checking this unit"/>
                     <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Check this unit" Margin="0,0,8,0"
                             Click="OnCheckActiveUnitClick" ToolTip="Close this check (asks about unsaved changes) and check the unit open in Inventor"/>
-                    <TextBlock x:Name="OtherUnitText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource AccentPending}"/>
+                    <TextBlock x:Name="OtherUnitText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource AccentPending}"/>
                 </DockPanel>
             </Border>
 
             <!-- ── Re-check summary ── -->
             <Border x:Name="CheckBanner" Margin="12,10,12,0" CornerRadius="6" Padding="12,7"
-                    Background="{StaticResource FailTint}" Visibility="Collapsed">
+                    Background="{DynamicResource FailTint}" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="✕" Click="OnCloseBannerClick" ToolTip="Dismiss"/>
                     <Button x:Name="BannerNextIssueButton" DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Content="Go to first issue"
@@ -983,7 +958,7 @@
                         </Border>
                     </StackPanel>
                 </TabItem.Header>
-                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
+                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource BgSurface}">
                     <Grid x:Name="RoofBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
@@ -1000,14 +975,14 @@
                         </DockPanel>
                         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ShowsPreview="False"/>
 
-                        <Grid Grid.Column="2" Background="{StaticResource BgPrimary}">
+                        <Grid Grid.Column="2" Background="{DynamicResource BgPrimary}">
                             <Grid x:Name="RoofDetailPanel" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
+                                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
                                     <StackPanel>
                                         <DockPanel>
                                             <Button DockPanel.Dock="Right" Content="Copy to all roofs…" Style="{StaticResource SmallButton}" Click="OnApplyRoofToAll"
@@ -1016,7 +991,7 @@
                                                 <ToggleButton.Template>
                                                     <ControlTemplate TargetType="ToggleButton">
                                                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                                                            <TextBlock x:Name="Chev" Text="▾" Foreground="{StaticResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
+                                                            <TextBlock x:Name="Chev" Text="▾" Foreground="{DynamicResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
                                                             <TextBlock Text="Expected construction" Style="{StaticResource SectionHeader}"/>
                                                         </StackPanel>
                                                         <ControlTemplate.Triggers>
@@ -1116,7 +1091,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="RoofPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a roof surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="RoofPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a roof surface to check its parts, or press F8 to jump to the next issue." Foreground="{DynamicResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1133,7 +1108,7 @@
                         </Border>
                     </StackPanel>
                 </TabItem.Header>
-                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
+                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource BgSurface}">
                     <Grid x:Name="WallBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
@@ -1150,14 +1125,14 @@
                         </DockPanel>
                         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ShowsPreview="False"/>
 
-                        <Grid Grid.Column="2" Background="{StaticResource BgPrimary}">
+                        <Grid Grid.Column="2" Background="{DynamicResource BgPrimary}">
                             <Grid x:Name="WallDetailPanel" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
+                                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
                                     <StackPanel>
                                         <DockPanel>
                                             <Button DockPanel.Dock="Right" Content="Copy to all walls…" Style="{StaticResource SmallButton}" Click="OnApplyWallToAll"
@@ -1166,7 +1141,7 @@
                                                 <ToggleButton.Template>
                                                     <ControlTemplate TargetType="ToggleButton">
                                                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                                                            <TextBlock x:Name="Chev" Text="▾" Foreground="{StaticResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
+                                                            <TextBlock x:Name="Chev" Text="▾" Foreground="{DynamicResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
                                                             <TextBlock Text="Expected construction" Style="{StaticResource SectionHeader}"/>
                                                         </StackPanel>
                                                         <ControlTemplate.Triggers>
@@ -1265,7 +1240,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="WallPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a wall surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="WallPlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a wall surface to check its parts, or press F8 to jump to the next issue." Foreground="{DynamicResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1282,7 +1257,7 @@
                         </Border>
                     </StackPanel>
                 </TabItem.Header>
-                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{StaticResource BgSurface}">
+                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource BgSurface}">
                     <Grid x:Name="BaseBody">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240" MinWidth="170" MaxWidth="420"/>
@@ -1299,20 +1274,20 @@
                         </DockPanel>
                         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ShowsPreview="False"/>
 
-                        <Grid Grid.Column="2" Background="{StaticResource BgPrimary}">
+                        <Grid Grid.Column="2" Background="{DynamicResource BgPrimary}">
                             <Grid x:Name="BaseDetailPanel" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
+                                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12">
                                     <StackPanel>
                                         <ToggleButton x:Name="BaseSpecToggle" IsChecked="True" HorizontalAlignment="Left" Cursor="Hand" FocusVisualStyle="{x:Null}">
                                             <ToggleButton.Template>
                                                 <ControlTemplate TargetType="ToggleButton">
                                                     <StackPanel Orientation="Horizontal" Background="Transparent">
-                                                        <TextBlock x:Name="Chev" Text="▾" Foreground="{StaticResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="Chev" Text="▾" Foreground="{DynamicResource TextSecondary}" Width="14" VerticalAlignment="Center"/>
                                                         <TextBlock Text="Expected construction" Style="{StaticResource SectionHeader}"/>
                                                     </StackPanel>
                                                     <ControlTemplate.Triggers>
@@ -1418,7 +1393,7 @@
                                     </DataGrid>
                                 </Grid>
                             </Grid>
-                            <TextBlock x:Name="BasePlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a base or floor surface to check its parts, or press F8 to jump to the next issue." Foreground="{StaticResource TextSecondary}"
+                            <TextBlock x:Name="BasePlaceholderText" TextWrapping="Wrap" TextAlignment="Center" Margin="16" Text="Select a base or floor surface to check its parts, or press F8 to jump to the next issue." Foreground="{DynamicResource TextSecondary}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
                         </Grid>
                     </Grid>
@@ -1427,7 +1402,7 @@
         </TabControl>
 
         <!-- ── Footer ── -->
-        <Border Grid.Row="3" Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="16,9">
+        <Border Grid.Row="3" Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1,0,0" Padding="16,9">
             <Grid x:Name="FooterGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -1435,20 +1410,20 @@
                 </Grid.ColumnDefinitions>
 
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border x:Name="EditModeFooterPanel" Background="{StaticResource PendingTint}" BorderBrush="{StaticResource AccentPending}"
+                    <Border x:Name="EditModeFooterPanel" Background="{DynamicResource PendingTint}" BorderBrush="{DynamicResource AccentPending}"
                             BorderThickness="1" CornerRadius="6" Padding="10,4" Margin="0,0,12,0" Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="StagedEditsText" Text="No part changes staged" Foreground="{StaticResource AccentPending}"
+                            <TextBlock x:Name="StagedEditsText" Text="No part changes staged" Foreground="{DynamicResource AccentPending}"
                                        FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
                             <Button Content="Discard" Style="{StaticResource GhostButton}" Margin="0,0,6,0" Click="OnCancelChanges"/>
                             <Button Content="Review &amp; write to parts…" Style="{StaticResource PrimaryButton}" Padding="12,4"
-                                    Background="{StaticResource AccentPending}" Click="OnWriteChanges"/>
+                                    Background="{DynamicResource AccentPending}" Click="OnWriteChanges"/>
                         </StackPanel>
                     </Border>
-                    <TextBlock x:Name="UnsavedOverridesLabel" Text="● Unsaved expectation changes" Foreground="{StaticResource AccentOrange}"
+                    <TextBlock x:Name="UnsavedOverridesLabel" Text="● Unsaved expectation changes" Foreground="{DynamicResource AccentOrange}"
                                VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed"
                                ToolTip="Click Save expectations to keep these changes for this unit"/>
-                    <TextBlock x:Name="NoticeText" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="NoticeText" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 </WrapPanel>
 
                 <StackPanel Grid.Column="1" x:Name="NormalModeFooterPanel" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -1471,15 +1446,15 @@
         <!-- Progress while part files are written and the unit re-scanned. Blocks input; the view underneath stays as it was
              (disabling the whole view turned the surface lists white and greyed everything, which looked broken). -->
         <Grid x:Name="BusyOverlay" Grid.RowSpan="4" Panel.ZIndex="11" Background="#B30C0D12" Visibility="Collapsed">
-            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
+            <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1" CornerRadius="8"
                     MaxWidth="460" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                 <StackPanel>
                     <TextBlock x:Name="BusyTitle" Text="Writing part changes…" Style="{StaticResource SectionHeader}" FontSize="15"/>
-                    <TextBlock x:Name="BusyDetail" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,10"/>
-                    <ProgressBar x:Name="BusyProgress" Height="6" Minimum="0" Maximum="1" Foreground="{StaticResource AccentPending}"
-                                 Background="{StaticResource BgInput}" BorderThickness="0"/>
+                    <TextBlock x:Name="BusyDetail" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                    <ProgressBar x:Name="BusyProgress" Height="6" Minimum="0" Maximum="1" Foreground="{DynamicResource AccentPending}"
+                                 Background="{DynamicResource BgInput}" BorderThickness="0"/>
                     <TextBlock Text="Inventor opens, updates and saves each part in turn, so this can take a while on many parts."
-                               Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="11.5"/>
+                               Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="11.5"/>
                 </StackPanel>
             </Border>
         </Grid>
@@ -1487,13 +1462,13 @@
         <!-- Regenerate changed review: every surface with its reason; surfaces whose channels changed are ticked.
              Covers the window until Regenerate or Cancel. -->
         <Grid x:Name="BatchReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
-            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
+            <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1" CornerRadius="8"
                     MaxWidth="820" MaxHeight="560" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock x:Name="BatchReviewTitle" Text="Regenerate channel features" Style="{StaticResource SectionHeader}" FontSize="15"/>
-                        <TextBlock x:Name="BatchReviewSummary" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                        <TextBlock x:Name="BatchReviewSummary" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
                         <Grid Margin="8,0,8,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="28"/>
@@ -1510,14 +1485,14 @@
                         <Button x:Name="BatchReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                                 Content="Cancel" IsCancel="True" Click="OnBatchReviewCancel"/>
                         <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
-                            <CheckBox x:Name="BatchReviewAutoCloseCheck" IsChecked="True" Foreground="{StaticResource TextPrimary}"
+                            <CheckBox x:Name="BatchReviewAutoCloseCheck" IsChecked="True" Foreground="{DynamicResource TextPrimary}"
                                       Content="Close YCShell's information boxes automatically"
                                       ToolTip="Only OK-only notices such as 'Channel Features have been recreated/replaced'. Yes/No questions always come to you."/>
-                            <TextBlock x:Name="BatchReviewNote" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="11.5"
+                            <TextBlock x:Name="BatchReviewNote" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="11.5"
                                        Text="YCShell saves each surface as it regenerates it. Closing without saving does not undo it."/>
                         </StackPanel>
                     </DockPanel>
-                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1">
+                    <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl x:Name="BatchReviewList">
                                 <ItemsControl.ItemTemplate>
@@ -1529,7 +1504,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay}" IsEnabled="{Binding CanRun}" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding SurfaceName}" FontFamily="Consolas" Foreground="{StaticResource TextPrimary}"
+                                            <TextBlock Grid.Column="1" Text="{Binding SurfaceName}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimary}"
                                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                             <TextBlock x:Name="ReasonText" Grid.Column="2" Text="{Binding ReasonText}" Style="{StaticResource ReadOnlyCellText}"
                                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
@@ -1539,10 +1514,10 @@
                                                 <Setter TargetName="RegenerateRow" Property="Opacity" Value="0.5"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
-                                                <Setter TargetName="ReasonText" Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                <Setter TargetName="ReasonText" Property="Foreground" Value="{DynamicResource AccentOrange}"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding CanRun}" Value="False">
-                                                <Setter TargetName="ReasonText" Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                <Setter TargetName="ReasonText" Property="Foreground" Value="{DynamicResource AccentRed}"/>
                                             </DataTrigger>
                                         </DataTemplate.Triggers>
                                     </DataTemplate>
@@ -1556,13 +1531,13 @@
 
         <!-- Write review: every staged change; untick to leave it staged. Covers the window until Write or Cancel. -->
         <Grid x:Name="WriteReviewOverlay" Grid.RowSpan="4" Panel.ZIndex="10" Background="#B30C0D12" Visibility="Collapsed">
-            <Border Background="{StaticResource BgSurface}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" CornerRadius="8"
+            <Border Background="{DynamicResource BgSurface}" BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1" CornerRadius="8"
                     MaxWidth="820" MaxHeight="560" Margin="16" Padding="18,14" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="Review part changes" Style="{StaticResource SectionHeader}" FontSize="15"/>
-                        <TextBlock x:Name="WriteReviewSummary" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
+                        <TextBlock x:Name="WriteReviewSummary" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,12"/>
                         <Grid Margin="8,0,8,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="28"/>
@@ -1580,13 +1555,13 @@
                     </StackPanel>
                     <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
                         <Button x:Name="WriteReviewConfirmButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="14,5"
-                                Background="{StaticResource AccentPending}" Content="Write changes" Click="OnWriteReviewConfirm"/>
+                                Background="{DynamicResource AccentPending}" Content="Write changes" Click="OnWriteReviewConfirm"/>
                         <Button x:Name="WriteReviewCancelButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
                                 Content="Cancel" IsCancel="True" Click="OnWriteReviewCancel"/>
-                        <TextBlock VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,12,0"
+                        <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,12,0"
                                    Text="Part files must be checked out of Vault. Ticked changes are written in one transaction."/>
                     </DockPanel>
-                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1">
+                    <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,1">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl x:Name="WriteReviewList">
                                 <ItemsControl.ItemTemplate>
@@ -1606,10 +1581,10 @@
                                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="2" Text="{Binding Parameter}" Style="{StaticResource ReadOnlyCellText}" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="3" Text="{Binding Current}" Style="{StaticResource MonoCellText}"
-                                                       Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="4" Text="→" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                       Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="4" Text="→" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             <TextBlock x:Name="NewText" Grid.Column="5" Text="{Binding NewValue}" ToolTip="{Binding NewValueTooltip}" FontFamily="Consolas"
-                                                       Foreground="{StaticResource AccentPending}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                       Foreground="{DynamicResource AccentPending}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                         </Grid>
                                         <DataTemplate.Triggers>
                                             <DataTrigger Binding="{Binding IsIncluded}" Value="False">
@@ -1617,7 +1592,7 @@
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding CanWrite}" Value="False">
                                                 <Setter TargetName="NewText" Property="TextDecorations" Value="Strikethrough"/>
-                                                <Setter TargetName="NewText" Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                <Setter TargetName="NewText" Property="Foreground" Value="{DynamicResource AccentRed}"/>
                                             </DataTrigger>
                                         </DataTemplate.Triggers>
                                     </DataTemplate>

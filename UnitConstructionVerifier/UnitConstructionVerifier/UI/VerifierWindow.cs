@@ -1,7 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media;
+using System.Windows.Data;
 
 namespace UnitConstructionVerifier.UI
 {
@@ -20,7 +20,8 @@ namespace UnitConstructionVerifier.UI
             MinWidth = 420;
             MinHeight = 480;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            Background = view.TryFindResource("BgPrimary") as Brush;
+            // Follows the view's theme: the window can't see the view's palette resources itself.
+            SetBinding(BackgroundProperty, new Binding(nameof(Background)) { Source = view });
             Content = view;
 
             Activated += (_, __) => view.NoteHostActivated();

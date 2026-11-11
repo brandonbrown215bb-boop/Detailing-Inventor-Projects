@@ -77,6 +77,11 @@ The verifier is **modeless** — you can pan and rotate the model in Inventor wh
 
   The round swatch next to it picks the highlight color.
 - **Edit parts** turns on part editing (see below).
+- The theme button (**◐ System**, **☀ Light**, **☾ Dark**) switches the colours. **System**, the default, follows
+  Windows (Settings › Personalization › Colors › app mode) and changes with it. Each click moves to the next choice;
+  it is remembered for your Windows user (`%AppData%\UnitConstructionVerifier\theme.txt`) and also sets the
+  Thickness Inspector tooltip and the wireframe preview. The preview's drawing area stays dark so light wireframe
+  colours remain visible.
 
 ### Surface tabs and list
 
@@ -284,6 +289,7 @@ Press **Thickness Inspector** on the ribbon, then hover a part. The tooltip show
 - **Measured 0.0598"** appears only when a sheet metal part's modelled thickness is off from the recorded one.
 - **No gauge match** means the gauge isn't in the materials database; line 1 then shows the material alone.
 - **No thickness recorded** on a part that isn't sheet metal means nothing records its thickness. The tooltip no longer guesses one from the part's size.
+- The tooltip uses the verifier's theme (light or dark, see Header).
 - Press the button again or Esc to stop.
 
 ---

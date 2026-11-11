@@ -4,7 +4,7 @@
         Title="Part Wireframe Preview"
         Width="520" Height="440" MinWidth="360" MinHeight="320"
         WindowStartupLocation="Manual"
-        Background="#191B22">
+        Background="{DynamicResource BgPrimary}">
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -20,7 +20,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="TitleLabel"
                        Grid.Column="0"
-                       Foreground="#E7E9EF"
+                       Foreground="{DynamicResource TextPrimary}"
                        FontSize="13"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"
@@ -38,12 +38,12 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="PreviewSwatchBorder"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="#4A5163"
+                                BorderBrush="{DynamicResource BorderStrong}"
                                 BorderThickness="1"
                                 CornerRadius="4"/>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="PreviewSwatchBorder" Property="BorderBrush" Value="#7C9EFF"/>
+                                <Setter TargetName="PreviewSwatchBorder" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -54,8 +54,8 @@
                    Placement="Bottom"
                    StaysOpen="False"
                    AllowsTransparency="True">
-                <Border Background="#20232B"
-                        BorderBrush="#4A5163"
+                <Border Background="{DynamicResource BgSurface}"
+                        BorderBrush="{DynamicResource BorderStrong}"
                         BorderThickness="1"
                         CornerRadius="6"
                         Padding="4">
@@ -64,9 +64,10 @@
             </Popup>
         </Grid>
 
+        <!-- Dark in both themes: the wireframe colour choices (yellow, white, cyan…) need a dark backdrop. -->
         <Border Grid.Row="1"
                 Background="#15171D"
-                BorderBrush="#4A5163"
+                BorderBrush="{DynamicResource BorderStrong}"
                 BorderThickness="1"
                 CornerRadius="6"
                 ClipToBounds="True">
@@ -81,7 +82,7 @@
 
         <TextBlock Grid.Row="2"
                    Margin="0,8,0,0"
-                   Foreground="#98A0B1"
+                   Foreground="{DynamicResource TextSecondary}"
                    FontSize="11"
                    Text="Drag: rotate · Wheel: zoom · Middle-drag: pan · Updates when surface/part selection changes"/>
     </Grid>
