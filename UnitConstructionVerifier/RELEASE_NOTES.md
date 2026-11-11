@@ -2,6 +2,15 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.37.0 (2026-11-11) — updates itself
+
+- **Self-update from the team share.** When Inventor starts, the add-in checks
+  `P:\Detailing\Detailing Tools\UnitConstructionVerifier_Dist.zip` in the background. If it holds a newer version,
+  the files are copied into the Addins folder and the new version loads on the next Inventor start; the verifier
+  says so once. Nothing changes if the share is unreachable or the copy fails. See *Releasing to detailers* in
+  `HOW_TO_USE.md`. Install this version once with `install.bat`; later versions arrive by themselves.
+- `create_dist.bat` writes `version.txt` into the zip for the update check.
+
 ## v1.0.36.0 (2026-11-11) — light theme
 
 - **Light and dark themes.** The verifier follows the Windows app mode by default and switches live when Windows

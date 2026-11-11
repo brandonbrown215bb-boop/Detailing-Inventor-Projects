@@ -21,6 +21,7 @@ namespace UnitConstructionVerifier
         public void Activate(ApplicationAddInSite addInSiteObject, bool firstTime)
         {
             DebugLogger.CleanUpOldLogs();
+            Deployment.SelfUpdater.StartInBackground();
             _inventorApp = addInSiteObject.Application;
             _verifierCommand = new VerifierCommand(_inventorApp);
             _hoverCommand = new Operations.ThicknessHoverCommand(_inventorApp);

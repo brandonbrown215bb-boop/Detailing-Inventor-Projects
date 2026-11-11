@@ -16,6 +16,8 @@
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
     <!-- WPF, for tests of window helpers -->
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="WindowsBase" />

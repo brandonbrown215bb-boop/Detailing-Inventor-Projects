@@ -103,6 +103,9 @@ namespace UnitConstructionVerifier.UI
 
             // Docked beside the model the view is narrow: fold to one column there, back to two when wide.
             SizeChanged += (_, __) => ApplyResponsiveLayout();
+
+            if (Deployment.SelfUpdater.StagedVersion is Version staged)
+                ShowNotice($"Version {staged.ToString(3)} is installed. Restart Inventor to start using it.");
         }
 
         /// <summary>Raised by the header's Dock / Pop out button; the presenter moves the view.</summary>

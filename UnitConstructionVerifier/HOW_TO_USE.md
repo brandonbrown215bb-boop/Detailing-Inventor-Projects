@@ -31,6 +31,25 @@ deploy.bat
 
 If deploy fails because the DLL is locked, close Inventor and run again.
 
+### Releasing to detailers (self-update)
+
+Detailers install once from the release zip with `install.bat`. After that the add-in keeps itself current:
+
+1. Bump `AssemblyVersion`/`FileVersion` in `UnitConstructionVerifier.csproj`, build Release, run `create_dist.bat`.
+   It writes `version.txt` (the DLL's file version) into `UnitConstructionVerifier_Dist.zip`.
+2. Copy the zip to `P:\Detailing\Detailing Tools` under a temporary name, then rename it to
+   `UnitConstructionVerifier_Dist.zip`, so nobody reads a half-copied file.
+3. Each time Inventor starts, the add-in checks that zip in the background
+   (`\\C4050MV010.go.johnsoncontrols.com\Public\Detailing\Detailing Tools`, the server behind P:). If its
+   `version.txt` is newer than the installed DLL, it copies the `.dll`, `.addin` and `.json` files into the Addins
+   folder, renaming the old ones to `*.old_<date>`. The new version loads on the **next** Inventor start; the
+   verifier shows a one-time notice saying so. Leftover `*.old_*` files are deleted on a later start.
+
+It only moves forward: a zip with the same or an older version is ignored. To roll the team back, rebuild the old
+code with a **higher** version number and publish that. If the share can't be reached, or anything fails, the
+installed version is left as it was and the reason goes to `ucv_debug.txt`. Detailers on v1.0.36 or earlier have
+no updater and must run `install.bat` once.
+
 ---
 
 ## Opening the verifier
@@ -340,6 +359,7 @@ Creates a source zip (respects `_package_exclude.txt`). Useful for transfer to a
 |-------|-----|
 | Add-in not in Inventor | Confirm deploy path, restart Inventor, check `.addin` in Addins folder |
 | Deploy “file locked” | Close Inventor; deploy renames old DLL with timestamp |
+| A new release didn't arrive | Restart Inventor twice (one start copies it, the next loads it); check `ucv_debug.txt` for "Self-update" |
 | Highlight missing on direct IAM open | Ensure you’re on v1.0.17 or later |
 | Property write-back failed | Confirm IPT is sheet metal and parameter names match config JSON |
 | Accidental paste dialog | Cancel in Inventor; see clipboard section above |

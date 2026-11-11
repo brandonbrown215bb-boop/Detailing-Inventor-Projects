@@ -48,6 +48,10 @@ if errorlevel 1 goto :error
 copy /Y "install.bat" "%DIST_DIR%\" >NUL
 if errorlevel 1 goto :error
 
+:: The add-in's self-updater compares this with the installed DLL's version
+powershell -NoProfile -Command "(Get-Item '%DIST_DIR%\UnitConstructionVerifier.dll').VersionInfo.FileVersion | Set-Content -Encoding ASCII '%DIST_DIR%\version.txt'"
+if errorlevel 1 goto :error
+
 :: Zip the dist folder contents using PowerShell
 echo Creating ZIP archive %ZIP_NAME%...
 powershell -Command "Compress-Archive -Path '%DIST_DIR%\*' -DestinationPath '%ZIP_NAME%' -Force"
