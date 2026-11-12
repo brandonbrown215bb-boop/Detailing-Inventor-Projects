@@ -2,6 +2,42 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.40.0 (2026-11-12) — restore warns when a roof fails
+
+- **⋯ > Restore roof segments…** now shows its result as a warning, starting with **RESTORE FAILED** and the roof
+  names, when any roof is not restored. A roof that failed after YCShell started changing it says so: it may be
+  changed in Inventor but not saved, so close the unit without saving and reopen it.
+- First release published to `P:\Detailing\Detailing Tools` for the self-update (v1.0.37). Detailers on v1.0.36 or
+  earlier run `install.bat` from the zip once; later releases arrive on their own after two Inventor starts.
+
+## v1.0.39.0 (2026-11-12) — restored roofs keep injected foam
+
+- **Fixed: a restored roof's foam came out as Foamboard.** The YLength workaround also raises the roof's nominal
+  thickness (2.79" on job 20275, 0050). YCShell looks foam up in its housing insulation calculator, which only has
+  2", 3" and 4" panels, so every region failed the lookup and YCShell converted it to Foamboard ("FB" on the
+  insulation page, instead of "IF" with volume and density).
+- **⋯ > Restore roof segments…** now also sets such a roof's nominal thickness to its segment's panel thickness
+  (`wallThickness_Top`, 2" on 20275). The roof's geometry and low/high side thicknesses stay as raised. Only YCShell's
+  insulation code reads the nominal thickness, so nothing else changes. Checked with YCShell's own calculator: 2.79"
+  is not found, 2" gives 391-20002-210 INSUL 2", 2" FOAM, 4.73 cu ft per 22.7" bay.
+- Roofs already restored with v1.0.38 are offered again for just this change. The result now lists the insulation
+  types YCShell wrote (for example `7 Foam`).
+
+## v1.0.38.0 (2026-11-11) — restore roof segments
+
+- **⋯ > Restore roof segments…** fixes roofs whose YLength was raised so the slope lands. MOM regenerates such a
+  roof without its segments, so YCShell has no materials or insulation type for it: the foam comes out empty and the
+  paperwork prints "Error getting segment and material." (Seen on job 20275, vestibule roof 0050; all 121 roofs
+  checked follow the rule.)
+  - UCV copies the order's segment under the roof from the unit's other surface configs, removes segments that are
+    not from the order (such as the ISG Bandage's), shows the change, backs up the config beside the roof IAM, then
+    has YCShell rebuild the foam and write the config the way its Upload does. Only the roof IAM is saved.
+  - On 20275 this restores the VESTIBULE segment (16 GA STL GALV skin, 18 GA ALM SHT liner, Foam). The Bandage's
+    stand-in had printed the liners as 20 GA galvanized.
+  - Not covered: openings (counted in the review, added by hand; see `Docs/roof_openings_local_generation_test_plan.md`),
+    bulkhead records on the restored segment, and re-sending a roof that Upload sees as unchanged.
+  - Decision record: `docs/decisions/0005-ucv-restore-roof-segments.md`.
+
 ## v1.0.37.0 (2026-11-11) — updates itself
 
 - **Self-update from the team share.** When Inventor starts, the add-in checks

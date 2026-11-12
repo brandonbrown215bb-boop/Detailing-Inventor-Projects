@@ -153,8 +153,8 @@ The verifier is **modeless** — you can pan and rotate the model in Inventor wh
 - **Save expectations** keeps expectation changes for this unit in the sidecar file next to the IAM.
 - **Re-check unit** re-reads the unit from Inventor, then runs every check again. It follows surfaces MOM renamed on
   upload (see below).
-- **⋯** holds **Check paperwork (IDW BOMs)…**, **Surface number history…** and **Save snapshot for regression tests…**
-  (see below).
+- **⋯** holds **Check paperwork (IDW BOMs)…**, **Restore roof segments…**, **Surface number history…** and
+  **Save snapshot for regression tests…** (see below).
 
 ---
 
@@ -286,6 +286,58 @@ material differs from the part as modelled, for example:
 - Rows are matched to parts by part number (after upload the file name can differ). Channel and insulation rows
   print no material and are not checked. A row whose part isn't in the unit is listed as *part not found*.
 - Each IDW opens hidden in Inventor and closes without saving; one taken from a ZIP is read from a temp copy.
+
+---
+
+## Restore roof segments
+
+Raising a sloped roof's **YLength** (so its slope lands on the next roof) makes MOM regenerate the roof **without
+its segments**: the roof's top is now above the segment it sits on, and MOM only keeps segments that contain the
+roof. Without a segment YCShell has no materials and no insulation type for the roof, so:
+
+- the skins, liners and trim are built with fallback materials (STL GALV 20);
+- the insulation (foam) is empty;
+- the paperwork BOM prints **Error getting segment and material.**
+
+**⋯ > Restore roof segments…** puts the order's segment back and has YCShell rebuild the foam:
+
+1. UCV reads every surface config of the unit and finds roofs that have no segment from the order. Each roof gets the
+   segments of its skid that sit under it, copied from the other surfaces' configs (the walls and base carry the
+   same segments). A segment that is not from the order, such as one the ISG Bandage added, is removed.
+   - The raised YLength also raised the roof's **nominal thickness** (for example 2.79"). YCShell only has foam for
+     2", 3" and 4" panels and turns any other thickness into **Foamboard**. UCV sets the nominal thickness to the
+     segment's panel thickness (`wallThickness_Top`, usually 2") so the foam stays injected foam. The roof's geometry
+     and its low and high side thicknesses are not changed. A roof that already has its segment but still carries
+     the raised thickness is offered for this change alone.
+2. A review lists, per roof, what is added and removed (type, top skin, top liner, insulation) and why the roof lost
+   its segments, for example `roof top 133.79 is above its segments' top 133 (YLength raised)`. Roofs that cannot
+   be restored say why. Press **Yes** to restore.
+3. For each roof, UCV saves the current config to `.ucv_config_backups\<roof>_<date-time>.json` beside the roof IAM,
+   then YCShell rebuilds the foam from the roof's channels and the segment's insulation type and writes the config
+   (as its Upload does), and UCV saves the roof IAM only. The result lists each roof with the insulation YCShell
+   wrote, for example `insulation: 7 Foam`. **FoamBoard** there means YCShell found no foam spec for the roof.
+   If any roof fails, the result opens as a warning that starts with **RESTORE FAILED** and names it. A roof that
+   failed part way may be changed in Inventor but not saved: do not save it; close the unit without saving and
+   reopen it.
+
+Then:
+
+- **Reopen the verifier** on the unit (expectations come from the configs when it opens). The roof's expected skin
+  and liner now come from the restored segment; write any parts it flags as usual.
+- **Generate Paperwork** in YCShell to see corrected paperwork, and **Upload changed** to send it.
+
+Requirements and limits:
+
+- YCShell loaded and logged in (it needs its engineering rules), and the roof loaded in YCShell.
+- The whole unit open, so the other surfaces' configs can be read. A roof with no segment of its skid under it is
+  reported, not filled.
+- **Openings are not restored.** The review counts the order's openings on the roof; add them by hand. See
+  `Docs/roof_openings_local_generation_test_plan.md`.
+- The restored segment carries no bulkhead records: the order lists bulkheads per surface, and which belong to the
+  roof can't be read from the others.
+- YCShell's Upload skips a surface with no part changes ("Complete - No Change Detected"). A roof already uploaded
+  with correct parts is not re-sent after a restore.
+- There is no undo button. The backup holds the config as it was, to put back by hand if ever needed.
 
 ---
 

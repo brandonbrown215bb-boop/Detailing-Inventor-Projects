@@ -92,6 +92,22 @@ namespace UnitConstructionVerifier.Extraction
             return null;
         }
 
+        /// <summary>The surface's DOCUMENT_CONFIG_JSON text as stored, or empty when it has none.</summary>
+        public static string ReadJson(AssemblyDocument doc)
+        {
+            foreach (AttributeSet set in doc.AttributeSets)
+            {
+                foreach (Inventor.Attribute attr in set)
+                {
+                    if (!string.Equals(attr.Name, AttrSetSearchName, StringComparison.OrdinalIgnoreCase)) continue;
+                    string json = AttributeText.Decode(attr.Value);
+                    if (!string.IsNullOrWhiteSpace(json)) return json;
+                }
+            }
+
+            return string.Empty;
+        }
+
         /// <summary>
         /// Deserializes a DOCUMENT_CONFIG_JSON payload. Shared with the headless scan tool.
         /// </summary>

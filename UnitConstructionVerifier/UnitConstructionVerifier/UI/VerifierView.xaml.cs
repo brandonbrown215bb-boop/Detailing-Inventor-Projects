@@ -1555,6 +1555,135 @@ namespace UnitConstructionVerifier.UI
         }
 
         /// <summary>
+        /// Puts back the order segments a roof lost when its YLength was raised, then has YCShell rebuild its foam and
+        /// write the config (docs/decisions/0005-ucv-restore-roof-segments.md). Shows what changes before doing it.
+        /// </summary>
+        private void OnRestoreRoofSegments(object sender, RoutedEventArgs e)
+        {
+            const string title = "Restore roof segments";
+            if (_iptResult is null)
+            {
+                Dialogs.Show(this, "Scan the unit first (Re-check unit).", title, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            FollowRenamedSurfaces();
+            var configs = new List<SurfaceConfigText>();
+            foreach (string path in _data.RoofRows.Select(r => r.SourceSurfaceIam)
+                         .Concat(_data.WallRows.Select(r => r.SourceSurfaceIam))
+                         .Concat(_data.BaseRows.Select(r => r.SourceSurfaceIam))
+                         .Where(p => !string.IsNullOrEmpty(p))
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (OpenAssembly(path) is Inventor.AssemblyDocument doc) configs.Add(new SurfaceConfigText(path, Extraction.ConfigJsonExtractor.ReadJson(doc)));
+            }
+
+            List<RoofRestorePlan> plans = RoofSegmentRestore.Plan(configs);
+            string report = RoofSegmentRestore.Report(plans);
+            List<RoofRestorePlan> ready = plans.Where(p => p.CanApply).ToList();
+            if (ready.Count == 0)
+            {
+                Dialogs.Show(this, report, title, MessageBoxButton.OK, plans.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                return;
+            }
+
+            if (Dialogs.Show(this,
+                    report + "\n\n" +
+                    $"Restore {WriteReview.Plural(ready.Count, "roof")}? UCV backs up each config beside its IAM, YCShell rebuilds the " +
+                    "foam from the roof's channels and writes the config, and UCV saves the roof IAM only. Parts are not changed.",
+                    title, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var trace = new List<string>();
+            _ycShell = YcShellBridge.Connect(_inventorApp, trace, out string problem, out IReadOnlyList<MemberCheck> checks);
+            if (_ycShell is not null && _ycShell.RestoreProblem.Length > 0)
+            {
+                problem = _ycShell.RestoreProblem;
+                checks = _ycShell.RestoreChecks;
+            }
+
+            if (_ycShell is null || problem.Length > 0)
+            {
+                DebugLogger.Log($"{title}: " + problem + Environment.NewLine + string.Join(Environment.NewLine, trace.Concat(checks.Select(c => c.ToString()))));
+                Dialogs.Show(this, $"{problem}\n\n{title} needs the JCI MOM (YCShell) add-in loaded and logged in. Nothing was changed. Details are in the UCV debug log.",
+                    title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var results = new List<string>();
+            var failed = new List<string>();
+            ShowBusy("Restoring roof segments…");
+            try
+            {
+                for (int i = 0; i < ready.Count; i++)
+                {
+                    RoofRestorePlan plan = ready[i];
+                    string name = Path.GetFileNameWithoutExtension(plan.IamPath);
+                    UpdateBusy(name, (double)i / ready.Count);
+                    (string line, bool roofFailed) = RestoreRoof(_ycShell, plan, configs.First(c => string.Equals(c.IamPath, plan.IamPath, StringComparison.OrdinalIgnoreCase)).Json);
+                    results.Add($"{name}: {line}");
+                    if (roofFailed) failed.Add(name);
+                }
+
+                ReScanAndRefresh();
+            }
+            finally
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+
+            string result = (failed.Count > 0
+                                ? $"RESTORE FAILED on {string.Join(", ", failed)}. Read its line below before saving anything." +
+                                  Environment.NewLine + Environment.NewLine
+                                : string.Empty) +
+                            string.Join(Environment.NewLine, results) + Environment.NewLine + Environment.NewLine +
+                            "Next: reopen the verifier on this unit so these roofs' expected materials come from the restored " +
+                            "segments, write any parts it flags, then Upload changed. Generate Paperwork in YCShell shows the " +
+                            "corrected paperwork now.";
+            DebugLogger.Log($"{title} result:" + Environment.NewLine + result);
+            Dialogs.Show(this, result, title, MessageBoxButton.OK, failed.Count > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+
+        /// <summary>Backs up, restores through YCShell and saves one roof. Returns a one-line outcome and whether it failed.</summary>
+        private (string Line, bool Failed) RestoreRoof(YcShellBridge bridge, RoofRestorePlan plan, string originalJson)
+        {
+            YcSurface? surface = bridge.GetOpenSurfaces().FirstOrDefault(s => s.IsLoaded && s.IsComposite != true && s.Matches(plan.IamPath));
+            if (surface is null || OpenAssembly(plan.IamPath) is not Inventor.AssemblyDocument doc)
+                return ("not restored: YCShell has not loaded this surface. Nothing was changed.", true);
+
+            string? backup = null;
+            try
+            {
+                backup = ConfigBackup.Save(plan.IamPath, originalJson, DateTime.Now);
+                bridge.RestoreConfiguration(surface, plan.RestoredJson);
+                doc.Save2(SaveDependents: false);
+
+                ConfigData? written = Extraction.ConfigJsonExtractor.Parse(Extraction.ConfigJsonExtractor.ReadJson(doc), plan.IamPath);
+                List<string> missing = plan.Add.Select(a => a.Id)
+                    .Where(id => written?.SurfaceSegmentList.Any(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase)) != true)
+                    .ToList();
+                if (missing.Count > 0) return ($"saved, but the config does not show the restored segment. The old config is in {backup}", true);
+
+                var changes = new List<string>();
+                if (plan.Add.Count > 0) changes.Add($"restored {string.Join(", ", plan.Add.Select(a => a.Type))}");
+                if (plan.Remove.Count > 0) changes.Add($"removed {string.Join(", ", plan.Remove.Select(r => r.Type))}");
+                if (plan.NominalTo is double to) changes.Add($"nominal thickness {plan.NominalFrom:0.###}\" → {to:0.###}\"");
+                string insulation = string.Join(", ", (written?.InsulationList ?? new List<InsulationEntry>())
+                    .GroupBy(i => i.InsulationType ?? "?").Select(g => $"{g.Count()} {g.Key}"));
+                return ($"{string.Join(", ", changes)}; insulation: {(insulation.Length > 0 ? insulation : "none")}. Backup: {Path.GetFileName(backup)}", false);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, $"RestoreRoof: {plan.IamPath}");
+                // Past the backup, YCShell may have changed the roof in memory before the failure.
+                return backup is null
+                    ? ($"failed before any change: {ex.Message}", true)
+                    : ($"failed part way: {ex.Message}. The roof may be changed in Inventor but not saved. Do not save it: " +
+                       "close the unit without saving and reopen it.", true);
+            }
+        }
+
+        /// <summary>
         /// Points surface rows, saved expectations and channel records at surfaces MOM renamed on upload (the old IAM is
         /// gone; the unit now references a new IAM in the same folder). Returns old path to new.
         /// </summary>

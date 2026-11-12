@@ -39,15 +39,104 @@ namespace UnitConstructionVerifier.Operations
             public MethodInfo HasHoles = null!;
         }
 
+        /// <summary>
+        /// What Restore roof segments needs (docs/decisions/0005): the steps YCShell's Upload runs to rebuild a
+        /// surface's insulation. Resolved apart from <see cref="Members"/> so Regenerate and Upload never depend on them.
+        /// </summary>
+        private sealed class RestoreMembers
+        {
+            public MethodInfo ParseConfiguration = null!;   // SerializationExtensions.ToISGConfiguration(string)
+            public MethodInfo CreateGenerator = null!;      // CUtility.CreateISGGenerator(CAssemblyDocument, CConfiguration, CEngineeringRules)
+            public FieldInfo EngineeringRules = null!;      // CGlobals.ENGINEERING_RULES (CEngineeringRulesWrapper)
+            public PropertyInfo RulesData = null!;          // CEngineeringRulesWrapper.Data
+            public MethodInfo GenerateInsulation = null!;   // CGenerator.GenerateInsulation()
+            public MethodInfo EmbedJson = null!;            // CGenerator.EmbedJSONInAssembly()
+        }
+
+        private readonly RestoreMembers? _restore;
+
         private YcShellBridge(object server, Members members, IReadOnlyList<MemberCheck> checks)
         {
             _server = server;
             _m = members;
             Checks = checks;
+
+            var restoreChecks = new List<MemberCheck>();
+            _restore = ResolveRestore(server.GetType().Assembly, restoreChecks);
+            RestoreChecks = restoreChecks;
         }
 
         /// <summary>One line per YCShell member UCV relies on, for the spike report.</summary>
         public IReadOnlyList<MemberCheck> Checks { get; }
+
+        /// <summary>One line per YCShell member Restore roof segments relies on.</summary>
+        public IReadOnlyList<MemberCheck> RestoreChecks { get; }
+
+        /// <summary>Empty when this YCShell can rebuild a restored roof; otherwise the first missing member.</summary>
+        public string RestoreProblem =>
+            _restore is not null ? string.Empty
+                : $"YCShell version not supported for Restore roof segments: {RestoreChecks.FirstOrDefault(c => !c.Found)?.Name ?? "member missing"}";
+
+        /// <summary>
+        /// Gives YCShell a surface's restored configuration and rebuilds its insulation, as YCShell's Upload does:
+        /// parse the JSON with YCShell's own model, create the surface's generator, GenerateInsulation (from the
+        /// surface's channels and the segments' insulation types), then EmbedJSONInAssembly, which writes the config
+        /// (JSON and its XML copy) and engineering JSON to the surface in YCShell's format. Does not save.
+        /// </summary>
+        public void RestoreConfiguration(YcSurface surface, string configJson)
+        {
+            RestoreMembers m = _restore ?? throw new InvalidOperationException(RestoreProblem);
+            object document = surface.Handle.GetType().GetProperty("AssemblyDocument")?.GetValue(surface.Handle)
+                              ?? throw new InvalidOperationException($"YCShell has not loaded {surface.FullFileName}.");
+            object config = Invoke(() => m.ParseConfiguration.Invoke(null, new object[] { configJson }))
+                            ?? throw new InvalidOperationException("YCShell could not read the restored configuration.");
+            object rules = (m.EngineeringRules.GetValue(null) is object wrapper ? m.RulesData.GetValue(wrapper) : null)
+                           ?? throw new InvalidOperationException("YCShell has no engineering rules loaded. Log in to MOM in YCShell first.");
+            object generator = Invoke(() => m.CreateGenerator.Invoke(null, new[] { document, config, rules }))
+                               ?? throw new InvalidOperationException("YCShell has no generator for this surface.");
+
+            Invoke(() => m.GenerateInsulation.Invoke(generator, null));
+            Invoke(() => m.EmbedJson.Invoke(generator, null));
+        }
+
+        private static RestoreMembers? ResolveRestore(Assembly asm, List<MemberCheck> list)
+        {
+            const BindingFlags Static = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+            const BindingFlags Instance = BindingFlags.Public | BindingFlags.Instance;
+
+            Type? utility = CheckType(list, asm, $"{Ns}.CUtility");
+            Type? globals = CheckType(list, asm, $"{Ns}.CGlobals");
+
+            MethodInfo? create = utility?.GetMethods(Static).FirstOrDefault(x => x.Name == "CreateISGGenerator" && x.GetParameters().Length == 3);
+            list.Add(new MemberCheck("CUtility.CreateISGGenerator", create is not null, create is null ? "not found" : Describe(create)));
+
+            FieldInfo? rulesField = globals?.GetField("ENGINEERING_RULES", Static);
+            list.Add(new MemberCheck("CGlobals.ENGINEERING_RULES", rulesField is not null, rulesField?.FieldType.Name ?? "not found"));
+            PropertyInfo? rulesData = rulesField?.FieldType.GetProperty("Data", Instance);
+            list.Add(new MemberCheck("CEngineeringRulesWrapper.Data", rulesData is not null, rulesData?.PropertyType.Name ?? "not found"));
+
+            ParameterInfo[] parameters = create?.GetParameters() ?? Array.Empty<ParameterInfo>();
+            MethodInfo? parse = parameters.Length == 3
+                ? parameters[1].ParameterType.Assembly.GetType("JCI.DataModel.ISG.Models.Extensions.SerializationExtensions")
+                    ?.GetMethod("ToISGConfiguration", Static, null, new[] { typeof(string) }, null)
+                : null;
+            list.Add(new MemberCheck("SerializationExtensions.ToISGConfiguration", parse is not null && parameters[1].ParameterType.IsAssignableFrom(parse.ReturnType),
+                parse is null ? "not found" : Describe(parse)));
+            if (rulesData is not null && parameters.Length == 3 && !parameters[2].ParameterType.IsAssignableFrom(rulesData.PropertyType))
+                list.Add(new MemberCheck("engineering rules type", false, $"{rulesData.PropertyType.Name} is not {parameters[2].ParameterType.Name}"));
+
+            MethodInfo? generate = create?.ReturnType.GetMethod("GenerateInsulation", Instance, null, Type.EmptyTypes, null);
+            list.Add(new MemberCheck("CGenerator.GenerateInsulation", generate is not null, generate is null ? "not found" : Describe(generate)));
+            MethodInfo? embed = create?.ReturnType.GetMethod("EmbedJSONInAssembly", Instance, null, Type.EmptyTypes, null);
+            list.Add(new MemberCheck("CGenerator.EmbedJSONInAssembly", embed is not null, embed is null ? "not found" : Describe(embed)));
+
+            if (list.Any(c => !c.Found)) return null;
+            return new RestoreMembers
+            {
+                ParseConfiguration = parse!, CreateGenerator = create!, EngineeringRules = rulesField!, RulesData = rulesData!,
+                GenerateInsulation = generate!, EmbedJson = embed!,
+            };
+        }
 
         public string Version => _server.GetType().Assembly.GetName().Version?.ToString() ?? "unknown";
 

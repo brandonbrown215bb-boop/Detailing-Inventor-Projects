@@ -16,6 +16,51 @@ namespace UnitConstructionVerifier.Tests
             UploadForm.LastStart = null;
             UploadForm.InUploadDuringStart = false;
             UploadForm.ThrowOnStart = false;
+            InventorAddIn_MOM_YCShell.CGlobals.ENGINEERING_RULES = new ISG_Common_Generator.CEngineeringRulesWrapper();
+            ISG_Common_Generator.CGenerator.Last = null;
+        }
+
+        [Test]
+        public void Restore_Rebuilds_Insulation_Then_Lets_YCShell_Write_The_Config()
+        {
+            var server = new InventorAddIn_MOM_YCShell.StandardAddInServer();
+            server.Add(@"C:\Unit\0050\0050.IAM", isLoaded: true, isComposite: false);
+            YcShellBridge bridge = YcShellBridge.FromServer(server, out _, out _)!;
+            YcSurface surface = bridge.GetOpenSurfaces().Single();
+
+            bridge.RestoreConfiguration(surface, "{\"configuration\":{}}");
+
+            Assert.IsEmpty(bridge.RestoreProblem);
+            Assert.That(bridge.RestoreChecks.Where(c => !c.Found), Is.Empty);
+            ISG_Common_Generator.CGenerator generator = ISG_Common_Generator.CGenerator.Last!;
+            Assert.AreSame(((InventorAddIn_MOM_YCShell.Types.CAssembly)surface.Handle).AssemblyDocument, generator.Document);
+            Assert.AreEqual("{\"configuration\":{}}", generator.Configuration.Json, "parsed by YCShell's own model");
+            Assert.AreSame(InventorAddIn_MOM_YCShell.CGlobals.ENGINEERING_RULES!.Data, generator.Rules);
+            CollectionAssert.AreEqual(new[] { "GenerateInsulation", "EmbedJSONInAssembly" }, generator.Calls);
+        }
+
+        [Test]
+        public void Restore_Refuses_When_YCShell_Has_No_Engineering_Rules()
+        {
+            InventorAddIn_MOM_YCShell.CGlobals.ENGINEERING_RULES = null;
+            var server = new InventorAddIn_MOM_YCShell.StandardAddInServer();
+            server.Add(@"C:\Unit\0050\0050.IAM", isLoaded: true, isComposite: false);
+            YcShellBridge bridge = YcShellBridge.FromServer(server, out _, out _)!;
+
+            var ex = Assert.Throws<InvalidOperationException>(() => bridge.RestoreConfiguration(bridge.GetOpenSurfaces().Single(), "{}"));
+            StringAssert.Contains("Log in to MOM", ex!.Message);
+            Assert.IsNull(ISG_Common_Generator.CGenerator.Last);
+        }
+
+        [Test]
+        public void Restore_Refuses_A_Surface_YCShell_Has_Not_Loaded()
+        {
+            var server = new InventorAddIn_MOM_YCShell.StandardAddInServer();
+            server.Add(@"C:\Unit\0050\0050.IAM", isLoaded: false, isComposite: false);
+            YcShellBridge bridge = YcShellBridge.FromServer(server, out _, out _)!;
+
+            var ex = Assert.Throws<InvalidOperationException>(() => bridge.RestoreConfiguration(bridge.GetOpenSurfaces().Single(), "{}"));
+            StringAssert.Contains("has not loaded", ex!.Message);
         }
 
         [Test]
@@ -152,6 +197,15 @@ namespace InventorAddIn_MOM_YCShell
     public static class CUtility
     {
         public delegate void DelegateSetStatus(string msg);
+
+        internal static ISG_Common_Generator.CGenerator CreateISGGenerator(Types.FakeAssemblyDocument document,
+            JCI.DataModel.ISG.Models.Configuration.CConfiguration configuration, JCI.DataModel.ISG.Models.EngineeringRules.CEngineeringRules rules) =>
+            ISG_Common_Generator.CGenerator.Last = new ISG_Common_Generator.CGenerator(document, configuration, rules);
+    }
+
+    public static class CGlobals
+    {
+        internal static ISG_Common_Generator.CEngineeringRulesWrapper? ENGINEERING_RULES;
     }
 
     public class StandardAddInServer
@@ -251,6 +305,55 @@ namespace InventorAddIn_MOM_YCShell.Types
     public class FakeAssemblyDocument
     {
         public bool IsCompositeAssembly { get; set; }
+    }
+}
+
+namespace ISG_Common_Generator
+{
+    public class CEngineeringRulesWrapper
+    {
+        public JCI.DataModel.ISG.Models.EngineeringRules.CEngineeringRules Data { get; } = new JCI.DataModel.ISG.Models.EngineeringRules.CEngineeringRules();
+    }
+
+    public class CGenerator
+    {
+        public static CGenerator? Last;
+
+        public CGenerator(object document, JCI.DataModel.ISG.Models.Configuration.CConfiguration configuration, object rules)
+        {
+            Document = document;
+            Configuration = configuration;
+            Rules = rules;
+        }
+
+        public object Document { get; }
+        public JCI.DataModel.ISG.Models.Configuration.CConfiguration Configuration { get; }
+        public object Rules { get; }
+        public List<string> Calls { get; } = new List<string>();
+
+        public void GenerateInsulation() => Calls.Add(nameof(GenerateInsulation));
+        public void EmbedJSONInAssembly() => Calls.Add(nameof(EmbedJSONInAssembly));
+    }
+}
+
+namespace JCI.DataModel.ISG.Models.Configuration
+{
+    public class CConfiguration
+    {
+        public string Json { get; set; } = string.Empty;
+    }
+}
+
+namespace JCI.DataModel.ISG.Models.EngineeringRules
+{
+    public class CEngineeringRules { }
+}
+
+namespace JCI.DataModel.ISG.Models.Extensions
+{
+    public static class SerializationExtensions
+    {
+        public static Configuration.CConfiguration ToISGConfiguration(this string json) => new Configuration.CConfiguration { Json = json };
     }
 }
 #pragma warning restore CS0169, CS0414, CS0649, IDE0051, IDE0044

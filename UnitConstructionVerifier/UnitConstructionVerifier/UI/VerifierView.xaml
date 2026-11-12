@@ -553,6 +553,7 @@
         </ContextMenu>
         <ContextMenu x:Key="OverflowMenu">
             <MenuItem Header="Check paperwork (IDW BOMs)…" Click="OnCheckPaperwork"/>
+            <MenuItem Header="Restore roof segments…" Click="OnRestoreRoofSegments"/>
             <MenuItem Header="Surface number history…" Click="OnShowSurfaceHistory"/>
             <MenuItem Header="Save snapshot for regression tests…" Click="OnSaveSnapshot"/>
         </ContextMenu>
