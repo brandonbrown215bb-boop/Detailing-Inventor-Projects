@@ -67,7 +67,7 @@ namespace QuestBoard.UI.Views
                 }
             }
 
-            return @"c:\Users\jbrow263\OneDrive - Johnson Controls\Documents\Inventor Projects";
+            return @"C:\dev\Inventor Projects";
         }
 
         private void LoadBackgroundImage(string repoRoot)
