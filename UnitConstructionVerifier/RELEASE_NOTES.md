@@ -2,6 +2,28 @@
 
 Root `UnitConstructionVerifier/` is the release line. Roadmap: `Docs/project_review.md` section 0.
 
+## v1.0.41.0 (2026-11-18) — hard-edited parts turn pink
+
+- **Edited parts now turn Pink instead of Yellow** (`EditedAppearance` in `materials_config.json`). Yellow
+  (221,221,13) was almost the same as Canary (226,220,42), which marks malformed channels. Pink (255,128,191) is the
+  most distinct library appearance that no YCShell part type uses; Magenta was ruled out because it marks reconnect
+  channels.
+- **Fixed: editing the same part a second time left its color alone.** A library appearance copied into a part keeps
+  an internal name (`1:Yellow`), so UCV never found it there, tried to copy it again, and Inventor refused. UCV now
+  also matches the display name.
+- **Placements turn Pink too.** YCShell colors each placement by part type in the surface's Default design view
+  (subfloors Foil Gold, and so on). That hid the part's color on screen and in the PDW that Upload sends, which reads
+  faces in the Default view. UCV now also colors the written parts' placements in every unlocked design view of the
+  assembly that holds them and puts back the view that was active. Checked on a copy of surface 0091 from the
+  spike-copy test unit: the SQ subfloor reads Pink in Default after save and reopen, YCShell's
+  `HAS_TRANSFORMED_COMPONENTS` / `HAS_DELETED_COMPONENTS` stay 0, and Upload's part swap (`Replace`) keeps the Pink.
+- **The surface is left unsaved; save the unit to keep the color.** Inventor marks a surface unsaved as soon as its
+  parts are newer than it, so UCV cannot tell a detailer's own unsaved work apart and does not save for them.
+  YCShell's Upload saves every unsaved surface it sends before building the PDW.
+- A read-only surface, or a placement Inventor refuses, is listed in a warning; the part write still counts.
+- Parts already yellow stay yellow until they are edited again. Regenerate and YCShell's part-type change set the
+  type's color again.
+
 ## v1.0.40.0 (2026-11-12) — restore warns when a roof fails
 
 - **⋯ > Restore roof segments…** now shows its result as a warning, starting with **RESTORE FAILED** and the roof

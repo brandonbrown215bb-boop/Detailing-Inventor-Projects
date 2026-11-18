@@ -175,7 +175,7 @@ namespace UnitConstructionVerifier.Tests
         public void TestEditedAppearance_LoadedFromConfig()
         {
             Assert.IsFalse(string.IsNullOrWhiteSpace(MaterialsConfig.EditedAppearance));
-            Assert.AreEqual("Yellow", MaterialsConfig.EditedAppearance);
+            Assert.AreEqual("Pink", MaterialsConfig.EditedAppearance);
         }
     }
 }

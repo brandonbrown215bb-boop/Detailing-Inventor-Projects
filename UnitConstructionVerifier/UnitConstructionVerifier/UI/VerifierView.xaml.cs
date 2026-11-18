@@ -1227,6 +1227,7 @@ namespace UnitConstructionVerifier.UI
             int successCount = 0;
             var errorList = new List<string>();
             var partWrites = new List<PartWriteRecord>();
+            var writtenFiles = new List<string>();
 
             int fileNumber = 0;
             ShowBusy("Writing part changes…");
@@ -1245,6 +1246,7 @@ namespace UnitConstructionVerifier.UI
                     if (writer.UpdatePartProperties(filePath, edits, out string err))
                     {
                         successCount++;
+                        writtenFiles.Add(filePath);
                         if (writer.LastWrite is PartWriteRecord write) partWrites.Add(write);
                     }
                     else
@@ -1281,6 +1283,8 @@ namespace UnitConstructionVerifier.UI
                     try { PartWriteStore.Record(_iamPath, partWrites); }
                     catch (Exception ex) { DebugLogger.Log(ex, "VerifierView: recording part writes"); }
 
+                    string colorNote = ColorWrittenPlacements(writtenFiles);
+
                     foreach (WriteReviewItem item in included)
                     {
                         _pendingEdits.Remove(item.Edit.Key);
@@ -1291,7 +1295,7 @@ namespace UnitConstructionVerifier.UI
                         : $" {WriteReview.Plural(_pendingEdits.Count, "change")} still staged.";
                     UpdateBusy($"Re-checking {Path.GetFileName(_iamPath)}…", 1);
                     ReScanAndRefresh();
-                    ShowNotice($"Updated {WriteReview.Plural(successCount, "part file")}. Re-checked the unit.{stillStaged}");
+                    ShowNotice($"Updated {WriteReview.Plural(successCount, "part file")}.{colorNote} Re-checked the unit.{stillStaged}");
                 }
             }
             catch (Exception ex)
@@ -1305,6 +1309,40 @@ namespace UnitConstructionVerifier.UI
             finally
             {
                 BusyOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Colors the written parts' placements in their surface assemblies (see PlacementAppearanceWriter).
+        /// The parts are already saved, so a problem here is a warning, not a failed write. Returns the notice text.
+        /// </summary>
+        private string ColorWrittenPlacements(List<string> writtenFiles)
+        {
+            if (writtenFiles.Count == 0 || FindUnitDocument() is not Inventor.AssemblyDocument unit)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                UpdateBusy("Coloring the parts' placements…", 1);
+                string appearance = MaterialsConfig.EditedAppearance;
+                Operations.PlacementColorResult colors =
+                    new Operations.PlacementAppearanceWriter(_inventorApp).ColorPlacements(unit, writtenFiles, appearance);
+
+                if (colors.Problems.Count > 0)
+                {
+                    Dialogs.Show(this,
+                        "The parts were written, but some placements were not colored:\n - " + string.Join("\n - ", colors.Problems),
+                        "Placement Colors", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                return colors.Summary(appearance);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log(ex, "VerifierView: coloring placements");
+                return " Placements were not colored (see the debug log).";
             }
         }
 

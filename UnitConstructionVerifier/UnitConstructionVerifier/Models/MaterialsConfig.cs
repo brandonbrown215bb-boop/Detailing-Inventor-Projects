@@ -8,7 +8,8 @@ namespace UnitConstructionVerifier.Models
 {
     public static class MaterialsConfig
     {
-        public static string EditedAppearance { get; set; } = "Yellow";
+        // Pink: no YCShell part type uses it; Yellow is too close to Canary (malformed channels).
+        public static string EditedAppearance { get; set; } = "Pink";
         public static List<string> Gauges { get; } = new List<string>();
         public static List<string> Materials { get; } = new List<string>();
         public static Dictionary<string, string> MaterialMappings { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -46,7 +47,7 @@ namespace UnitConstructionVerifier.Models
 
         private static void ResetToDefaults()
         {
-            EditedAppearance = "Yellow";
+            EditedAppearance = "Pink";
             Gauges.Clear();
             Gauges.AddRange(DefaultGauges);
 

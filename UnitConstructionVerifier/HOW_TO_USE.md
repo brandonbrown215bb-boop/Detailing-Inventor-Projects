@@ -169,7 +169,15 @@ When editing part properties from the verifier:
   `Thickness * 2 ul`, and one-sided cuts and holes to `Thickness`. Cuts that never went all the way through are left
   alone. Writing a part also repairs cuts an earlier version left halfway (see release notes v1.0.33, v1.0.35).
 - Edited values go to the user-defined iProperties (`Thickness`, `YCMATL`, `INPUT_PARAMETER_*`) **and** the `MOM_DATA` attribute set (`ORIGINAL_SHEET_METAL_THICKNESS`, `MATERIAL_TYPE_CODE`). `MOM_DATA` is read first when present.
-- Every edited part is stamped `IS_HARD_EDITED = TRUE`, `MOM_DATA.PART_SOURCE = SQPart`, `MOM_DATA.DOCUMENT_STATUS = Changed_SQ`, and gets the `EditedAppearance` color from `materials_config.json` (default **Yellow**).
+- Every edited part is stamped `IS_HARD_EDITED = TRUE`, `MOM_DATA.PART_SOURCE = SQPart`, `MOM_DATA.DOCUMENT_STATUS = Changed_SQ`, and gets the `EditedAppearance` color from `materials_config.json` (default **Pink**).
+  Pink is used because no YCShell part type uses it; Yellow looked like Canary, which marks malformed channels.
+- UCV also colors the part's **placements** Pink in the assembly that holds them (the surface IAM), in every unlocked
+  design view. YCShell colors placements by part type in the surface's **Default** view, and that color, not the
+  part's, is what you see and what goes into the PDW at Upload.
+  - The surface is left **unsaved**: save the unit to keep the color. YCShell's Upload saves every unsaved surface it
+    sends before it builds the PDW, and keeps the Pink when it swaps in its renamed copy of the part.
+  - A read-only surface, or a placement Inventor refuses, is listed in a warning; the parts are still written.
+  - YCShell's Regenerate, or changing the part type in YCShell, sets the type's color again.
 - Write-back was signed off on SW0004 on 2026-10-27 (v1.0.33): 23 parts written and uploaded through YCShell, with
   MOM working out the DXF code itself. UCV leaves the part's stored `MOM_DATA.DXF_CODE` at its old gauge; MOM does
   not use it.

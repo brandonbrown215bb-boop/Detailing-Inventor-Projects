@@ -345,45 +345,7 @@ namespace UnitConstructionVerifier.Operations
                 string appearanceName = MaterialsConfig.EditedAppearance;
                 if (string.IsNullOrWhiteSpace(appearanceName)) return false;
 
-                Asset? targetAppearance = null;
-
-                // 1. Check local document appearances
-                foreach (Asset appAsset in doc.AppearanceAssets)
-                {
-                    if (string.Equals(appAsset.Name, appearanceName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetAppearance = appAsset;
-                        break;
-                    }
-                }
-
-                // 2. Check ActiveAppearanceLibrary in Inventor Application if missing locally
-                if (targetAppearance == null && _app != null)
-                {
-                    try
-                    {
-                        Asset libAppearance = _app.ActiveAppearanceLibrary.AppearanceAssets[appearanceName];
-                        if (libAppearance != null)
-                        {
-                            targetAppearance = libAppearance.CopyTo(doc);
-                        }
-                    }
-                    catch { }
-                }
-
-                // 3. Fall back to ActiveMaterialLibrary if needed
-                if (targetAppearance == null && _app != null)
-                {
-                    try
-                    {
-                        Asset libAppearance = _app.ActiveMaterialLibrary.AppearanceAssets[appearanceName];
-                        if (libAppearance != null)
-                        {
-                            targetAppearance = libAppearance.CopyTo(doc);
-                        }
-                    }
-                    catch { }
-                }
+                Asset? targetAppearance = AppearanceLookup.FindOrCopy(_app, doc.AppearanceAssets, doc, appearanceName);
 
                 if (targetAppearance != null)
                 {
